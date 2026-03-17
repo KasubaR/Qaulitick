@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact Submissions | Admin Panel</title>
+    
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
+    <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
+    
+    <!-- Professional Admin Styles -->
+    <link rel="stylesheet" href="/css/admin/admin-professional.css">
+    <link rel="stylesheet" href="/css/admin/admin-components.css">
+    <link rel="stylesheet" href="/css/admin/admin-responsive.css">
+    <!-- Admin Dashboard Stylesheet -->
+    <link rel="stylesheet" href="/css/admin/dashboard.css">
+    <!-- Admin Orders Stylesheet (reuse for similar table structure) -->
+    <link rel="stylesheet" href="/css/admin/orders.css">
+</head>
+<body class="admin-page">
+    <!-- ADMIN CONTACT SUBMISSIONS PAGE -->
+    <div class="admin-container">
+        <!-- Sidebar Navigation -->
+        <%- include('../partials/admin-sidebar', { activePage: 'contact-submissions' }) %>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <!-- Header -->
+            <header class="admin-header">
+                <div class="header-left">
+                    <button class="sidebar-toggle" id="sidebarToggle">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 class="page-title">Contact Submissions</h1>
+                </div>
+                
+                <div class="header-right">
+                    <button class="btn-outline" id="refreshBtn">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </header>
+
+            <!-- Submissions Content -->
+            <div class="orders-content">
+                <!-- Search and Filters -->
+                <div class="orders-toolbar">
+                    <div class="search-section">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="submissionSearch" placeholder="Search by name, email, or message...">
+                            <button class="search-btn" id="searchBtn">Search</button>
+                        </div>
+                    </div>
+
+                    <div class="filters-section">
+                        <div class="filter-group">
+                            <label>Status</label>
+                            <select id="filterStatus" class="filter-select">
+                                <option value="">All Status</option>
+                                <option value="new">New</option>
+                                <option value="replied">Replied</option>
+                                <option value="archived">Archived</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label>Subject</label>
+                            <select id="filterSubject" class="filter-select">
+                                <option value="">All Subjects</option>
+                                <option value="product-inquiry">Product Inquiry</option>
+                                <option value="order-support">Order Support</option>
+                                <option value="shipping">Shipping & Delivery</option>
+                                <option value="returns">Returns & Exchanges</option>
+                                <option value="business">Business Partnership</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label>Date Range</label>
+                            <div class="date-range">
+                                <input type="date" id="startDate" class="date-input">
+                                <span>to</span>
+                                <input type="date" id="endDate" class="date-input">
+                            </div>
+                        </div>
+
+                        <button class="btn-outline" id="clearFiltersBtn">
+                            <i class="fas fa-times"></i> Clear Filters
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Submissions Table -->
+                <div class="table-card">
+                    <div class="table-header">
+                        <div class="table-info">
+                            <span id="submissionsCount">0</span> submissions found
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="admin-table" id="submissionsTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>Subject</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="submissionsBody">
+                                <tr>
+                                    <td colspan="7" class="empty-state">Loading submissions...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div class="pagination" id="pagination" style="display: none;">
+                        <button class="pagination-btn" id="prevPage" disabled>
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </button>
+                        <div class="pagination-info">
+                            <span id="pageInfo">Page 1 of 1</span>
+                        </div>
+                        <button class="pagination-btn" id="nextPage" disabled>
+                            Next <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Submission Details Modal -->
+    <div class="modal" id="submissionModal" style="display: none;">
+        <div class="modal-content" style="max-width: 700px;">
+            <button class="modal-close" id="closeModal">&times;</button>
+            <h2 id="modalTitle">Submission Details</h2>
+            <div id="modalBody">
+                <!-- Details will be populated by JavaScript -->
+            </div>
+            <div class="modal-actions">
+                <button class="btn-outline" id="markRepliedBtn">Mark as Replied</button>
+                <button class="btn-outline" id="archiveBtn">Archive</button>
+                <button class="btn-primary" id="closeModalBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal" id="deleteModal" style="display: none;">
+        <div class="modal-content">
+            <button class="modal-close" id="closeDeleteModal">&times;</button>
+            <h3>Delete Submission</h3>
+            <p>Are you sure you want to delete this submission? This action cannot be undone.</p>
+            <div class="modal-actions">
+                <button class="btn-outline" id="cancelDeleteBtn">Cancel</button>
+                <button class="btn-primary" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/js/admin/auth-utils.js"></script>
+    <script src="/js/admin/sidebar.js"></script>
+    <script src="/js/admin/orders-badge.js"></script>
+    <script src="/js/admin/contact-submissions.js"></script>
+</body>
+</html>
+

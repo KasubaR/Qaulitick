@@ -1,0 +1,313 @@
+<%- include('partials/header', {title: 'Order Success | Qualitick Collections', page: 'order-success'}) %>
+
+    <!-- BREADCRUMB -->
+    <div class="breadcrumb">
+        <div class="breadcrumb-container">
+            <a href="/">Home</a>
+            <span class="breadcrumb-separator">›</span>
+            <a href="/shop">Shop</a>
+            <span class="breadcrumb-separator">›</span>
+            <span class="breadcrumb-current">Order Success</span>
+        </div>
+    </div>
+
+    <!-- ORDER SUCCESS PAGE -->
+    <section class="order-success-section">
+        <div class="order-success-container">
+            <div class="success-content">
+                <div class="success-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                
+                <h1 class="success-title">Order Placed Successfully!</h1>
+                
+                <p class="success-message">
+                    Thank you for your purchase! Your order has been confirmed and you will receive an email confirmation shortly.
+                </p>
+
+                <div class="order-details-card">
+                    <div class="order-number">
+                        <span class="label">Order Number:</span>
+                        <span class="value" id="orderNumber"><%= orderNumber %></span>
+                    </div>
+                    
+                    <div class="order-info">
+                        <p><i class="fas fa-envelope"></i> A confirmation email has been sent to your email address.</p>
+                        <p><i class="fas fa-clock"></i> Your order will be processed within 24 hours.</p>
+                        <p><i class="fas fa-truck"></i> You will receive tracking information once your order ships.</p>
+                    </div>
+                </div>
+
+                <div class="success-actions">
+                    <a href="/" class="btn-primary">
+                        <i class="fas fa-home"></i> Continue Shopping
+                    </a>
+                    <a href="/shop" class="btn-outline">
+                        <i class="fas fa-shopping-bag"></i> Browse More Products
+                    </a>
+                    <button class="btn-outline" id="viewOrderBtn" style="display: none;">
+                        <i class="fas fa-receipt"></i> View Order Details
+                    </button>
+                </div>
+
+                <div class="trust-badges-success">
+                    <div class="trust-badge-item">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>Secure Payment</span>
+                    </div>
+                    <div class="trust-badge-item">
+                        <i class="fas fa-truck"></i>
+                        <span>Fast Delivery</span>
+                    </div>
+                    <div class="trust-badge-item">
+                        <i class="fas fa-undo"></i>
+                        <span>30-Day Returns</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <style>
+        .order-success-section {
+            min-height: 80vh;
+            padding: 60px 5%;
+            background: #000;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .order-success-container {
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .success-content {
+            text-align: center;
+            background: #111;
+            border-radius: 15px;
+            padding: 50px 40px;
+            border: 1px solid rgba(255, 238, 193, 0.2);
+        }
+
+        .success-icon {
+            font-size: 100px;
+            color: #28a745;
+            margin-bottom: 30px;
+            animation: scaleIn 0.5s ease-out;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .success-title {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            background: var(--gold-gradient-horizontal);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .success-message {
+            font-size: 18px;
+            color: #aaa;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+
+        .order-details-card {
+            background: rgba(255, 238, 193, 0.05);
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 40px;
+            border: 1px solid rgba(255, 238, 193, 0.1);
+        }
+
+        .order-number {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 25px;
+            padding-bottom: 25px;
+            border-bottom: 2px solid rgba(255, 238, 193, 0.2);
+        }
+
+        .order-number .label {
+            font-size: 18px;
+            color: #aaa;
+        }
+
+        .order-number .value {
+            font-size: 24px;
+            font-weight: 700;
+            background: var(--gold-gradient-horizontal);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .order-info {
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .order-info p {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #aaa;
+            font-size: 14px;
+            margin: 0;
+        }
+
+        .order-info i {
+            color: var(--gold-light);
+            width: 20px;
+        }
+
+        .success-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 40px;
+        }
+
+        .btn-primary {
+            padding: 15px 30px;
+            background: var(--gold-gradient-horizontal);
+            color: #000;
+            border: none;
+            border-radius: 5px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            transition: transform 0.2s;
+            font-size: 16px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-outline {
+            padding: 15px 30px;
+            background: transparent;
+            color: #fff;
+            border: 1px solid rgba(255, 238, 193, 0.3);
+            border-radius: 5px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .btn-outline:hover {
+            background: rgba(255, 238, 193, 0.1);
+            border-color: var(--gold-light);
+        }
+
+        .trust-badges-success {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+            padding-top: 30px;
+            border-top: 1px solid rgba(255, 238, 193, 0.1);
+        }
+
+        .trust-badge-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        .trust-badge-item i {
+            font-size: 32px;
+            color: var(--gold-light);
+        }
+
+        @media (max-width: 768px) {
+            .order-success-section {
+                padding: 40px 3%;
+            }
+
+            .success-content {
+                padding: 30px 20px;
+            }
+
+            .success-icon {
+                font-size: 80px;
+            }
+
+            .success-title {
+                font-size: 28px;
+            }
+
+            .success-message {
+                font-size: 16px;
+            }
+
+            .order-number {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .success-actions {
+                flex-direction: column;
+            }
+
+            .success-actions a,
+            .success-actions button {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .trust-badges-success {
+                flex-direction: column;
+                gap: 20px;
+            }
+        }
+    </style>
+
+    <script>
+        // Store order number for potential future use
+        const orderNumber = '<%= orderNumber %>';
+        console.log('Order placed:', orderNumber);
+        
+        // Clear cart if still exists
+        localStorage.removeItem('cart');
+        
+        // Update cart count
+        if (typeof updateCartCount === 'function') {
+            updateCartCount();
+        }
+    </script>
+
+<%- include('partials/footer') %>
+

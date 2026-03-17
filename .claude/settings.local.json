@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"match\\\\|ObjectId\\\\|$in\\\\|validIds\\\\|invalidIds\" \"d:/Web Projects/qualitick-collections/src/controllers/product.controller.js\")",
+      "Bash(grep -r \"men.*women\\\\|Men.*Women\" 'd:/Web Projects/qualitick-collections/src' --include=*.js)",
+      "Bash(grep -rn \"gender.*ENUM\\\\|validGenders\\\\|validCategories\" 'd:/Web Projects/qualitick-collections/src' --include=*.js)",
+      "Bash(npm list:*)",
+      "Bash(npm install:*)"
+    ]
+  }
+}

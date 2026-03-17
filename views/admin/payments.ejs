@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payments Management | Admin Panel</title>
+    
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
+    <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
+    
+    <!-- Professional Admin Styles -->
+    <link rel="stylesheet" href="/css/admin/admin-professional.css">
+    <link rel="stylesheet" href="/css/admin/admin-components.css">
+    <link rel="stylesheet" href="/css/admin/admin-responsive.css">
+    <!-- Admin Dashboard Stylesheet -->
+    <link rel="stylesheet" href="/css/admin/dashboard.css">
+    <!-- Admin Payments Stylesheet -->
+    <link rel="stylesheet" href="/css/admin/payments.css">
+</head>
+<body class="admin-page">
+    <!-- ADMIN PAYMENTS PAGE -->
+    <div class="admin-container">
+        <!-- Sidebar Navigation -->
+        <%- include('../partials/admin-sidebar', { activePage: 'payments' }) %>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <!-- Header -->
+            <header class="admin-header">
+                <div class="header-left">
+                    <button class="sidebar-toggle" id="sidebarToggle">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 class="page-title">Payments Management</h1>
+                </div>
+                
+                <div class="header-right">
+                    <button class="btn-outline" id="exportPaymentsBtn">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                </div>
+            </header>
+
+            <!-- Payments Content -->
+            <div class="payments-content">
+                <!-- Search and Filters -->
+                <div class="payments-toolbar">
+                    <div class="search-section">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="paymentSearch" placeholder="Search by Order ID, Transaction ID, customer name, or email...">
+                            <button class="search-btn" id="searchBtn">Search</button>
+                        </div>
+                    </div>
+
+                    <div class="filters-section">
+                        <div class="filter-group">
+                            <label>Payment Status</label>
+                            <select id="filterPaymentStatus" class="filter-select">
+                                <option value="">All Status</option>
+                                <option value="pending">Pending</option>
+                                <option value="processing">Processing</option>
+                                <option value="completed">Completed</option>
+                                <option value="failed">Failed</option>
+                                <option value="cancelled">Cancelled</option>
+                                <option value="refunded">Refunded</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label>Payment Method</label>
+                            <select id="filterPaymentMethod" class="filter-select">
+                                <option value="">All Methods</option>
+                                <option value="mobile_money">Mobile Money</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="card">Card</option>
+                                <option value="cash_on_delivery">Cash on Delivery</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label>Provider</label>
+                            <select id="filterProvider" class="filter-select">
+                                <option value="">All Providers</option>
+                                <option value="airtel">Airtel</option>
+                                <option value="mtn">MTN</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label>Date Range</label>
+                            <div class="date-range">
+                                <input type="date" id="startDate" class="date-input">
+                                <span>to</span>
+                                <input type="date" id="endDate" class="date-input">
+                            </div>
+                        </div>
+
+                        <div class="filter-group">
+                            <label>Sort By</label>
+                            <select id="sortBy" class="filter-select">
+                                <option value="newest">Newest First</option>
+                                <option value="oldest">Oldest First</option>
+                                <option value="highest">Highest Amount</option>
+                                <option value="lowest">Lowest Amount</option>
+                            </select>
+                        </div>
+
+                        <button class="btn-outline" id="clearFiltersBtn">
+                            <i class="fas fa-times"></i> Clear Filters
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Payments Table -->
+                <div class="table-card">
+                    <div class="table-header">
+                        <div class="table-info">
+                            <span id="paymentsCount">0</span> payments found
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="admin-table" id="paymentsTable">
+                            <thead>
+                                <tr>
+                                    <th width="120">Order Number</th>
+                                    <th>Customer</th>
+                                    <th width="120">Date</th>
+                                    <th width="120">Payment Method</th>
+                                    <th width="120">Provider</th>
+                                    <th width="120">Amount</th>
+                                    <th width="120">Status</th>
+                                    <th width="150">Transaction ID</th>
+                                    <th width="250">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="paymentsTableBody">
+                                <tr>
+                                    <td colspan="9" class="empty-state">
+                                        <i class="fas fa-credit-card"></i>
+                                        <p>No payments found</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div class="pagination" id="pagination">
+                        <button class="page-btn" id="prevPage" disabled>
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </button>
+                        <div class="page-numbers" id="pageNumbers">
+                            <span class="page-number active">1</span>
+                        </div>
+                        <button class="page-btn" id="nextPage">
+                            Next <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Payment Details Modal -->
+    <div class="modal" id="paymentDetailsModal" style="display: none;">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2>Payment Details - <span id="paymentDetailsId"></span></h2>
+                <button class="modal-close" id="closePaymentModal">&times;</button>
+            </div>
+
+            <div class="payment-details-content">
+                <!-- Tabs -->
+                <div class="form-tabs">
+                    <button type="button" class="tab-btn active" data-tab="overview">
+                        <i class="fas fa-info-circle"></i> Overview
+                    </button>
+                    <button type="button" class="tab-btn" data-tab="transaction">
+                        <i class="fas fa-exchange-alt"></i> Transaction Details
+                    </button>
+                    <button type="button" class="tab-btn" data-tab="webhook">
+                        <i class="fas fa-code"></i> Webhook Data
+                    </button>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="tab-content">
+                    <!-- Overview Tab -->
+                    <div class="tab-pane active" id="overviewTab">
+                        <div class="details-grid">
+                            <div class="details-section">
+                                <h3>Customer Information</h3>
+                                <div class="info-group">
+                                    <div class="info-item">
+                                        <span class="info-label">Name:</span>
+                                        <span class="info-value" id="customerName">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Email:</span>
+                                        <span class="info-value" id="customerEmail">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Phone:</span>
+                                        <span class="info-value" id="customerPhone">-</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="details-section">
+                                <h3>Payment Information</h3>
+                                <div class="info-group">
+                                    <div class="info-item">
+                                        <span class="info-label">Order Number:</span>
+                                        <span class="info-value" id="orderNumber">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Payment Method:</span>
+                                        <span class="info-value" id="paymentMethod">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Provider:</span>
+                                        <span class="info-value" id="provider">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Status:</span>
+                                        <span class="info-value" id="paymentStatus">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Amount:</span>
+                                        <span class="info-value" id="paymentAmount">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Currency:</span>
+                                        <span class="info-value" id="currency">-</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="details-section">
+                                <h3>Transaction Information</h3>
+                                <div class="info-group">
+                                    <div class="info-item">
+                                        <span class="info-label">Transaction ID:</span>
+                                        <span class="info-value" id="transactionId">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Lenco Transaction ID:</span>
+                                        <span class="info-value" id="lencoTransactionId">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Lenco Reference:</span>
+                                        <span class="info-value" id="lencoReference">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Lenco Status:</span>
+                                        <span class="info-value" id="lencoStatus">-</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="details-section">
+                                <h3>Timeline</h3>
+                                <div class="info-group">
+                                    <div class="info-item">
+                                        <span class="info-label">Created:</span>
+                                        <span class="info-value" id="createdAt">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Completed:</span>
+                                        <span class="info-value" id="completedAt">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Failed:</span>
+                                        <span class="info-value" id="failedAt">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Expires:</span>
+                                        <span class="info-value" id="expiresAt">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Failure Reason:</span>
+                                        <span class="info-value" id="failureReason">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Payment Actions -->
+                        <div class="payment-actions">
+                            <h3>Actions</h3>
+                            <div class="action-buttons-group">
+                                <button class="btn-primary" id="verifyPaymentBtn">
+                                    <i class="fas fa-check-circle"></i> Verify Payment
+                                </button>
+                                <button class="btn-outline" id="viewOrderBtn">
+                                    <i class="fas fa-shopping-cart"></i> View Order
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transaction Details Tab -->
+                    <div class="tab-pane" id="transactionTab">
+                        <div class="transaction-details">
+                            <div class="details-section">
+                                <h3>Bank Transfer Details</h3>
+                                <div class="info-group" id="bankDetailsGroup">
+                                    <div class="info-item">
+                                        <span class="info-label">Bank Name:</span>
+                                        <span class="info-value" id="bankName">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Account Number:</span>
+                                        <span class="info-value" id="accountNumber">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Account Name:</span>
+                                        <span class="info-value" id="accountName">-</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="details-section">
+                                <h3>Payment Instructions</h3>
+                                <div class="payment-instructions" id="paymentInstructions">
+                                    <p>-</p>
+                                </div>
+                            </div>
+
+                            <div class="details-section" id="qrCodeSection" style="display: none;">
+                                <h3>QR Code</h3>
+                                <div class="qr-code-container">
+                                    <img id="qrCodeImage" src="" alt="Payment QR Code" style="max-width: 300px;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Webhook Data Tab -->
+                    <div class="tab-pane" id="webhookTab">
+                        <div class="webhook-data">
+                            <div class="details-section">
+                                <h3>Webhook Information</h3>
+                                <div class="info-group">
+                                    <div class="info-item">
+                                        <span class="info-label">Webhook Received:</span>
+                                        <span class="info-value" id="webhookReceived">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Webhook Received At:</span>
+                                        <span class="info-value" id="webhookReceivedAt">-</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="details-section">
+                                <h3>Raw Response Data</h3>
+                                <div class="code-block">
+                                    <pre id="lencoResponseData">-</pre>
+                                </div>
+                            </div>
+
+                            <div class="details-section">
+                                <h3>Webhook Payload</h3>
+                                <div class="code-block">
+                                    <pre id="webhookPayloadData">-</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Actions -->
+            <div class="modal-actions">
+                <button class="btn-outline" id="closePaymentDetailsBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/admin/auth-utils.js"></script>
+    <script src="/js/admin/sidebar.js"></script>
+    <script src="/js/admin/orders-badge.js"></script>
+    <script src="/js/admin/admin-payments.api.js"></script>
+    <script src="/js/admin/payments.js"></script>
+</body>
+</html>
+

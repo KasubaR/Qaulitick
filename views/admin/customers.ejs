@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customers Management | Admin Panel</title>
+    
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
+    <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
+    
+    <!-- Professional Admin Styles -->
+    <link rel="stylesheet" href="/css/admin/admin-professional.css">
+    <link rel="stylesheet" href="/css/admin/admin-components.css">
+    <link rel="stylesheet" href="/css/admin/admin-responsive.css">
+    <!-- Admin Dashboard Stylesheet -->
+    <link rel="stylesheet" href="/css/admin/dashboard.css">
+    <!-- Admin Orders Stylesheet (for action menu styles) -->
+    <link rel="stylesheet" href="/css/admin/orders.css">
+    <!-- Admin Customers Stylesheet -->
+    <link rel="stylesheet" href="/css/admin/customers.css">
+</head>
+<body class="admin-page">
+    <!-- ADMIN CUSTOMERS PAGE -->
+    <div class="admin-container">
+        <!-- Sidebar Navigation -->
+        <%- include('../partials/admin-sidebar', { activePage: 'customers' }) %>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <!-- Header -->
+            <header class="admin-header">
+                <div class="header-left">
+                    <button class="sidebar-toggle" id="sidebarToggle">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 class="page-title">Customers Management</h1>
+                </div>
+                
+                <div class="header-right">
+                    <button class="btn-outline" id="exportCustomersBtn">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                </div>
+            </header>
+
+            <!-- Customers Content -->
+            <div class="customers-content">
+                <!-- Statistics Cards -->
+                <div class="customers-stats">
+                    <div class="stat-card">
+                        <div class="stat-icon total">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-label">Total Customers</div>
+                            <div class="stat-value" id="totalCustomers">0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon active">
+                            <i class="fas fa-user-check"></i>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-label">Active Customers</div>
+                            <div class="stat-value" id="activeCustomers">0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon new">
+                            <i class="fas fa-user-plus"></i>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-label">New This Month</div>
+                            <div class="stat-value" id="newCustomers">0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon revenue">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-label">Total Revenue</div>
+                            <div class="stat-value" id="totalRevenue">K0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search and Filters -->
+                <div class="customers-toolbar">
+                    <div class="search-section">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="customerSearch" placeholder="Search by name, email, or phone...">
+                            <button class="search-btn" id="searchBtn">Search</button>
+                        </div>
+                    </div>
+
+                    <div class="filters-section">
+                        <div class="filter-group">
+                            <label>Customer Type</label>
+                            <select id="filterCustomerType" class="filter-select">
+                                <option value="">All Customers</option>
+                                <option value="active">Active (Has Orders)</option>
+                                <option value="new">New This Month</option>
+                                <option value="vip">VIP (High Value)</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label>Date Range</label>
+                            <div class="date-range">
+                                <input type="date" id="startDate" class="date-input">
+                                <span>to</span>
+                                <input type="date" id="endDate" class="date-input">
+                            </div>
+                        </div>
+
+                        <div class="filter-group">
+                            <label>Sort By</label>
+                            <select id="sortBy" class="filter-select">
+                                <option value="newest">Newest First</option>
+                                <option value="oldest">Oldest First</option>
+                                <option value="name-asc">Name: A to Z</option>
+                                <option value="name-desc">Name: Z to A</option>
+                                <option value="spent-desc">Total Spent: High to Low</option>
+                                <option value="spent-asc">Total Spent: Low to High</option>
+                                <option value="orders-desc">Orders: High to Low</option>
+                            </select>
+                        </div>
+
+                        <button class="btn-outline" id="clearFiltersBtn">
+                            <i class="fas fa-times"></i> Clear Filters
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Customers Table -->
+                <div class="table-card">
+                    <div class="table-header">
+                        <div class="table-info">
+                            <span id="customersCount">0</span> customers found
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="admin-table" id="customersTable">
+                            <thead>
+                                <tr>
+                                    <th>Customer</th>
+                                    <th width="150">Contact</th>
+                                    <th width="120">Total Orders</th>
+                                    <th width="120">Total Spent</th>
+                                    <th width="120">Last Order</th>
+                                    <th width="100">Status</th>
+                                    <th width="250">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customersTableBody">
+                                <tr>
+                                    <td colspan="7" class="empty-state">
+                                        <i class="fas fa-users"></i>
+                                        <p>No customers found</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div class="pagination" id="pagination">
+                        <button class="page-btn" id="prevPage" disabled>
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </button>
+                        <div class="page-numbers" id="pageNumbers">
+                            <span class="page-number active">1</span>
+                        </div>
+                        <button class="page-btn" id="nextPage">
+                            Next <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Customer Details Modal -->
+    <div class="modal" id="customerDetailsModal" style="display: none;">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2>Customer Details - <span id="customerDetailsName"></span></h2>
+                <button class="modal-close" id="closeCustomerModal">&times;</button>
+            </div>
+
+            <div class="customer-details-content">
+                <!-- Tabs -->
+                <div class="form-tabs">
+                    <button type="button" class="tab-btn active" data-tab="overview">
+                        <i class="fas fa-info-circle"></i> Overview
+                    </button>
+                    <button type="button" class="tab-btn" data-tab="orders">
+                        <i class="fas fa-shopping-cart"></i> Orders
+                    </button>
+                    <button type="button" class="tab-btn" data-tab="payments">
+                        <i class="fas fa-credit-card"></i> Payments
+                    </button>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="tab-content">
+                    <!-- Overview Tab -->
+                    <div class="tab-pane active" id="overviewTab">
+                        <div class="details-grid">
+                            <div class="details-section">
+                                <h3>Contact Information</h3>
+                                <div class="info-group">
+                                    <div class="info-item">
+                                        <span class="info-label">Name:</span>
+                                        <span class="info-value" id="customerName">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Email:</span>
+                                        <span class="info-value" id="customerEmail">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Phone:</span>
+                                        <span class="info-value" id="customerPhone">-</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="details-section">
+                                <h3>Customer Statistics</h3>
+                                <div class="info-group">
+                                    <div class="info-item">
+                                        <span class="info-label">Total Orders:</span>
+                                        <span class="info-value" id="totalOrders">0</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Total Spent:</span>
+                                        <span class="info-value" id="totalSpent">K0</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Average Order Value:</span>
+                                        <span class="info-value" id="averageOrderValue">K0</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">First Order:</span>
+                                        <span class="info-value" id="firstOrderDate">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Last Order:</span>
+                                        <span class="info-value" id="lastOrderDate">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Orders Tab -->
+                    <div class="tab-pane" id="ordersTab">
+                        <div class="customer-orders-list" id="customerOrdersList">
+                            <!-- Orders will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Payments Tab -->
+                    <div class="tab-pane" id="paymentsTab">
+                        <div class="customer-payments-list" id="customerPaymentsList">
+                            <!-- Payments will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Actions -->
+            <div class="modal-actions">
+                <button class="btn-outline" id="closeCustomerDetailsBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/admin/auth-utils.js"></script>
+    <script src="/js/admin/sidebar.js"></script>
+    <script src="/js/admin/orders-badge.js"></script>
+    <script src="/js/admin/admin-customers.api.js"></script>
+    <script src="/js/admin/customers.js"></script>
+</body>
+</html>
+

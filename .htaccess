@@ -1,0 +1,3 @@
+# Disable directory listing - prevent folder contents from being shown
+# when no index file exists (shows 403 Forbidden instead)
+Options -Indexes

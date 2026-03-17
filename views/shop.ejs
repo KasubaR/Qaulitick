@@ -1,0 +1,378 @@
+﻿<%- include('partials/header', {
+    title: typeof title !== 'undefined' ? title : 'Shop | Qualitick Collections',
+    page: 'shop',
+    description: typeof description !== 'undefined' ? description : 'Shop premium triple-A luxury watches. Browse Rolex, Omega, Tag Heuer, Cartier and more.',
+    keywords: typeof keywords !== 'undefined' ? keywords : 'luxury watches, AAA replica watches, premium watches',
+    canonicalUrl: typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com/shop',
+    url: typeof url !== 'undefined' ? url : '/shop',
+    ogType: typeof ogType !== 'undefined' ? ogType : 'website'
+}) %>
+
+    <!-- SHOP PAGE CONTENT -->
+    <div class="shop-container">
+        <!-- Breadcrumb -->
+        <div class="breadcrumb">
+            <a href="/">Home</a> <span class="separator"><i class="fas fa-chevron-right"></i></span>
+            <span class="current">Shop</span>
+        </div>
+
+        <!-- Shop Header -->
+        <div class="shop-header">
+            <h1 class="shop-title">Luxury Watch Collection</h1>
+            <div class="shop-tools">
+                <div class="total-products">
+                    <span id="productCount"><%= typeof products !== 'undefined' && products ? products.length : 0 %></span> Products Found
+                </div>
+                <div class="shop-controls">
+                    <div class="search-control">
+                        <input type="text" id="searchInput" placeholder="Search watches..." class="search-input-header">
+                        <button class="search-btn-header" id="searchBtn">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                    <div class="sort-options">
+                        <select id="sortSelect" class="sort-select">
+                            <option value="latest">Latest Arrivals</option>
+                            <option value="price-low">Price: Low to High</option>
+                            <option value="price-high">Price: High to Low</option>
+                            <option value="popularity">Most Popular</option>
+                            <option value="rating">Best Rated</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Filter Button -->
+        <button class="mobile-filter-btn" id="mobileFilterBtn">
+            <i class="fas fa-filter"></i> Filters
+        </button>
+
+        <!-- Shop Content -->
+        <div class="shop-content">
+            <!-- Filter Sidebar -->
+            <aside class="filter-sidebar" id="filterSidebar">
+                <div class="filter-header">
+                    <h3 class="filter-title">Filters</h3>
+                    <button class="clear-filters" id="clearFiltersBtn">Clear All</button>
+                </div>
+
+                <!-- Price Filter -->
+                <div class="filter-section">
+                    <h4 class="filter-section-title">Price Range</h4>
+                    <div class="price-filter">
+                        <div class="price-inputs">
+                            <div class="price-input-group">
+                                <label for="priceMin">Min</label>
+                                <input type="number" min="0" max="10000" value="0" class="price-input" id="priceMin" placeholder="0" step="1">
+                            </div>
+                            <div class="price-input-group">
+                                <label for="priceMax">Max</label>
+                                <input type="number" min="0" max="10000" value="10000" class="price-input" id="priceMax" placeholder="10000" step="1">
+                            </div>
+                        </div>
+                        <div id="priceRangeError" style="display: none; color: #ff4444; font-size: 12px; margin-top: 8px; padding: 5px;"></div>
+                    </div>
+                </div>
+
+                <!-- Brand Filter -->
+                <div class="filter-section">
+                    <h4 class="filter-section-title">Brand</h4>
+                    <div class="checkbox-filter">
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="brand" value="rolex">
+                            <span class="checkmark"></span>
+                            Rolex
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="brand" value="omega">
+                            <span class="checkmark"></span>
+                            Omega
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="brand" value="tagheuer">
+                            <span class="checkmark"></span>
+                            Tag Heuer
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="brand" value="cartier">
+                            <span class="checkmark"></span>
+                            Cartier
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="brand" value="audemars">
+                            <span class="checkmark"></span>
+                            Audemars Piguet
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="brand" value="patek">
+                            <span class="checkmark"></span>
+                            Patek Philippe
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Gender Filter -->
+                <div class="filter-section">
+                    <h4 class="filter-section-title">Gender</h4>
+                    <div class="radio-filter">
+                        <label class="radio-item">
+                            <input type="radio" name="gender" value="all" checked>
+                            <span class="radiomark"></span>
+                            All
+                        </label>
+                        <label class="radio-item">
+                            <input type="radio" name="gender" value="men">
+                            <span class="radiomark"></span>
+                            Men
+                        </label>
+                        <label class="radio-item">
+                            <input type="radio" name="gender" value="women">
+                            <span class="radiomark"></span>
+                            Women
+                        </label>
+                        <label class="radio-item">
+                            <input type="radio" name="gender" value="unisex">
+                            <span class="radiomark"></span>
+                            Unisex
+                        </label>
+                        <label class="radio-item">
+                            <input type="radio" name="gender" value="accessories">
+                            <span class="radiomark"></span>
+                            Accessories
+                        </label>
+                        <label class="radio-item">
+                            <input type="radio" name="gender" value="gift picks">
+                            <span class="radiomark"></span>
+                            Gift Picks
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Strap Type Filter -->
+                <div class="filter-section">
+                    <h4 class="filter-section-title">Strap Type</h4>
+                    <div class="checkbox-filter">
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="strap" value="metal">
+                            <span class="checkmark"></span>
+                            Metal Bracelet
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="strap" value="leather">
+                            <span class="checkmark"></span>
+                            Leather
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="strap" value="rubber">
+                            <span class="checkmark"></span>
+                            Rubber
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="strap" value="ceramic">
+                            <span class="checkmark"></span>
+                            Ceramic
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Rating Filter -->
+                <div class="filter-section">
+                    <h4 class="filter-section-title">Rating</h4>
+                    <div class="rating-filter">
+                        <label class="rating-item">
+                            <input type="checkbox" name="rating" value="5">
+                            <span class="stars">
+                                <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i
+                                    class="fas fa-star"></i><i class="fas fa-star"></i>
+                            </span>
+                            <span class="rating-text">5 Stars</span>
+                        </label>
+                        <label class="rating-item">
+                            <input type="checkbox" name="rating" value="4">
+                            <span class="stars">
+                                <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i
+                                    class="fas fa-star"></i><i class="far fa-star"></i> & above
+                            </span>
+                            <span class="rating-text">4+ Stars</span>
+                        </label>
+                        <label class="rating-item">
+                            <input type="checkbox" name="rating" value="3">
+                            <span class="stars">
+                                <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i
+                                    class="far fa-star"></i><i class="far fa-star"></i> & above
+                            </span>
+                            <span class="rating-text">3+ Stars</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Stock Filter -->
+                <div class="filter-section">
+                    <h4 class="filter-section-title">Stock Status</h4>
+                    <div class="checkbox-filter">
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="stock" value="in-stock" checked>
+                            <span class="checkmark"></span>
+                            In Stock Only
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="stock" value="low-stock">
+                            <span class="checkmark"></span>
+                            Include Low Stock
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Apply Filters Button -->
+                <div class="filter-actions">
+                    <button class="apply-filters-btn" id="applyFiltersBtn">
+                        <i class="fas fa-filter"></i> Apply Filters
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Product Grid -->
+            <main class="product-grid-section">
+                <!-- Active Filters -->
+                <div class="active-filters" id="activeFilters">
+                    <!-- Active filters will appear here -->
+                </div>
+
+                <!-- Product Grid -->
+                <div class="product-grid" id="productGrid">
+                    <% if (typeof noProductsMessage !== 'undefined' && noProductsMessage) { %>
+                        <div class="no-products" style="grid-column: 1 / -1; text-align: center; padding: 60px 20px;">
+                            <i class="fas fa-search" style="font-size: 64px; color: #666; margin-bottom: 20px;"></i>
+                            <h3 style="font-size: 24px; margin-bottom: 10px; color: #fff;"><%= noProductsMessage %></h3>
+                            <p style="color: #aaa; margin-bottom: 30px;">Try adjusting your filters or search terms to find what you're looking for.</p>
+                            <button onclick="if (typeof clearAllFilters === 'function') { clearAllFilters(); } else { window.location.href = '/shop'; }" class="btn-primary" style="padding: 12px 25px; background: var(--gold-gradient-horizontal); color: #000; border: none; border-radius: 5px; font-weight: 600; cursor: pointer;">
+                                <i class="fas fa-redo"></i> Clear All Filters
+                            </button>
+                        </div>
+                    <% } else if (typeof products !== 'undefined' && products && products.length > 0) { %>
+                        <% products.forEach(product => { %>
+                            <div class="shop-product-card">
+                                <a href="/product/<%= product._id %>" class="product-link">
+                                    <div class="product-image-wrapper">
+                                        <% if (product.discount > 0) { %>
+                                            <span class="discount-badge">-<%= product.discount %>%</span>
+                                        <% } %>
+                                        <% if (product.stock === 0) { %>
+                                            <div class="out-of-stock-overlay">Out of Stock</div>
+                                        <% } %>
+                                        <img 
+                                            src="<%= product.images && product.images[0] ? product.images[0] : '/images/placeholder.jpg' %>" 
+                                            alt="<%= product.model %>"
+                                            class="product-image"
+                                            loading="lazy"
+                                            decoding="async"
+                                            width="400"
+                                            height="400"
+                                            style="aspect-ratio: 1 / 1; object-fit: cover;"
+                                        >
+                                    </div>
+                                    <div class="product-info">
+                                        <div class="product-brand"><%= product.brand || 'Brand' %></div>
+                                        <h3 class="product-name"><%= product.model %></h3>
+                                        <div class="product-rating">
+                                            <% for(let i = 1; i <= 5; i++) { %>
+                                                <% if (i <= Math.floor(product.rating || 0)) { %>
+                                                    <i class="fas fa-star"></i>
+                                                <% } else if (i === Math.ceil(product.rating || 0) && (product.rating || 0) % 1 !== 0) { %>
+                                                    <i class="fas fa-star-half-alt"></i>
+                                                <% } else { %>
+                                                    <i class="far fa-star"></i>
+                                                <% } %>
+                                            <% } %>
+                                            <span class="rating-value">(<%= product.rating || 0 %>)</span>
+                                        </div>
+                                        <div class="product-price">
+                                            <% if (product.discount > 0) { %>
+                                                <span class="original-price">K<%= (product.originalPrice || product.price || 0).toLocaleString() %></span>
+                                                <span class="current-price" data-final-price="<%= product.finalPrice || product.price || 0 %>">K<%= (product.finalPrice || product.price || 0).toLocaleString() %></span>
+                                            <% } else { %>
+                                                <span class="current-price" data-final-price="<%= product.finalPrice || product.price || 0 %>">K<%= (product.finalPrice || product.price || 0).toLocaleString() %></span>
+                                            <% } %>
+                                        </div>
+                                        <div class="product-meta">
+                                            <span class="product-strap">
+                                                <i class="fas fa-link"></i>
+                                                <%= product.strapType || 'N/A' %>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                        <% }) %>
+                    <% } else { %>
+                        <div class="no-products">
+                            <i class="fas fa-search"></i>
+                            <h3>No watches found</h3>
+                            <p>Try adjusting your filters or search terms</p>
+                        </div>
+                    <% } %>
+                </div>
+
+                <!-- Pagination (initially hidden, shown only when there are multiple pages) -->
+                <div class="pagination" id="pagination" style="display: none;">
+                    <button class="page-btn prev-btn" id="prevPageBtn">
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </button>
+                    <div class="page-numbers" id="pageNumbers"></div>
+                    <button class="page-btn next-btn" id="nextPageBtn">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+
+                <!-- Loading Spinner -->
+                <div class="loading-spinner" id="loadingSpinner">
+                    <div class="spinner"></div>
+                    <p>Loading watches...</p>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Schema.org CollectionPage Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        "name": "Luxury Watch Collection",
+        "description": "Shop premium triple-A luxury watches from top brands",
+        "url": "https://qualitick-collections.com/shop",
+        "mainEntity": {
+            "@type": "ItemList",
+            "numberOfItems": "<%= typeof products !== 'undefined' && products ? products.length : 0 %>",
+            "itemListElement": [
+                <% if (typeof products !== 'undefined' && products) { %>
+                    <% products.forEach((product, index) => { %>
+                    {
+                        "@type": "ListItem",
+                        "position": <%= index + 1 %>,
+                        "item": {
+                            "@type": "Product",
+                            "name": "<%= product.model %>",
+                            "url": "https://qualitick-collections.com/product/<%= product._id %>",
+                            "image": "<%= product.images && product.images[0] ? product.images[0] : '' %>",
+                            "brand": {
+                                "@type": "Brand",
+                                "name": "<%= product.brand %>"
+                            },
+                            "offers": {
+                                "@type": "Offer",
+                                "price": "<%= product.price %>",
+                                "priceCurrency": "ZMW",
+                                "availability": "<%= product.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock' %>"
+                            }
+                        }
+                    }<%= index < products.length - 1 ? ',' : '' %>
+                    <% }) %>
+                <% } %>
+            ]
+        }
+    }
+    </script>
+
+    <%- include('partials/footer') %>

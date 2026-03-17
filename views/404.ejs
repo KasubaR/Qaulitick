@@ -1,0 +1,31 @@
+<%- include('partials/header', {title: '404 - Page Not Found', page: '404'}) %>
+
+    <section class="error-section" style="min-height: 70vh; display: flex; align-items: center; justify-content: center; padding: 40px 5%;">
+        <div class="error-container" style="text-align: center; max-width: 600px;">
+            <div class="error-icon" style="font-size: 120px; color: #ff4444; margin-bottom: 20px;">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h1 class="error-title" style="font-size: 48px; font-weight: 700; margin-bottom: 20px; background: var(--gold-gradient-horizontal); -webkit-background-clip: text; background-clip: text; color: transparent;">
+                404
+            </h1>
+            <h2 class="error-subtitle" style="font-size: 24px; margin-bottom: 15px; color: #fff;">
+                <%= typeof message !== 'undefined' ? message : 'Page Not Found' %>
+            </h2>
+            <p class="error-message" style="color: #aaa; margin-bottom: 30px; font-size: 16px; line-height: 1.6;">
+                <%= typeof message !== 'undefined' && message.includes('product') 
+                    ? 'The product you are looking for does not exist or has been removed.' 
+                    : 'The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.' %>
+            </p>
+            <div class="error-actions" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                <a href="/" class="btn-primary" style="padding: 12px 25px; background: var(--gold-gradient-horizontal); color: #000; border: none; border-radius: 5px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block;">
+                    <i class="fas fa-home"></i> Go Home
+                </a>
+                <a href="/shop" class="btn-outline" style="padding: 12px 25px; background: transparent; color: #fff; border: 1px solid rgba(255, 238, 193, 0.3); border-radius: 5px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-shopping-bag"></i> Browse Shop
+                </a>
+            </div>
+        </div>
+    </section>
+
+<%- include('partials/footer') %>
+

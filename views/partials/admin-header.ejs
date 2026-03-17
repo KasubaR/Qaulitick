@@ -1,0 +1,52 @@
+<!-- Admin Header Partial -->
+<header class="admin-header">
+    <div class="header-left">
+        <button class="sidebar-toggle" id="sidebarToggle">
+            <i class="fas fa-bars"></i>
+        </button>
+        <h1 class="page-title"><%= typeof pageTitle !== 'undefined' ? pageTitle : 'Admin Panel' %></h1>
+    </div>
+    
+    <div class="header-right">
+        <% if (typeof showSearch !== 'undefined' && showSearch) { %>
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" placeholder="Search orders, products, customers..." id="adminSearch">
+        </div>
+        <% } %>
+        
+        <% if (typeof headerActions !== 'undefined' && headerActions) { %>
+        <div class="header-actions">
+            <% if (typeof showNotifications !== 'undefined' && showNotifications) { %>
+            <button class="icon-btn" id="notificationsBtn" title="Notifications">
+                <i class="fas fa-bell"></i>
+                <span class="notification-dot" id="notificationDot"></span>
+            </button>
+            <% } %>
+            
+            <div class="admin-profile">
+                <img src="/images/admin-avatar.png" alt="Admin" class="profile-avatar" onerror="this.src='https://ui-avatars.com/api/?name=<%= typeof admin !== 'undefined' && admin ? encodeURIComponent(admin.name || admin.email) : 'Admin' %>&background=FFEEC1&color=000'">
+                <div class="profile-info">
+                    <span class="profile-name"><%= typeof admin !== 'undefined' && admin ? (admin.name || 'Admin') : 'Admin' %></span>
+                    <% if (typeof admin !== 'undefined' && admin && admin.email) { %>
+                    <span class="profile-email"><%= admin.email %></span>
+                    <% } %>
+                </div>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            
+            <!-- Logout Button -->
+            <a href="/admin/logout" class="icon-btn logout-btn" title="Logout">
+                <i class="fas fa-sign-out-alt"></i>
+            </a>
+        </div>
+        <% } else { %>
+        <!-- Simple header with just logout -->
+        <a href="/admin/logout" class="btn-secondary logout-btn" title="Logout">
+            <i class="fas fa-sign-out-alt"></i>
+            <span>Logout</span>
+        </a>
+        <% } %>
+    </div>
+</header>
+

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= typeof title !== 'undefined' ? title : 'Access Denied | Admin Panel' %></title>
+    
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
+    <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
+    
+    <!-- Access Denied Styles -->
+    <link rel="stylesheet" href="/css/admin/login.css">
+    <style>
+        .access-denied-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: var(--login-bg-primary);
+        }
+        
+        .access-denied-card {
+            background: linear-gradient(135deg, var(--login-bg-secondary) 0%, #0f172a 100%);
+            border: 1px solid var(--login-border);
+            border-radius: 20px;
+            padding: 60px 40px;
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.5s ease-out;
+        }
+        
+        .access-denied-icon {
+            font-size: 80px;
+            color: var(--login-error);
+            margin-bottom: 30px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.8;
+                transform: scale(1.05);
+            }
+        }
+        
+        .access-denied-title {
+            font-size: 32px;
+            font-weight: 600;
+            color: var(--login-text-primary);
+            margin-bottom: 16px;
+        }
+        
+        .access-denied-message {
+            font-size: 16px;
+            color: var(--login-text-secondary);
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        
+        .access-denied-error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 30px;
+            color: var(--login-error);
+            font-size: 14px;
+        }
+        
+        .access-denied-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            align-items: center;
+        }
+        
+        .btn-primary-access {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 28px;
+            background: linear-gradient(135deg, var(--login-gold) 0%, var(--login-gold-light) 100%);
+            color: #000;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary-access:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3);
+        }
+        
+        .btn-secondary-access {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 24px;
+            background: transparent;
+            color: var(--login-text-secondary);
+            text-decoration: none;
+            border: 1px solid var(--login-border);
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-secondary-access:hover {
+            color: var(--login-gold);
+            border-color: var(--login-gold);
+        }
+        
+        .info-box {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 10px;
+            padding: 16px;
+            margin-top: 30px;
+            color: var(--login-text-secondary);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        
+        .info-box strong {
+            color: var(--login-text-primary);
+        }
+        
+        @media (max-width: 480px) {
+            .access-denied-card {
+                padding: 40px 20px;
+            }
+            
+            .access-denied-icon {
+                font-size: 60px;
+            }
+            
+            .access-denied-title {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body class="login-page">
+    <div class="access-denied-container">
+        <div class="access-denied-card">
+            <!-- Icon -->
+            <div class="access-denied-icon">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            
+            <!-- Title -->
+            <h1 class="access-denied-title">Access Denied</h1>
+            
+            <!-- Message -->
+            <p class="access-denied-message">
+                You need to be authenticated to access this page. Please log in with your admin credentials.
+            </p>
+            
+            <!-- Error Message (if provided) -->
+            <% if (typeof error !== 'undefined' && error) { %>
+            <div class="access-denied-error">
+                <i class="fas fa-exclamation-circle"></i>
+                <strong>Error:</strong> <%= error %>
+            </div>
+            <% } %>
+            
+            <!-- Actions -->
+            <div class="access-denied-actions">
+                <% if (typeof showLoginLink !== 'undefined' && showLoginLink !== false) { %>
+                <a href="/admin/login" class="btn-primary-access">
+                    <i class="fas fa-sign-in-alt"></i>
+                    <span>Go to Login Page</span>
+                </a>
+                <% } %>
+                
+                <a href="/" class="btn-secondary-access">
+                    <i class="fas fa-home"></i>
+                    <span>Back to Home</span>
+                </a>
+            </div>
+            
+            <!-- Info Box -->
+            <div class="info-box">
+                <i class="fas fa-info-circle"></i>
+                <strong>Note:</strong> To access the admin panel, you need to use the secret URL with your admin credentials. 
+                Contact your administrator if you need access.
+            </div>
+        </div>
+        
+        <!-- Background Decoration -->
+        <div class="login-background">
+            <div class="bg-shape bg-shape-1"></div>
+            <div class="bg-shape bg-shape-2"></div>
+            <div class="bg-shape bg-shape-3"></div>
+        </div>
+    </div>
+</body>
+</html>
+

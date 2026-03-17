@@ -1,0 +1,137 @@
+const { sequelize } = require('../config/mysql');
+const { DataTypes, Op } = require('sequelize');
+
+function mapLencoStatusToPaymentStatus(lencoStatus) {
+    const map = {
+        pending: 'pending',
+        'pay-offline': 'pending',
+        processing: 'processing',
+        successful: 'completed',
+        success: 'completed',
+        completed: 'completed',
+        failed: 'failed',
+        cancelled: 'cancelled',
+        expired: 'cancelled'
+    };
+    return map[lencoStatus] || 'pending';
+}
+
+const Payment = sequelize.define('Payment', {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
+    orderNumber: { type: DataTypes.STRING(50), allowNull: false },
+    paymentMethod: {
+        type: DataTypes.ENUM('mobile_money', 'bank_transfer', 'card', 'cash_on_delivery'),
+        allowNull: false
+    },
+    amount: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
+    currency: { type: DataTypes.STRING(10), defaultValue: 'ZMW' },
+    status: {
+        type: DataTypes.ENUM('pending', 'processing', 'completed', 'failed', 'cancelled', 'refunded'),
+        defaultValue: 'pending'
+    },
+    customerInfo: { type: DataTypes.JSON, allowNull: true },
+    lencoTransactionId: { type: DataTypes.STRING(100), allowNull: true },
+    lencoReference: { type: DataTypes.STRING(100), allowNull: true },
+    lencoProvider: { type: DataTypes.STRING(20), allowNull: true },
+    lencoStatus: { type: DataTypes.STRING(50), allowNull: true },
+    lencoResponse: { type: DataTypes.JSON, allowNull: true },
+    webhookReceived: { type: DataTypes.BOOLEAN, defaultValue: false },
+    webhookPayload: { type: DataTypes.JSON, allowNull: true },
+    webhookReceivedAt: { type: DataTypes.DATE, allowNull: true },
+    gatewayResponse: { type: DataTypes.JSON, allowNull: true },
+    transactionId: { type: DataTypes.STRING(100), allowNull: true },
+    paymentInstructions: { type: DataTypes.TEXT, allowNull: true },
+    qrCode: { type: DataTypes.TEXT, allowNull: true },
+    paymentUrl: { type: DataTypes.STRING(500), allowNull: true },
+    bankDetails: { type: DataTypes.JSON, allowNull: true },
+    expiresAt: { type: DataTypes.DATE, allowNull: true },
+    failureReason: { type: DataTypes.TEXT, allowNull: true },
+    failedAt: { type: DataTypes.DATE, allowNull: true },
+    completedAt: { type: DataTypes.DATE, allowNull: true },
+    retryOf: { type: DataTypes.INTEGER, allowNull: true },
+    retryCount: { type: DataTypes.INTEGER, defaultValue: 0 },
+    metadata: { type: DataTypes.JSON, allowNull: true, defaultValue: {} }
+}, {
+    tableName: 'payments',
+    timestamps: true
+});
+
+Payment.mapLencoStatusToPaymentStatus = mapLencoStatusToPaymentStatus;
+
+Payment.prototype.mapLencoStatusToPaymentStatus = function(lencoStatus) {
+    return mapLencoStatusToPaymentStatus(lencoStatus);
+};
+
+Payment.prototype.updateLencoStatus = async function(status, response = null) {
+    this.lencoStatus = status;
+    this.status = mapLencoStatusToPaymentStatus(status);
+    if (response) this.lencoResponse = response;
+    return this.save();
+};
+
+Payment.prototype.markWebhookReceived = async function(payload) {
+    this.webhookReceived = true;
+    this.webhookPayload = payload;
+    this.webhookReceivedAt = new Date();
+    return this.save();
+};
+
+Object.defineProperty(Payment.prototype, 'isExpired', {
+    get() { return this.expiresAt ? new Date() > this.expiresAt : false; }
+});
+
+Object.defineProperty(Payment.prototype, 'isLencoPayment', {
+    get() { return !!(this.lencoTransactionId || this.lencoReference); }
+});
+
+Payment.findByLencoTransactionId = function(transactionId) {
+    return this.findOne({ where: { lencoTransactionId: transactionId } });
+};
+
+Payment.findByLencoReference = function(reference) {
+    return this.findOne({ where: { lencoReference: reference } });
+};
+
+Payment.findByTransactionId = function(transactionId) {
+    return this.findOne({
+        where: { [Op.or]: [{ transactionId: transactionId }, { lencoTransactionId: transactionId }] }
+    });
+};
+
+Payment.findByOrderNumber = function(orderNumber) {
+    return this.findOne({ where: { orderNumber } });
+};
+
+Payment.findPendingPayments = function() {
+    return this.findAll({ where: { status: 'pending' } });
+};
+
+Payment.findExpiredPayments = function() {
+    return this.findAll({
+        where: { status: 'pending', expiresAt: { [Op.lt]: new Date() } }
+    });
+};
+
+Payment.findOneAndUpdate = async function(filter, update, options = {}) {
+    const where = { ...filter };
+    if (where._id !== undefined) { where.id = where._id; delete where._id; }
+    if (where.$or) {
+        where[Op.or] = where.$or.map(clause => {
+            const c = { ...clause };
+            if (c.status && c.status.$nin) { c.status = { [Op.notIn]: c.status.$nin }; }
+            return c;
+        });
+        delete where.$or;
+    }
+    const doc = await this.findOne({ where });
+    if (!doc) return null;
+    const updatePayload = update.$set || update;
+    await doc.update(updatePayload, options);
+    return options.new !== false ? this.findByPk(doc.id) : doc;
+};
+
+module.exports = Payment;

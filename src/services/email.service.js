@@ -1,0 +1,881 @@
+const nodemailer = require('nodemailer');
+require('dotenv').config();
+const settingsService = require('./settings.service');
+
+/**
+ * Email Service
+ * 
+ * Handles all email sending operations using Gmail SMTP
+ * Integrates with notification settings to respect user preferences
+ */
+
+// Gmail SMTP Configuration
+const createTransporter = () => {
+    const gmailUser = process.env.GMAIL_USER;
+    const gmailPassword = process.env.GMAIL_APP_PASSWORD;
+    const adminEmail = process.env.CONTACT_ADMIN_EMAIL || process.env.GMAIL_USER;
+
+    if (!gmailUser || !gmailPassword) {
+        console.warn('[Email Service] Gmail credentials not configured. Email functionality will be disabled.');
+        return null;
+    }
+
+    // TLS options to handle SSL certificate issues
+    // In development, you may need to set NODE_TLS_REJECT_UNAUTHORIZED=0 or use rejectUnauthorized: false
+    // For production, ensure proper SSL certificates are configured
+    const tlsOptions = {};
+    
+    // Allow insecure certificates in development (set via environment variable)
+    // WARNING: Only use this in development. In production, fix SSL certificate issues properly.
+    if (process.env.NODE_ENV === 'development' || process.env.ALLOW_INSECURE_EMAIL === 'true') {
+        tlsOptions.rejectUnauthorized = false;
+        console.warn('[Email Service] WARNING: SSL certificate validation is disabled. This should only be used in development.');
+    }
+
+    // Use explicit Gmail SMTP configuration for better reliability
+    return nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false, // true for 465, false for other ports
+        auth: {
+            user: gmailUser,
+            pass: gmailPassword
+        },
+        tls: Object.keys(tlsOptions).length > 0 ? tlsOptions : undefined
+    });
+};
+
+const transporter = createTransporter();
+// Fallback admin email (will be overridden by settings)
+const fallbackAdminEmail = process.env.CONTACT_ADMIN_EMAIL || process.env.GMAIL_USER || 'support@qualitick-collections.com';
+
+/**
+ * Get subject label from subject code
+ */
+function getSubjectLabel(subject) {
+    const subjects = {
+        'product-inquiry': 'Product Inquiry',
+        'order-support': 'Order Support',
+        'shipping': 'Shipping & Delivery',
+        'returns': 'Returns & Exchanges',
+        'business': 'Business Partnership',
+        'other': 'Other'
+    };
+    return subjects[subject] || 'General Inquiry';
+}
+
+/**
+ * Send contact form notification to admin
+ * @param {Object} submission - Contact submission data
+ * @returns {Promise<Object>} - Email send result
+ */
+async function sendContactNotificationToAdmin(submission) {
+    if (!transporter) {
+        console.warn('[Email Service] Cannot send email: Transporter not configured');
+        return { success: false, error: 'Email service not configured' };
+    }
+
+    // Check if contact submission notifications are enabled
+    try {
+        const shouldSend = await settingsService.shouldSendNotification('contactSubmission');
+        if (!shouldSend) {
+            console.log('[Email Service] Contact submission notifications are disabled in settings');
+            return { success: false, error: 'Contact submission notifications are disabled' };
+        }
+    } catch (settingsError) {
+        console.warn('[Email Service] Error checking notification settings, proceeding with send:', settingsError.message);
+        // Continue with send if settings check fails (fail open)
+    }
+
+    try {
+        // Get notification email from settings
+        const notificationEmail = await settingsService.getNotificationEmail();
+        const subjectLabel = getSubjectLabel(submission.subject);
+        const formattedDate = new Date(submission.createdAt || Date.now()).toLocaleString('en-US', {
+            dateStyle: 'long',
+            timeStyle: 'short'
+        });
+
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #FFEEC1 0%, #FFD700 100%); padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+                    .content { background: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; }
+                    .field { margin: 15px 0; }
+                    .label { font-weight: bold; color: #555; }
+                    .value { margin-top: 5px; padding: 10px; background: white; border-radius: 4px; }
+                    .message-box { padding: 15px; background: white; border-left: 4px solid #FFD700; margin: 15px 0; }
+                    .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #777; text-align: center; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h2 style="margin: 0; color: #333;">New Contact Form Submission</h2>
+                    </div>
+                    <div class="content">
+                        <div class="field">
+                            <div class="label">Subject:</div>
+                            <div class="value">${subjectLabel}</div>
+                        </div>
+                        <div class="field">
+                            <div class="label">Name:</div>
+                            <div class="value">${submission.name}</div>
+                        </div>
+                        <div class="field">
+                            <div class="label">Email:</div>
+                            <div class="value"><a href="mailto:${submission.email}">${submission.email}</a></div>
+                        </div>
+                        ${submission.phone ? `
+                        <div class="field">
+                            <div class="label">Phone:</div>
+                            <div class="value">${submission.phone}</div>
+                        </div>
+                        ` : ''}
+                        <div class="field">
+                            <div class="label">Message:</div>
+                            <div class="message-box">${submission.message.replace(/\n/g, '<br>')}</div>
+                        </div>
+                        <div class="field">
+                            <div class="label">Submitted:</div>
+                            <div class="value">${formattedDate}</div>
+                        </div>
+                        <div class="footer">
+                            <p>This is an automated notification from Qualitick Collections contact form.</p>
+                            <p>Please respond to the customer at: <a href="mailto:${submission.email}">${submission.email}</a></p>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        const mailOptions = {
+            from: `"Qualitick Collections" <${process.env.GMAIL_USER}>`,
+            to: notificationEmail,
+            subject: `New Contact Form Submission - ${subjectLabel}`,
+            html: htmlContent,
+            replyTo: submission.email
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`[Email Service] Admin notification sent: ${info.messageId}`);
+        return { success: true, messageId: info.messageId };
+    } catch (error) {
+        console.error('[Email Service] Error sending admin notification:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Send confirmation email to user
+ * @param {Object} submission - Contact submission data
+ * @returns {Promise<Object>} - Email send result
+ */
+async function sendContactConfirmationToUser(submission) {
+    if (!transporter) {
+        console.warn('[Email Service] Cannot send email: Transporter not configured');
+        return { success: false, error: 'Email service not configured' };
+    }
+
+    try {
+        const subjectLabel = getSubjectLabel(submission.subject);
+        const formattedDate = new Date(submission.createdAt || Date.now()).toLocaleString('en-US', {
+            dateStyle: 'long',
+            timeStyle: 'short'
+        });
+
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #FFEEC1 0%, #FFD700 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+                    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+                    .message { background: white; padding: 20px; border-radius: 4px; margin: 20px 0; border-left: 4px solid #FFD700; }
+                    .info-box { background: white; padding: 15px; border-radius: 4px; margin: 15px 0; }
+                    .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #777; text-align: center; }
+                    .btn { display: inline-block; padding: 12px 24px; background: #FFD700; color: #333; text-decoration: none; border-radius: 4px; font-weight: bold; margin-top: 20px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1 style="margin: 0; color: #333;">Thank You for Contacting Us!</h1>
+                    </div>
+                    <div class="content">
+                        <p>Dear ${submission.name},</p>
+                        <p>Thank you for reaching out to Qualitick Collections. We have received your message and our team will get back to you as soon as possible.</p>
+                        
+                        <div class="info-box">
+                            <strong>Your Inquiry Details:</strong><br>
+                            <strong>Subject:</strong> ${subjectLabel}<br>
+                            <strong>Submitted:</strong> ${formattedDate}
+                        </div>
+                        
+                        <div class="message">
+                            <strong>Your Message:</strong><br>
+                            ${submission.message.replace(/\n/g, '<br>')}
+                        </div>
+                        
+                        <p>We typically respond within 24-48 hours during business days (Monday-Friday, 9AM-6PM).</p>
+                        
+                        <p>If you have any urgent inquiries, please feel free to contact us directly via WhatsApp at <a href="https://wa.me/260975587617">+260 975 587 617</a>.</p>
+                        
+                        <div style="text-align: center;">
+                            <a href="https://qualitick-collections.com" class="btn">Visit Our Website</a>
+                        </div>
+                        
+                        <div class="footer">
+                            <p><strong>Qualitick Collections</strong></p>
+                            <p>Premium Luxury Watches</p>
+                            <p>This is an automated confirmation email. Please do not reply to this email.</p>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        const mailOptions = {
+            from: `"Qualitick Collections" <${process.env.GMAIL_USER}>`,
+            to: submission.email,
+            subject: 'Thank You for Contacting Qualitick Collections',
+            html: htmlContent
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`[Email Service] User confirmation sent: ${info.messageId}`);
+        return { success: true, messageId: info.messageId };
+    } catch (error) {
+        console.error('[Email Service] Error sending user confirmation:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Send invoice email to customer
+ * @param {Object} order - Order object
+ * @param {Buffer} pdfBuffer - PDF invoice buffer
+ * @param {Object} options - Additional options (cc, bcc, etc.)
+ * @returns {Promise<Object>} - Email send result
+ */
+async function sendInvoiceEmail(order, pdfBuffer, options = {}) {
+    if (!transporter) {
+        console.warn('[Email Service] Cannot send email: Transporter not configured');
+        return { success: false, error: 'Email service not configured' };
+    }
+
+    try {
+        const orderDate = new Date(order.createdAt || Date.now()).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #FFEEC1 0%, #FFD700 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+                    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+                    .order-info { background: white; padding: 20px; border-radius: 4px; margin: 20px 0; border-left: 4px solid #FFD700; }
+                    .info-row { display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee; }
+                    .info-label { font-weight: bold; color: #555; }
+                    .info-value { color: #333; }
+                    .items-summary { background: white; padding: 15px; border-radius: 4px; margin: 15px 0; }
+                    .item-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+                    .total-row { display: flex; justify-content: space-between; padding: 15px 0; margin-top: 10px; border-top: 2px solid #FFD700; font-size: 18px; font-weight: bold; }
+                    .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #777; text-align: center; }
+                    .btn { display: inline-block; padding: 12px 24px; background: #FFD700; color: #333; text-decoration: none; border-radius: 4px; font-weight: bold; margin-top: 20px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1 style="margin: 0; color: #333;">Your Order Invoice</h1>
+                    </div>
+                    <div class="content">
+                        <p>Dear ${order.customer.name},</p>
+                        <p>Thank you for your order with Qualitick Collections! Please find your invoice attached to this email.</p>
+                        
+                        <div class="order-info">
+                            <h3 style="margin-top: 0; color: #333;">Order Details</h3>
+                            <div class="info-row">
+                                <span class="info-label">Order Number:</span>
+                                <span class="info-value">${order.orderNumber}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Order Date:</span>
+                                <span class="info-value">${orderDate}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Order Status:</span>
+                                <span class="info-value">${order.status.charAt(0).toUpperCase() + order.status.slice(1)}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Payment Status:</span>
+                                <span class="info-value">${order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Payment Method:</span>
+                                <span class="info-value">${formatPaymentMethod(order.paymentMethod)}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="items-summary">
+                            <h3 style="margin-top: 0; color: #333;">Order Summary</h3>
+                            ${order.items.map(item => `
+                                <div class="item-row">
+                                    <span>${item.name} x ${item.quantity}</span>
+                                    <span>K${formatCurrency(item.price * item.quantity)}</span>
+                                </div>
+                            `).join('')}
+                            <div class="info-row">
+                                <span class="info-label">Subtotal:</span>
+                                <span class="info-value">K${formatCurrency(order.totals.subtotal || 0)}</span>
+                            </div>
+                            ${order.totals.discount > 0 ? `
+                            <div class="info-row">
+                                <span class="info-label">Discount:</span>
+                                <span class="info-value">-K${formatCurrency(order.totals.discount)}</span>
+                            </div>
+                            ` : ''}
+                            ${order.totals.delivery > 0 ? `
+                            <div class="info-row">
+                                <span class="info-label">Delivery Fee:</span>
+                                <span class="info-value">K${formatCurrency(order.totals.delivery)}</span>
+                            </div>
+                            ` : ''}
+                            <div class="total-row">
+                                <span>Total:</span>
+                                <span>K${formatCurrency(order.totals.total || 0)}</span>
+                            </div>
+                        </div>
+                        
+                        ${order.shipping && !order.shipping.pickup ? `
+                        <div class="order-info">
+                            <h3 style="margin-top: 0; color: #333;">Shipping Address</h3>
+                            <p style="margin: 5px 0;">${order.shipping.address}</p>
+                            <p style="margin: 5px 0;">${order.shipping.city}, ${order.shipping.province}</p>
+                        </div>
+                        ` : `
+                        <div class="order-info">
+                            <h3 style="margin-top: 0; color: #333;">Delivery Method</h3>
+                            <p style="margin: 5px 0;">Store Pickup</p>
+                        </div>
+                        `}
+                        
+                        <p>Your invoice is attached as a PDF document. Please keep this for your records.</p>
+                        
+                        <p>If you have any questions about your order, please don't hesitate to contact us.</p>
+                        
+                        <div style="text-align: center;">
+                            <a href="https://qualitick-collections.com" class="btn">Visit Our Website</a>
+                        </div>
+                        
+                        <div class="footer">
+                            <p><strong>Qualitick Collections</strong></p>
+                            <p>Premium Luxury Watches</p>
+                            <p>Email: info@qualitickcollections.com</p>
+                            <p>This is an automated email. Please do not reply to this email.</p>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        const mailOptions = {
+            from: `"Qualitick Collections" <${process.env.GMAIL_USER}>`,
+            to: order.customer.email,
+            cc: options.cc || undefined,
+            bcc: options.bcc || undefined,
+            subject: `Invoice for Order ${order.orderNumber} - Qualitick Collections`,
+            html: htmlContent,
+            attachments: [
+                {
+                    filename: `Invoice-${order.orderNumber}.pdf`,
+                    content: pdfBuffer,
+                    contentType: 'application/pdf'
+                }
+            ]
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`[Email Service] Invoice email sent to ${order.customer.email}: ${info.messageId}`);
+        return { success: true, messageId: info.messageId };
+    } catch (error) {
+        console.error('[Email Service] Error sending invoice email:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Format currency amount
+ * @param {number} amount - Amount to format
+ * @returns {string} Formatted currency string
+ */
+function formatCurrency(amount) {
+    return parseFloat(amount || 0).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+/**
+ * Format payment method
+ * @param {string} method - Payment method
+ * @returns {string} Formatted payment method
+ */
+function formatPaymentMethod(method) {
+    const methods = {
+        'mobile_money': 'Mobile Money',
+        'bank_transfer': 'Bank Transfer',
+        'card': 'Credit/Debit Card',
+        'cash_on_delivery': 'Cash on Delivery'
+    };
+    return methods[method] || method || 'N/A';
+}
+
+/**
+ * Send new order notification to admin
+ * @param {Object} order - Order object
+ * @returns {Promise<Object>} - Email send result
+ */
+async function sendOrderNotificationToAdmin(order) {
+    if (!transporter) {
+        console.warn('[Email Service] Cannot send email: Transporter not configured');
+        return { success: false, error: 'Email service not configured' };
+    }
+
+    // Check if new order notifications are enabled
+    try {
+        const shouldSend = await settingsService.shouldSendNotification('newOrder');
+        if (!shouldSend) {
+            console.log('[Email Service] New order notifications are disabled in settings');
+            return { success: false, error: 'New order notifications are disabled' };
+        }
+    } catch (settingsError) {
+        console.warn('[Email Service] Error checking notification settings, proceeding with send:', settingsError.message);
+        // Continue with send if settings check fails (fail open)
+    }
+
+    try {
+        // Get notification email from settings
+        const notificationEmail = await settingsService.getNotificationEmail();
+        
+        const orderDate = new Date(order.createdAt || Date.now()).toLocaleString('en-US', {
+            dateStyle: 'long',
+            timeStyle: 'short'
+        });
+
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #FFEEC1 0%, #FFD700 100%); padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+                    .content { background: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; }
+                    .order-info { background: white; padding: 20px; border-radius: 4px; margin: 20px 0; border-left: 4px solid #28a745; }
+                    .info-row { display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee; }
+                    .info-label { font-weight: bold; color: #555; }
+                    .info-value { color: #333; }
+                    .items-list { background: white; padding: 15px; border-radius: 4px; margin: 15px 0; }
+                    .item-row { padding: 8px 0; border-bottom: 1px solid #eee; }
+                    .total-row { display: flex; justify-content: space-between; padding: 15px 0; margin-top: 10px; border-top: 2px solid #28a745; font-size: 18px; font-weight: bold; }
+                    .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #777; text-align: center; }
+                    .btn { display: inline-block; padding: 12px 24px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; margin-top: 20px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h2 style="margin: 0; color: #333;">New Order Received</h2>
+                    </div>
+                    <div class="content">
+                        <p>A new order has been placed on your store.</p>
+                        
+                        <div class="order-info">
+                            <h3 style="margin-top: 0; color: #333;">Order Details</h3>
+                            <div class="info-row">
+                                <span class="info-label">Order Number:</span>
+                                <span class="info-value">${order.orderNumber}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Order Date:</span>
+                                <span class="info-value">${orderDate}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Customer:</span>
+                                <span class="info-value">${order.customer.name}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Customer Email:</span>
+                                <span class="info-value"><a href="mailto:${order.customer.email}">${order.customer.email}</a></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Customer Phone:</span>
+                                <span class="info-value">${order.customer.phone || 'N/A'}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Payment Method:</span>
+                                <span class="info-value">${formatPaymentMethod(order.paymentMethod)}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Order Status:</span>
+                                <span class="info-value">${order.status.charAt(0).toUpperCase() + order.status.slice(1)}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Payment Status:</span>
+                                <span class="info-value">${order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="items-list">
+                            <h3 style="margin-top: 0; color: #333;">Order Items</h3>
+                            ${order.items.map(item => `
+                                <div class="item-row">
+                                    <strong>${item.name}</strong> x ${item.quantity} - K${formatCurrency(item.price * item.quantity)}
+                                </div>
+                            `).join('')}
+                            <div class="info-row">
+                                <span class="info-label">Subtotal:</span>
+                                <span class="info-value">K${formatCurrency(order.totals.subtotal || 0)}</span>
+                            </div>
+                            ${order.totals.discount > 0 ? `
+                            <div class="info-row">
+                                <span class="info-label">Discount:</span>
+                                <span class="info-value">-K${formatCurrency(order.totals.discount)}</span>
+                            </div>
+                            ` : ''}
+                            ${order.totals.delivery > 0 ? `
+                            <div class="info-row">
+                                <span class="info-label">Delivery Fee:</span>
+                                <span class="info-value">K${formatCurrency(order.totals.delivery)}</span>
+                            </div>
+                            ` : ''}
+                            <div class="total-row">
+                                <span>Total:</span>
+                                <span>K${formatCurrency(order.totals.total || 0)}</span>
+                            </div>
+                        </div>
+                        
+                        ${order.shipping && !order.shipping.pickup ? `
+                        <div class="order-info">
+                            <h3 style="margin-top: 0; color: #333;">Shipping Address</h3>
+                            <p style="margin: 5px 0;">${order.shipping.address}</p>
+                            <p style="margin: 5px 0;">${order.shipping.city}, ${order.shipping.province}</p>
+                        </div>
+                        ` : `
+                        <div class="order-info">
+                            <h3 style="margin-top: 0; color: #333;">Delivery Method</h3>
+                            <p style="margin: 5px 0;">Store Pickup</p>
+                        </div>
+                        `}
+                        
+                        <div style="text-align: center;">
+                            <a href="${process.env.SITE_URL || 'https://qualitick-collections.com'}/admin/orders" class="btn">View Order in Admin Panel</a>
+                        </div>
+                        
+                        <div class="footer">
+                            <p>This is an automated notification from Qualitick Collections.</p>
+                            <p>Order notifications can be managed in Admin Settings.</p>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        const mailOptions = {
+            from: `"Qualitick Collections" <${process.env.GMAIL_USER}>`,
+            to: notificationEmail,
+            subject: `New Order #${order.orderNumber} - K${formatCurrency(order.totals.total || 0)}`,
+            html: htmlContent
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`[Email Service] New order notification sent to ${notificationEmail}: ${info.messageId}`);
+        return { success: true, messageId: info.messageId };
+    } catch (error) {
+        console.error('[Email Service] Error sending new order notification:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Send low stock notification to admin
+ * @param {Object} product - Product object
+ * @returns {Promise<Object>} - Email send result
+ */
+async function sendLowStockNotificationToAdmin(product) {
+    if (!transporter) {
+        console.warn('[Email Service] Cannot send email: Transporter not configured');
+        return { success: false, error: 'Email service not configured' };
+    }
+
+    // Check if low stock notifications are enabled
+    try {
+        const shouldSend = await settingsService.shouldSendNotification('lowStock');
+        if (!shouldSend) {
+            console.log('[Email Service] Low stock notifications are disabled in settings');
+            return { success: false, error: 'Low stock notifications are disabled' };
+        }
+    } catch (settingsError) {
+        console.warn('[Email Service] Error checking notification settings, proceeding with send:', settingsError.message);
+        // Continue with send if settings check fails (fail open)
+    }
+
+    try {
+        // Get notification email from settings
+        const notificationEmail = await settingsService.getNotificationEmail();
+        
+        const threshold = product.lowStockThreshold || 5;
+        const isCritical = product.stock === 0;
+
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, ${isCritical ? '#ff6b6b' : '#ffa500'} 0%, ${isCritical ? '#dc3545' : '#ff8c00'} 100%); padding: 20px; text-align: center; border-radius: 8px 8px 0 0; color: white; }
+                    .content { background: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; }
+                    .alert-box { background: white; padding: 20px; border-radius: 4px; margin: 20px 0; border-left: 4px solid ${isCritical ? '#dc3545' : '#ff8c00'}; }
+                    .info-row { display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee; }
+                    .info-label { font-weight: bold; color: #555; }
+                    .info-value { color: #333; }
+                    .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #777; text-align: center; }
+                    .btn { display: inline-block; padding: 12px 24px; background: ${isCritical ? '#dc3545' : '#ff8c00'}; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; margin-top: 20px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h2 style="margin: 0;">${isCritical ? '⚠️ Out of Stock Alert' : '⚠️ Low Stock Alert'}</h2>
+                    </div>
+                    <div class="content">
+                        <p>A product in your inventory ${isCritical ? 'is out of stock' : 'has low stock'}.</p>
+                        
+                        <div class="alert-box">
+                            <h3 style="margin-top: 0; color: #333;">Product Details</h3>
+                            <div class="info-row">
+                                <span class="info-label">Product:</span>
+                                <span class="info-value"><strong>${product.brand} ${product.model}</strong></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">SKU:</span>
+                                <span class="info-value">${product.sku}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Current Stock:</span>
+                                <span class="info-value" style="color: ${isCritical ? '#dc3545' : '#ff8c00'}; font-weight: bold;">${product.stock} units</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Low Stock Threshold:</span>
+                                <span class="info-value">${threshold} units</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Price:</span>
+                                <span class="info-value">K${formatCurrency(product.price || 0)}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Status:</span>
+                                <span class="info-value">${product.status || 'active'}</span>
+                            </div>
+                        </div>
+                        
+                        <div style="text-align: center;">
+                            <a href="${process.env.SITE_URL || 'https://qualitick-collections.com'}/admin/inventory" class="btn">Manage Inventory</a>
+                        </div>
+                        
+                        <div class="footer">
+                            <p>This is an automated notification from Qualitick Collections.</p>
+                            <p>Low stock notifications can be managed in Admin Settings.</p>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        const mailOptions = {
+            from: `"Qualitick Collections" <${process.env.GMAIL_USER}>`,
+            to: notificationEmail,
+            subject: `${isCritical ? 'Out of Stock' : 'Low Stock'} Alert: ${product.brand} ${product.model} (${product.sku})`,
+            html: htmlContent
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`[Email Service] Low stock notification sent to ${notificationEmail}: ${info.messageId}`);
+        return { success: true, messageId: info.messageId };
+    } catch (error) {
+        console.error('[Email Service] Error sending low stock notification:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Send payment notification to admin
+ * @param {Object} payment - Payment object
+ * @param {Object} order - Optional order object for context
+ * @returns {Promise<Object>} - Email send result
+ */
+async function sendPaymentNotificationToAdmin(payment, order = null) {
+    if (!transporter) {
+        console.warn('[Email Service] Cannot send email: Transporter not configured');
+        return { success: false, error: 'Email service not configured' };
+    }
+
+    // Check if payment notifications are enabled
+    try {
+        const shouldSend = await settingsService.shouldSendNotification('payment');
+        if (!shouldSend) {
+            console.log('[Email Service] Payment notifications are disabled in settings');
+            return { success: false, error: 'Payment notifications are disabled' };
+        }
+    } catch (settingsError) {
+        console.warn('[Email Service] Error checking notification settings, proceeding with send:', settingsError.message);
+        // Continue with send if settings check fails (fail open)
+    }
+
+    try {
+        // Get notification email from settings
+        const notificationEmail = await settingsService.getNotificationEmail();
+        
+        const paymentDate = new Date(payment.createdAt || Date.now()).toLocaleString('en-US', {
+            dateStyle: 'long',
+            timeStyle: 'short'
+        });
+        
+        const isCompleted = payment.status === 'completed' || payment.status === 'paid';
+        const isFailed = payment.status === 'failed';
+
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, ${isCompleted ? '#28a745' : isFailed ? '#dc3545' : '#ffc107'} 0%, ${isCompleted ? '#20c997' : isFailed ? '#c82333' : '#ff9800'} 100%); padding: 20px; text-align: center; border-radius: 8px 8px 0 0; color: white; }
+                    .content { background: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; }
+                    .payment-info { background: white; padding: 20px; border-radius: 4px; margin: 20px 0; border-left: 4px solid ${isCompleted ? '#28a745' : isFailed ? '#dc3545' : '#ffc107'}; }
+                    .info-row { display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee; }
+                    .info-label { font-weight: bold; color: #555; }
+                    .info-value { color: #333; }
+                    .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #777; text-align: center; }
+                    .btn { display: inline-block; padding: 12px 24px; background: ${isCompleted ? '#28a745' : isFailed ? '#dc3545' : '#ffc107'}; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; margin-top: 20px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h2 style="margin: 0;">Payment ${isCompleted ? 'Completed' : isFailed ? 'Failed' : 'Update'}</h2>
+                    </div>
+                    <div class="content">
+                        <p>A payment has been ${isCompleted ? 'successfully completed' : isFailed ? 'failed' : 'updated'}.</p>
+                        
+                        <div class="payment-info">
+                            <h3 style="margin-top: 0; color: #333;">Payment Details</h3>
+                            <div class="info-row">
+                                <span class="info-label">Order Number:</span>
+                                <span class="info-value">${payment.orderNumber}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Payment Status:</span>
+                                <span class="info-value" style="color: ${isCompleted ? '#28a745' : isFailed ? '#dc3545' : '#ffc107'}; font-weight: bold;">${payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Amount:</span>
+                                <span class="info-value"><strong>K${formatCurrency(payment.amount || 0)}</strong></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Currency:</span>
+                                <span class="info-value">${payment.currency || 'ZMW'}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Payment Method:</span>
+                                <span class="info-value">${formatPaymentMethod(payment.paymentMethod)}</span>
+                            </div>
+                            ${payment.transactionId || payment.lencoTransactionId ? `
+                            <div class="info-row">
+                                <span class="info-label">Transaction ID:</span>
+                                <span class="info-value">${payment.transactionId || payment.lencoTransactionId}</span>
+                            </div>
+                            ` : ''}
+                            <div class="info-row">
+                                <span class="info-label">Payment Date:</span>
+                                <span class="info-value">${paymentDate}</span>
+                            </div>
+                            ${payment.customerInfo ? `
+                            <div class="info-row">
+                                <span class="info-label">Customer:</span>
+                                <span class="info-value">${payment.customerInfo.name}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Customer Email:</span>
+                                <span class="info-value"><a href="mailto:${payment.customerInfo.email}">${payment.customerInfo.email}</a></span>
+                            </div>
+                            ` : ''}
+                        </div>
+                        
+                        <div style="text-align: center;">
+                            <a href="${process.env.SITE_URL || 'https://qualitick-collections.com'}/admin/orders" class="btn">View Order in Admin Panel</a>
+                        </div>
+                        
+                        <div class="footer">
+                            <p>This is an automated notification from Qualitick Collections.</p>
+                            <p>Payment notifications can be managed in Admin Settings.</p>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        const mailOptions = {
+            from: `"Qualitick Collections" <${process.env.GMAIL_USER}>`,
+            to: notificationEmail,
+            subject: `Payment ${isCompleted ? 'Completed' : isFailed ? 'Failed' : 'Update'} - Order #${payment.orderNumber} - K${formatCurrency(payment.amount || 0)}`,
+            html: htmlContent
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`[Email Service] Payment notification sent to ${notificationEmail}: ${info.messageId}`);
+        return { success: true, messageId: info.messageId };
+    } catch (error) {
+        console.error('[Email Service] Error sending payment notification:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+module.exports = {
+    sendContactNotificationToAdmin,
+    sendContactConfirmationToUser,
+    sendInvoiceEmail,
+    sendOrderNotificationToAdmin,
+    sendLowStockNotificationToAdmin,
+    sendPaymentNotificationToAdmin,
+    createTransporter
+};
+

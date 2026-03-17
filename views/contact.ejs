@@ -1,0 +1,188 @@
+<%- include('partials/header', {
+    title: typeof title !== 'undefined' ? title : 'Contact Us | Qualitick Collections',
+    page: 'contact',
+    description: 'Get in touch with Qualitick Collections. Contact us for inquiries about our premium luxury watches, customer support, or business partnerships.',
+    keywords: 'contact qualitick collections, customer support, luxury watches contact, watch inquiries',
+    canonicalUrl: typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com/contact',
+    url: typeof url !== 'undefined' ? url : '/contact',
+    ogType: 'website'
+}) %>
+
+<!-- CONTACT HERO -->
+<section class="contact-hero">
+    <div class="contact-hero-inner">
+        <span class="contact-eyebrow">Get In Touch · We're Here to Help</span>
+        <h1 class="contact-hero-title">Reach Out to<br><em>Our Team</em></h1>
+        <p class="contact-hero-sub">Have a question about our luxury watches? Need assistance with an order? Want to discuss a business partnership? We'd love to hear from you.</p>
+    </div>
+    <img src="/images/icons/watermark.svg" alt="" class="contact-watermark" aria-hidden="true">
+</section>
+
+    <!-- CONTACT PAGE CONTENT -->
+    <div class="contact-container">
+
+        <!-- Contact Content -->
+        <div class="contact-content-wrapper">
+            <!-- Contact Form Section -->
+            <section class="contact-form-section">
+                <h2 class="section-title">Send Us a Message</h2>
+                <form id="contactForm" class="contact-form">
+                    <div class="form-group">
+                        <label for="name">Full Name <span class="required">*</span></label>
+                        <input type="text" id="name" name="name" required placeholder="Enter your full name">
+                        <span class="error-message" id="nameError"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">Email Address <span class="required">*</span></label>
+                        <input type="email" id="email" name="email" required placeholder="your.email@example.com">
+                        <span class="error-message" id="emailError"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="phone">Phone Number</label>
+                        <input type="tel" id="phone" name="phone" placeholder="+260 977 123 456 or 0977 123 456">
+                        <span class="error-message" id="phoneError"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="subject">Subject <span class="required">*</span></label>
+                        <select id="subject" name="subject" required>
+                            <option value="">Select a subject</option>
+                            <option value="product-inquiry">Product Inquiry</option>
+                            <option value="order-support">Order Support</option>
+                            <option value="shipping">Shipping & Delivery</option>
+                            <option value="returns">Returns & Exchanges</option>
+                            <option value="business">Business Partnership</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <span class="error-message" id="subjectError"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="message">Message <span class="required">*</span></label>
+                        <textarea id="message" name="message" rows="6" required placeholder="Tell us how we can help you..."></textarea>
+                        <span class="error-message" id="messageError"></span>
+                    </div>
+
+                    <button type="submit" class="btn gradient-flow submit-btn">
+                        <i class="fas fa-paper-plane"></i> Send Message
+                    </button>
+                </form>
+            </section>
+
+            <!-- Contact Information Section -->
+            <section class="contact-info-section">
+                <h2 class="section-title">Contact Information</h2>
+
+                <div class="contact-info-grid">
+                    <div class="contact-info-card">
+                        <div class="contact-icon">
+                            <i class="fas fa-envelope"></i>
+                        </div>
+                        <h3>Email Us</h3>
+                        <p>For general inquiries</p>
+                        <a href="mailto:support@qualitick-collections.com" class="contact-link">
+                            support@qualitick-collections.com
+                        </a>
+                    </div>
+
+                    <a href="https://wa.me/260975587617" target="_blank" rel="noopener noreferrer" class="contact-info-card contact-info-card-link">
+                        <div class="contact-icon">
+                            <i class="fab fa-whatsapp"></i>
+                        </div>
+                        <h3>WhatsApp Us</h3>
+                        <p>Monday - Friday, 9AM - 6PM</p>
+                    </a>
+
+                    <div class="contact-info-card">
+                        <div class="contact-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <h3>Visit Us</h3>
+                        <p>Online Store</p>
+                        <address class="contact-address">
+                            Qualitick Collections is a fully online shop.<br>
+                            Orders and support are handled 100% digitally.
+                        </address>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Business Hours & Social (below the main grid) -->
+        <div class="contact-extras">
+            <div class="business-hours">
+                <h3 class="hours-title">
+                    <i class="fas fa-clock"></i> Business Hours
+                </h3>
+                <div class="hours-list">
+                    <div class="hours-item">
+                            <span class="hours-day">Monday - Sunday</span>
+                            <span class="hours-time">24/7</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="social-section">
+                <h3 class="social-title">Follow Us</h3>
+                <div class="social-links">
+                    <a href="https://www.instagram.com/qualitick_collections" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="Instagram">
+                        <i class="fab fa-instagram"></i>
+                    </a>
+                    <a href="https://www.facebook.com/profile.php?id=61552156502774" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="Facebook">
+                        <i class="fab fa-facebook-f"></i>
+                    </a>
+                    <a href="https://www.tiktok.com/@qualitick_collections?_r=1&_t=ZS-93sydbZvxVV" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="TikTok">
+                        <i class="fab fa-tiktok"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- FAQ Section -->
+        <section class="faq-section">
+            <h2 class="section-title">Frequently Asked Questions</h2>
+            <div class="faq-grid">
+                <div class="faq-item">
+                    <h3 class="faq-question">
+                        <i class="fas fa-question-circle"></i> How long does shipping take?
+                    </h3>
+                    <p class="faq-answer">
+                        Standard shipping typically takes 5-7 business days. Express shipping options are available 
+                        for faster delivery (2-3 business days).
+                    </p>
+                </div>
+                <div class="faq-item">
+                    <h3 class="faq-question">
+                        <i class="fas fa-question-circle"></i> What is your return policy?
+                    </h3>
+                    <p class="faq-answer">
+                        We offer a 30-day return policy. Items must be in original condition with all packaging. 
+                        Please contact us for return authorization.
+                    </p>
+                </div>
+                <div class="faq-item">
+                    <h3 class="faq-question">
+                        <i class="fas fa-question-circle"></i> Do you offer international shipping?
+                    </h3>
+                    <p class="faq-answer">
+                        Yes, we ship worldwide. Shipping times and costs vary by location. Contact us for specific 
+                        international shipping rates.
+                    </p>
+                </div>
+                <div class="faq-item">
+                    <h3 class="faq-question">
+                        <i class="fas fa-question-circle"></i> Are your watches authentic?
+                    </h3>
+                    <p class="faq-answer">
+                        We specialize in premium triple-A grade luxury watches that meet the highest quality standards. 
+                        Each watch undergoes rigorous quality control before shipping.
+                    </p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+<%- include('partials/footer') %>
+

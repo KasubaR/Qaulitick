@@ -1,0 +1,194 @@
+<%- include('partials/header', {title: title, page: page}) %>
+
+    <!-- HERO SECTION -->
+    <section class="hero">
+        <div class="hero-content">
+            <p class="hero-eyebrow">Premium Timepieces · Zambia</p>
+            <h1 class="hero-title">Shop Now,<br><em>Pay in<br>Installments</em></h1>
+            <p class="hero-sub">Get the watches and accessories you love with easy laybuy and installment plans — no hidden fees, just clear and transparent payments.</p>
+            <div class="hero-cta">
+                <a href="/shop" class="btn-hero-primary" id="heroShopBtn">
+                    Shop Collection
+                    <img src="/images/icons/Arrow-Icon.svg" alt="">
+                </a>
+                <a href="#how-laybuy" class="btn-hero-secondary">
+                    How Laybuy Works
+                    <img src="/images/icons/arrow-Icon-2.svg" alt="">
+                </a>
+            </div>
+        </div>
+        <img src="/images/icons/watermark-half.svg" alt="" class="hero-watermark" aria-hidden="true">
+    </section>
+
+    <!-- BROWSE BY CATEGORY -->
+    <section class="category-section">
+        <div class="category-header">
+            <h2 class="section-title-serif">Browse by Category</h2>
+        </div>
+        <div class="category-grid">
+            <a href="/shop?gender=men" class="category-card home-reveal">
+                <div class="category-image">
+                    <img src="/images/icons/Men's-Watches -Accesories.svg" alt="Men's Watches & Accessories">
+                </div>
+                <div class="category-body">
+                    <div class="category-title">Men's Watches &amp; Accessories</div>
+                    <div class="category-desc">Timeless pieces for everyday wear and special occasions, with refined add-ons.</div>
+                </div>
+            </a>
+            <a href="/shop?gender=women" class="category-card home-reveal" style="transition-delay:0.12s">
+                <div class="category-image">
+                    <img src="/images/icons/Women's-Watches -Accesories.svg" alt="Women's Watches & Accessories">
+                </div>
+                <div class="category-body">
+                    <div class="category-title">Women's Watches &amp; Accessories</div>
+                    <div class="category-desc">Elegant essentials designed for grace and confidence with add-ons for that extra beauty.</div>
+                </div>
+            </a>
+            <a href="/shop?gender=gift picks" class="category-card home-reveal" style="transition-delay:0.24s">
+                <div class="category-image">
+                    <img src="/images/icons/Categories_Gifts.svg" alt="Gift Picks">
+                </div>
+                <div class="category-body">
+                    <div class="category-title">Gift Picks</div>
+                    <div class="category-desc">Thoughtful pieces for birthdays, anniversaries, and celebrations — a combination of our finest products.</div>
+                </div>
+            </a>
+        </div>
+        <img src="/images/icons/watermark-half.svg" alt="" class="section-watermark" aria-hidden="true">
+    </section>
+
+    <!-- FEATURED PRODUCTS SLIDER -->
+    <section class="featured-section">
+        <h2 class="section-title">Featured Products</h2>
+        <div class="products-slider">
+            <div class="slider-container" id="featuredSlider"></div>
+        </div>
+    </section>
+
+    <!-- FLASH SALES -->
+    <section id="flashSalesSection" class="flash-sales-section">
+        <div class="flash-sales">
+            <div class="flash-header">
+                <div class="flash-title">
+                    <span class="flash-icon">⚡</span> FLASH SALE
+                </div>
+                <div class="timer gradient-text" id="flashTimer">02:15:33</div>
+            </div>
+            <div class="progress-bar">
+                <div class="progress gradient-flow"></div>
+            </div>
+            <p id="flashBannerText">Limited stock available! 60% of items already sold.</p>
+            <div class="products" id="flashProducts"></div>
+        </div>
+    </section>
+
+    <!-- WHY SHOP WITH US -->
+    <section class="why-section" id="how-laybuy">
+        <h2 class="section-title-serif why-title-dark">Why Shop With Us?</h2>
+        <div class="why-grid">
+            <div class="why-card home-reveal">
+                <div class="why-icon-wrap">
+                    <img src="/images/icons/Laybuy.svg" alt="Laybuy for All">
+                </div>
+                <div class="why-card-title">Laybuy for All</div>
+                <div class="why-card-desc">Simple payment plans made to fit your budget.</div>
+            </div>
+            <div class="why-card home-reveal" style="transition-delay:0.1s">
+                <div class="why-icon-wrap">
+                    <img src="/images/icons/Returns.svg" alt="Easy Returns">
+                </div>
+                <div class="why-card-title">Easy 30 Day Returns</div>
+                <div class="why-card-desc">Simple returns for products covered under warranty.</div>
+            </div>
+            <div class="why-card home-reveal" style="transition-delay:0.2s">
+                <div class="why-icon-wrap">
+                    <img src="/images/icons/Secure payments.svg" alt="Secure Payments">
+                </div>
+                <div class="why-card-title">Secure Payments</div>
+                <div class="why-card-desc">Safe, reliable, and transparent payment options.</div>
+            </div>
+            <div class="why-card home-reveal" style="transition-delay:0.3s">
+                <div class="why-icon-wrap">
+                    <img src="/images/icons/Deliveru.svg" alt="Countrywide Delivery">
+                </div>
+                <div class="why-card-title">Countrywide Delivery</div>
+                <div class="why-card-desc">We deliver across Zambia for a convenient shopping experience.</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- TESTIMONIALS -->
+    <section class="testimonials-section">
+        <h2 class="section-title">What Our Clients Say</h2>
+        <div class="testimonials">
+            <div class="testimonial-card">
+                <div class="testimonial-text">
+                    "The quality is exceptional! My Rolex from Qualitick is indistinguishable from the original. Perfect service!"
+                </div>
+                <div class="testimonial-author">
+                    <div class="author-avatar gradient-flow">JD</div>
+                    <div>
+                        <h4 class="gradient-text">John Davidson</h4>
+                        <p>CEO, TechCorp</p>
+                    </div>
+                </div>
+            </div>
+            <div class="testimonial-card">
+                <div class="testimonial-text">
+                    "Fast shipping and excellent customer service. The Omega watch I purchased exceeded my expectations."
+                </div>
+                <div class="testimonial-author">
+                    <div class="author-avatar gradient-flow">SR</div>
+                    <div>
+                        <h4 class="gradient-text">Sarah Roberts</h4>
+                        <p>Fashion Influencer</p>
+                    </div>
+                </div>
+            </div>
+            <div class="testimonial-card">
+                <div class="testimonial-text">
+                    "Best quality triple-A watches online! The attention to detail is remarkable. Will definitely buy again."
+                </div>
+                <div class="testimonial-author">
+                    <div class="author-avatar gradient-flow">ME</div>
+                    <div>
+                        <h4 class="gradient-text">Michael Evans</h4>
+                        <p>Watch Collector</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- NEWSLETTER -->
+    <section class="newsletter-section">
+        <div class="newsletter">
+            <h3 class="gradient-text">Join Our Exclusive Community</h3>
+            <p>Subscribe to get early access to new collections, special offers, and luxury watch insights.</p>
+            <form class="newsletter-form" id="newsletterForm">
+                <input type="email" class="newsletter-input" placeholder="Enter your email" required>
+                <button type="submit" class="btn gradient-flow">Subscribe</button>
+            </form>
+            <p style="margin-top: 15px; font-size: 14px;">We respect your privacy. Unsubscribe at any time.</p>
+        </div>
+    </section>
+
+    <%- include('partials/footer') %>
+
+    <script>
+        // Scroll reveal for home page elements
+        const homeRevealEls = document.querySelectorAll('.home-reveal');
+        if ('IntersectionObserver' in window) {
+            const obs = new IntersectionObserver((entries) => {
+                entries.forEach(e => {
+                    if (e.isIntersecting) {
+                        e.target.classList.add('home-reveal-visible');
+                        obs.unobserve(e.target);
+                    }
+                });
+            }, { threshold: 0.12 });
+            homeRevealEls.forEach(el => obs.observe(el));
+        } else {
+            homeRevealEls.forEach(el => el.classList.add('home-reveal-visible'));
+        }
+    </script>

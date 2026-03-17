@@ -1,0 +1,426 @@
+<%- include('partials/header', {title: 'Checkout | Qualitick Collections', page: 'checkout'}) %>
+
+    <!-- BREADCRUMB -->
+    <div class="breadcrumb">
+        <div class="breadcrumb-container">
+            <a href="/">Home</a>
+            <span class="breadcrumb-separator">›</span>
+            <a href="/cart">Cart</a>
+            <span class="breadcrumb-separator">›</span>
+            <span class="breadcrumb-current">Checkout</span>
+        </div>
+    </div>
+
+    <!-- CHECKOUT PAGE -->
+    <section class="checkout-section">
+        <div class="checkout-container">
+            <h1 class="checkout-title">Checkout</h1>
+
+            <div class="checkout-layout">
+                <!-- Checkout Form (Left - 65%) -->
+                <div class="checkout-form-section">
+                    <form id="checkoutForm" class="checkout-form">
+                        <!-- Customer Information -->
+                        <div class="form-section">
+                            <h2 class="section-title">
+                                <i class="fas fa-user"></i> Customer Information
+                            </h2>
+                            
+                            <div class="form-group">
+                                <label for="fullName">Full Name <span class="required">*</span></label>
+                                <input 
+                                    type="text" 
+                                    id="fullName" 
+                                    name="fullName" 
+                                    class="form-input" 
+                                    required
+                                    placeholder="Enter your full name"
+                                >
+                                <span class="error-message" id="fullNameError"></span>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="phone">Phone Number <span class="required">*</span></label>
+                                    <input 
+                                        type="tel" 
+                                        id="phone" 
+                                        name="phone" 
+                                        class="form-input" 
+                                        required
+                                        placeholder="+260 9XX XXX XXX"
+                                    >
+                                    <span class="error-message" id="phoneError"></span>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="email">Email Address <span class="required">*</span></label>
+                                    <input 
+                                        type="email" 
+                                        id="email" 
+                                        name="email" 
+                                        class="form-input" 
+                                        required
+                                        placeholder="your.email@example.com"
+                                    >
+                                    <span class="error-message" id="emailError"></span>
+                                </div>
+                            </div>
+
+                            <div class="form-group checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="createAccount" name="createAccount">
+                                    <span>Create an account for faster checkout next time</span>
+                                </label>
+                            </div>
+
+                            <div class="login-prompt" id="loginPrompt" style="display: none;">
+                                <p>Already have an account? <a href="#" id="loginLink">Log in</a></p>
+                            </div>
+                        </div>
+
+                        <!-- Delivery / Shipping Information -->
+                        <div class="form-section">
+                            <h2 class="section-title">
+                                <i class="fas fa-truck"></i> Delivery Information
+                            </h2>
+
+                            <div class="form-group">
+                                <label for="deliveryAddress">Delivery Address <span class="required">*</span></label>
+                                <input 
+                                    type="text" 
+                                    id="deliveryAddress" 
+                                    name="deliveryAddress" 
+                                    class="form-input" 
+                                    required
+                                    placeholder="Street address, house number"
+                                >
+                                <span class="error-message" id="deliveryAddressError"></span>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="province">Province <span class="required">*</span></label>
+                                    <select id="province" name="province" class="form-input" required>
+                                        <option value="">Select Province</option>
+                                        <option value="Central">Central Province</option>
+                                        <option value="Copperbelt">Copperbelt Province</option>
+                                        <option value="Eastern">Eastern Province</option>
+                                        <option value="Luapula">Luapula Province</option>
+                                        <option value="Lusaka">Lusaka Province</option>
+                                        <option value="Muchinga">Muchinga Province</option>
+                                        <option value="Northern">Northern Province</option>
+                                        <option value="North-Western">North-Western Province</option>
+                                        <option value="Southern">Southern Province</option>
+                                        <option value="Western">Western Province</option>
+                                    </select>
+                                    <span class="error-message" id="provinceError"></span>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="city">City / Town <span class="required">*</span></label>
+                                    <input 
+                                        type="text" 
+                                        id="city" 
+                                        name="city" 
+                                        class="form-input" 
+                                        required
+                                        placeholder="Lusaka"
+                                    >
+                                    <span class="error-message" id="cityError"></span>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="deliveryInstructions">Delivery Instructions (Optional)</label>
+                                <textarea 
+                                    id="deliveryInstructions" 
+                                    name="deliveryInstructions" 
+                                    class="form-input" 
+                                    rows="3"
+                                    placeholder="Any special delivery instructions..."
+                                ></textarea>
+                            </div>
+
+                            <div class="form-group checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="pickupOption" name="pickupOption">
+                                    <span>I prefer to pick up from store</span>
+                                </label>
+                            </div>
+
+                            <div class="delivery-fee-display" id="deliveryFeeDisplay" style="display: none;">
+                                <p>Estimated Delivery Fee: <strong id="deliveryFeeAmount">K0</strong></p>
+                            </div>
+                        </div>
+
+                        <!-- Payment Method Selection -->
+                        <div class="form-section">
+                            <h2 class="section-title">
+                                <i class="fas fa-credit-card"></i> Payment Method
+                            </h2>
+
+                            <div class="payment-methods">
+                                <!-- Mobile Money Option -->
+                                <div class="payment-option">
+                                    <input type="radio" id="paymentMobile" name="paymentMethod" value="mobile" required>
+                                    <label for="paymentMobile" class="payment-label">
+                                        <div class="payment-icon">
+                                            <i class="fas fa-mobile-alt"></i>
+                                        </div>
+                                        <div class="payment-info">
+                                            <span class="payment-name">Mobile Money</span>
+                                            <span class="payment-desc">Pay with Airtel or MTN</span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <!-- Bank Transfer Option - DISABLED FOR NOW (Will be enabled in future update) -->
+                                <!--
+                                <div class="payment-option">
+                                    <input type="radio" id="paymentBank" name="paymentMethod" value="bank" required>
+                                    <label for="paymentBank" class="payment-label">
+                                        <div class="payment-icon">
+                                            <i class="fas fa-university"></i>
+                                        </div>
+                                        <div class="payment-info">
+                                            <span class="payment-name">Bank Transfer</span>
+                                            <span class="payment-desc">Direct bank transfer</span>
+                                        </div>
+                                    </label>
+                                </div>
+                                -->
+                            </div>
+                            
+                            <!-- Payment Method Specific Fields (dynamically added by JavaScript) -->
+                            <!-- Mobile Money Provider and Bank Selection will be added here -->
+                            
+                            <span class="error-message" id="paymentMethodError"></span>
+                            
+                            <!-- Payment Status Indicator (shown during payment processing) -->
+                            <div id="paymentStatusIndicator" style="display: none; margin-top: 15px; padding: 12px; background: rgba(59, 130, 246, 0.1); border-radius: 8px; border-left: 4px solid #3b82f6;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <i class="fas fa-spinner fa-spin" style="color: #3b82f6;"></i>
+                                    <div>
+                                        <strong style="color: #3b82f6;">Payment Pending</strong>
+                                        <p style="margin: 5px 0 0 0; font-size: 14px; color: #64748b;" id="paymentStatusText">
+                                            Waiting for payment confirmation...
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Terms & Conditions -->
+                        <div class="form-section">
+                            <div class="form-group checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="acceptTerms" name="acceptTerms" required>
+                                    <span>I agree to the <a href="/terms" target="_blank">Terms & Conditions</a> and <a href="/privacy" target="_blank">Privacy Policy</a> <span class="required">*</span></span>
+                                </label>
+                                <span class="error-message" id="acceptTermsError"></span>
+                            </div>
+                        </div>
+
+                        <!-- Place Order Button -->
+                        <div class="form-actions">
+                            <button type="submit" class="btn-place-order" id="placeOrderBtn">
+                                <i class="fas fa-lock"></i> Place Order
+                            </button>
+                            <a href="/cart" class="btn-back-to-cart">
+                                <i class="fas fa-arrow-left"></i> Back to Cart
+                            </a>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Order Summary Panel (Right - 35%) -->
+                <aside class="order-summary-panel">
+                    <div class="summary-card">
+                        <h2 class="summary-title">Order Summary</h2>
+                        
+                        <a href="/cart" class="edit-cart-link">
+                            <i class="fas fa-edit"></i> Edit Cart
+                        </a>
+
+                        <!-- Cart Items List -->
+                        <div class="summary-items" id="summaryItems">
+                            <!-- Cart items will be dynamically inserted here -->
+                        </div>
+
+                        <!-- Summary Totals -->
+                        <div class="summary-totals">
+                            <div class="summary-row">
+                                <span>Subtotal</span>
+                                <span id="summarySubtotal">K0</span>
+                            </div>
+                            <div class="summary-row">
+                                <span>Delivery Fee</span>
+                                <span id="summaryDelivery">K0</span>
+                            </div>
+                            <div class="summary-divider"></div>
+                            <div class="summary-row total-row">
+                                <span><strong>Total</strong></span>
+                                <span class="total-amount" id="summaryTotal"><strong>K0</strong></span>
+                            </div>
+                        </div>
+
+                        <!-- Trust Badges -->
+                        <div class="trust-badges">
+                            <div class="trust-badge-item">
+                                <i class="fas fa-shield-alt"></i>
+                                <span>Secure Checkout</span>
+                            </div>
+                            <div class="trust-badge-item">
+                                <i class="fas fa-truck"></i>
+                                <span>Free Shipping</span>
+                            </div>
+                            <div class="trust-badge-item">
+                                <i class="fas fa-undo"></i>
+                                <span>30-Day Returns</span>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </section>
+
+    <!-- Payment Processing Modal -->
+    <div class="modal" id="paymentModal" style="display: none;">
+        <div class="modal-content">
+            <div class="payment-processing">
+                <div class="spinner"></div>
+                <h3>Processing Payment</h3>
+                <p>Please wait while we process your payment...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Success Modal -->
+    <div class="modal" id="successModal" style="display: none;">
+        <div class="modal-content">
+            <button class="modal-close" id="closeSuccessModal">&times;</button>
+            <div class="success-content">
+                <i class="fas fa-check-circle"></i>
+                <h3>Order Placed Successfully!</h3>
+                <p>Your order has been confirmed. You will receive an email confirmation shortly.</p>
+                <div class="order-number">
+                    <strong>Order #<span id="orderNumber"></span></strong>
+                </div>
+                <div class="modal-actions">
+                    <a href="/" class="btn-primary">Continue Shopping</a>
+                    <a href="/orders" class="btn-outline">View Orders</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Error Modal -->
+    <div class="modal" id="errorModal" style="display: none;">
+        <div class="modal-content">
+            <button class="modal-close" id="closeErrorModal">&times;</button>
+            <div class="error-content">
+                <i class="fas fa-exclamation-circle"></i>
+                <h3>Payment Failed</h3>
+                <p id="errorMessage">There was an error processing your payment. Please try again.</p>
+                <div class="modal-actions">
+                    <button class="btn-primary" id="retryPaymentBtn">Retry Payment</button>
+                    <button class="btn-outline" id="cancelPaymentBtn">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Instructions Modal -->
+    <div class="modal" id="paymentInstructionsModal" style="display: none;">
+        <div class="modal-content payment-instructions-modal" style="max-width: 600px;">
+            <button class="modal-close" id="closePaymentInstructionsBtn">&times;</button>
+            <div class="payment-instructions-content">
+                <h3 style="margin-bottom: 20px; color: #1e293b;">
+                    <i class="fas fa-info-circle" style="color: #3b82f6;"></i> Payment Instructions
+                </h3>
+                
+                <!-- Payment Reference -->
+                <div class="payment-reference" style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
+                    <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748b;">
+                        <strong style="color: #1e293b;">Payment Reference:</strong>
+                    </p>
+                    <div class="reference-code" style="font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; color: #3b82f6; word-break: break-all;">
+                        <!-- Reference will be inserted here by JavaScript -->
+                    </div>
+                </div>
+                
+                <!-- QR Code Section -->
+                <div class="qr-code-section" style="text-align: center; margin-bottom: 20px; display: none;">
+                    <p style="margin-bottom: 15px; font-weight: 600; color: #1e293b;">
+                        <i class="fas fa-qrcode" style="color: #3b82f6;"></i> Scan QR Code to Pay
+                    </p>
+                    <div style="display: inline-block; padding: 15px; background: white; border-radius: 8px; border: 2px solid #e2e8f0;">
+                        <img src="" alt="Payment QR Code" class="qr-code-image" style="max-width: 250px; height: auto; display: block;">
+                    </div>
+                </div>
+                
+                <!-- Payment URL Section -->
+                <div class="payment-url-section" style="margin-bottom: 20px; display: none;">
+                    <p style="margin-bottom: 10px; font-weight: 600; color: #1e293b;">
+                        <i class="fas fa-link" style="color: #3b82f6;"></i> Or click the link below to pay:
+                    </p>
+                    <a href="#" target="_blank" class="payment-link-btn" style="display: inline-block; padding: 12px 24px; background: #3b82f6; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; transition: background 0.2s;">
+                        <i class="fas fa-external-link-alt"></i> Open Payment Page
+                    </a>
+                </div>
+                
+                <!-- Payment Instructions Text -->
+                <div class="payment-instructions-text" style="margin-bottom: 20px; display: none;">
+                    <p style="margin-bottom: 10px; font-weight: 600; color: #1e293b;">
+                        <i class="fas fa-list-ol" style="color: #3b82f6;"></i> Instructions:
+                    </p>
+                    <div class="instructions-content" style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6; color: #475569; line-height: 1.6;">
+                        <!-- Instructions will be inserted here by JavaScript -->
+                    </div>
+                </div>
+                
+                <!-- Bank Account Details (for bank transfers) -->
+                <div class="bank-account-section" style="margin-bottom: 20px; display: none;">
+                    <p style="margin-bottom: 10px; font-weight: 600; color: #1e293b;">
+                        <i class="fas fa-university" style="color: #3b82f6;"></i> Bank Account Details:
+                    </p>
+                    <div class="bank-details" style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        <!-- Bank details will be inserted here by JavaScript -->
+                    </div>
+                </div>
+                
+                <!-- Payment Status Info -->
+                <div class="payment-status-info" style="background: #fef3c7; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; margin-bottom: 20px;">
+                    <p style="margin: 0 0 8px 0; color: #92400e; font-weight: 600;">
+                        <i class="fas fa-clock"></i> Waiting for payment confirmation...
+                    </p>
+                    <p style="margin: 0; font-size: 14px; color: #78350f;">
+                        Please complete the payment using the instructions above. This page will automatically update when payment is confirmed.
+                    </p>
+                </div>
+                
+                <!-- Payment Expiry -->
+                <div class="payment-expiry" style="display: none; background: #fee2e2; padding: 12px; border-radius: 8px; border-left: 4px solid #ef4444; margin-bottom: 20px;">
+                    <p style="margin: 0; color: #991b1b; font-size: 14px;">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        Payment expires at: <strong id="paymentExpiryTime"></strong>
+                    </p>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="modal-actions" style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn-primary" id="completedPaymentBtn" style="flex: 1; padding: 12px 24px; background: #10b981; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
+                        <i class="fas fa-check-circle"></i> I've Completed Payment
+                    </button>
+                    <button class="btn-outline" id="closePaymentInstructionsBtn2" style="padding: 12px 24px; background: transparent; color: #64748b; border: 2px solid #e2e8f0; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<%- include('partials/footer') %>
+

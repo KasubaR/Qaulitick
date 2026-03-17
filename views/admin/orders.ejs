@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orders Management | Admin Panel</title>
+    
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
+    <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
+    
+    <!-- Professional Admin Styles -->
+    <link rel="stylesheet" href="/css/admin/admin-professional.css">
+    <link rel="stylesheet" href="/css/admin/admin-components.css">
+    <link rel="stylesheet" href="/css/admin/admin-responsive.css">
+    <!-- Admin Dashboard Stylesheet -->
+    <link rel="stylesheet" href="/css/admin/dashboard.css">
+    <!-- Admin Orders Stylesheet -->
+    <link rel="stylesheet" href="/css/admin/orders.css">
+</head>
+<body class="admin-page">
+    <!-- ADMIN ORDERS PAGE -->
+    <div class="admin-container">
+        <!-- Sidebar Navigation -->
+        <%- include('../partials/admin-sidebar', { activePage: 'orders' }) %>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <!-- Header -->
+            <header class="admin-header">
+                <div class="header-left">
+                    <button class="sidebar-toggle" id="sidebarToggle">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 class="page-title">Orders Management</h1>
+                </div>
+                
+                <div class="header-right">
+                    <button class="btn-outline" id="exportOrdersBtn">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                </div>
+            </header>
+
+            <!-- Orders Content -->
+            <div class="orders-content">
+                <!-- Search and Filters -->
+                <div class="orders-toolbar">
+                    <div class="search-section">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="orderSearch" placeholder="Search by Order ID, customer name, phone, or email...">
+                            <button class="search-btn" id="searchBtn">Search</button>
+                        </div>
+                    </div>
+
+                    <div class="filters-section">
+                        <div class="filter-group">
+                            <label>Order Status</label>
+                            <select id="filterOrderStatus" class="filter-select">
+                                <option value="">All Status</option>
+                                <option value="pending">Pending</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="packed">Packed</option>
+                                <option value="shipped">Shipped</option>
+                                <option value="delivered">Delivered</option>
+                                <option value="cancelled">Cancelled</option>
+                                <option value="returned">Returned</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label>Payment Status</label>
+                            <select id="filterPaymentStatus" class="filter-select">
+                                <option value="">All Payment Status</option>
+                                <option value="paid">Paid</option>
+                                <option value="pending">Pending</option>
+                                <option value="failed">Failed</option>
+                                <option value="refunded">Refunded</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label>Payment Method</label>
+                            <select id="filterPaymentMethod" class="filter-select">
+                                <option value="">All Methods</option>
+                                <option value="mobile">Mobile Money</option>
+                                <option value="card">Card</option>
+                                <option value="paypal">PayPal</option>
+                                <option value="bank">Bank Transfer</option>
+                                <option value="crypto">Cryptocurrency</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label>Date Range</label>
+                            <div class="date-range">
+                                <input type="date" id="startDate" class="date-input">
+                                <span>to</span>
+                                <input type="date" id="endDate" class="date-input">
+                            </div>
+                        </div>
+
+                        <div class="filter-group">
+                            <label>Sort By</label>
+                            <select id="sortBy" class="filter-select">
+                                <option value="newest">Newest First</option>
+                                <option value="oldest">Oldest First</option>
+                                <option value="highest">Highest Value</option>
+                                <option value="lowest">Lowest Value</option>
+                            </select>
+                        </div>
+
+                        <button class="btn-outline" id="clearFiltersBtn">
+                            <i class="fas fa-times"></i> Clear Filters
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- Orders Table -->
+                <div class="table-card">
+                    <div class="table-header">
+                        <div class="table-info">
+                            <span id="ordersCount">0</span> orders found
+                        </div>
+                        <div class="table-actions">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="selectAll">
+                                <span>Select All</span>
+                            </label>
+                            <button class="btn-danger" id="deleteSelectedBtn" style="display: none;">
+                                <i class="fas fa-trash"></i> Delete Selected
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="admin-table" id="ordersTable">
+                            <thead>
+                                <tr>
+                                    <th width="50">
+                                        <input type="checkbox" id="selectAllCheckbox">
+                                    </th>
+                                    <th width="120">Order ID</th>
+                                    <th>Customer</th>
+                                    <th width="120">Date</th>
+                                    <th width="120">Payment Method</th>
+                                    <th width="120">Payment Status</th>
+                                    <th width="120">Order Status</th>
+                                    <th width="120">Total Amount</th>
+                                    <th width="80">Delivery</th>
+                                    <th width="180">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ordersTableBody">
+                                <tr>
+                                    <td colspan="10" class="empty-state">
+                                        <i class="fas fa-shopping-cart"></i>
+                                        <p>No orders found</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div class="pagination" id="pagination">
+                        <button class="page-btn" id="prevPage" disabled>
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </button>
+                        <div class="page-numbers" id="pageNumbers">
+                            <span class="page-number active">1</span>
+                        </div>
+                        <button class="page-btn" id="nextPage">
+                            Next <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Order Details Modal -->
+    <div class="modal" id="orderDetailsModal" style="display: none;">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2>Order Details - <span id="orderDetailsId"></span></h2>
+                <button class="modal-close" id="closeOrderModal">&times;</button>
+            </div>
+
+            <div class="order-details-content">
+                <!-- Tabs -->
+                <div class="form-tabs">
+                    <button type="button" class="tab-btn active" data-tab="overview">
+                        <i class="fas fa-info-circle"></i> Overview
+                    </button>
+                    <button type="button" class="tab-btn" data-tab="items">
+                        <i class="fas fa-box"></i> Order Items
+                    </button>
+                    <button type="button" class="tab-btn" data-tab="shipping">
+                        <i class="fas fa-truck"></i> Shipping
+                    </button>
+                    <button type="button" class="tab-btn" data-tab="history">
+                        <i class="fas fa-history"></i> History & Notes
+                    </button>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="tab-content">
+                    <!-- Overview Tab -->
+                    <div class="tab-pane active" id="overviewTab">
+                        <div class="details-grid">
+                            <div class="details-section">
+                                <h3>Customer Information</h3>
+                                <div class="info-group">
+                                    <div class="info-item">
+                                        <span class="info-label">Name:</span>
+                                        <span class="info-value" id="customerName">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Phone:</span>
+                                        <span class="info-value" id="customerPhone">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Email:</span>
+                                        <span class="info-value" id="customerEmail">-</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="details-section">
+                                <h3>Delivery Information</h3>
+                                <div class="info-group">
+                                    <div class="info-item">
+                                        <span class="info-label">Address:</span>
+                                        <span class="info-value" id="deliveryAddress">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">City:</span>
+                                        <span class="info-value" id="deliveryCity">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Zone:</span>
+                                        <span class="info-value" id="deliveryZone">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Instructions:</span>
+                                        <span class="info-value" id="deliveryInstructions">-</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="details-section">
+                                <h3>Payment Information</h3>
+                                <div class="info-group">
+                                    <div class="info-item">
+                                        <span class="info-label">Method:</span>
+                                        <span class="info-value" id="paymentMethod">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Status:</span>
+                                        <span class="info-value" id="paymentStatus">-</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Transaction ID:</span>
+                                        <span class="info-value" id="transactionId">-</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="details-section">
+                                <h3>Order Summary</h3>
+                                <div class="summary-group">
+                                    <div class="summary-item">
+                                        <span>Subtotal:</span>
+                                        <span id="orderSubtotal">K0</span>
+                                    </div>
+                                    <div class="summary-item">
+                                        <span>Discount:</span>
+                                        <span id="orderDiscount">K0</span>
+                                    </div>
+                                    <div class="summary-item">
+                                        <span>Shipping:</span>
+                                        <span id="orderShipping">K0</span>
+                                    </div>
+                                    <div class="summary-item total">
+                                        <span>Total:</span>
+                                        <span id="orderTotal">K0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Status Management -->
+                        <div class="status-management">
+                            <h3>Update Order Status</h3>
+                            <div class="status-actions">
+                                <button class="status-btn confirm" id="confirmOrderBtn">
+                                    <i class="fas fa-check"></i> Confirm Order
+                                </button>
+                                <button class="status-btn pack" id="packOrderBtn">
+                                    <i class="fas fa-box"></i> Mark as Packed
+                                </button>
+                                <button class="status-btn ship" id="shipOrderBtn">
+                                    <i class="fas fa-shipping-fast"></i> Dispatch Order
+                                </button>
+                                <button class="status-btn deliver" id="deliverOrderBtn">
+                                    <i class="fas fa-check-circle"></i> Mark Delivered
+                                </button>
+                                <button class="status-btn cancel" id="cancelOrderBtn">
+                                    <i class="fas fa-times"></i> Cancel Order
+                                </button>
+                                <button class="status-btn refund" id="refundOrderBtn">
+                                    <i class="fas fa-undo"></i> Initiate Refund
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Order Items Tab -->
+                    <div class="tab-pane" id="itemsTab">
+                        <div class="order-items-list" id="orderItemsList">
+                            <!-- Order items will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Shipping Tab -->
+                    <div class="tab-pane" id="shippingTab">
+                        <div class="shipping-management">
+                            <div class="form-group">
+                                <label>Courier/Shipping Company</label>
+                                <select id="courierSelect" class="form-input">
+                                    <option value="">Select Courier</option>
+                                    <option value="dhl">DHL</option>
+                                    <option value="fedex">FedEx</option>
+                                    <option value="ups">UPS</option>
+                                    <option value="local">Local Courier</option>
+                                    <option value="pickup">Store Pickup</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Tracking Number</label>
+                                <div class="tracking-input-group">
+                                    <input type="text" id="trackingNumber" class="form-input" placeholder="Enter tracking number">
+                                    <button class="btn-primary" id="updateTrackingBtn">Update</button>
+                                </div>
+                            </div>
+
+                            <div class="tracking-info" id="trackingInfo">
+                                <h4>Tracking Information</h4>
+                                <div class="tracking-timeline" id="trackingTimeline">
+                                    <!-- Tracking history will be shown here -->
+                                </div>
+                            </div>
+
+                            <div class="shipping-actions">
+                                <button class="btn-outline" id="printDeliveryNoteBtn">
+                                    <i class="fas fa-print"></i> Print Delivery Note
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- History & Notes Tab -->
+                    <div class="tab-pane" id="historyTab">
+                        <div class="order-history-section">
+                            <h3>Order History</h3>
+                            <div class="history-timeline" id="orderHistoryTimeline">
+                                <!-- Order history will be shown here -->
+                            </div>
+                        </div>
+
+                        <div class="order-notes-section">
+                            <h3>Admin Notes</h3>
+                            <div class="notes-list" id="adminNotesList">
+                                <!-- Admin notes will be shown here -->
+                            </div>
+                            <div class="add-note-form">
+                                <textarea id="newNote" class="form-input" rows="3" placeholder="Add internal note..."></textarea>
+                                <button class="btn-primary" id="addNoteBtn">
+                                    <i class="fas fa-plus"></i> Add Note
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Actions -->
+            <div class="modal-actions">
+                <button class="btn-outline" id="printInvoiceBtn">
+                    <i class="fas fa-file-pdf"></i> Print Invoice
+                </button>
+                <button class="btn-outline" id="emailInvoiceBtn">
+                    <i class="fas fa-envelope"></i> Email Invoice
+                </button>
+                <button class="btn-outline" id="closeOrderDetailsBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Update Modal -->
+    <div class="modal" id="statusUpdateModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="statusModalTitle">Update Order Status</h2>
+                <button class="modal-close" id="closeStatusModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>New Status</label>
+                    <select id="newStatusSelect" class="form-input">
+                        <option value="pending">Pending</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="packed">Packed</option>
+                        <option value="shipped">Shipped</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="returned">Returned</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Notes (Optional)</label>
+                    <textarea id="statusNotes" class="form-input" rows="3" placeholder="Add notes about this status change..."></textarea>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-outline" id="cancelStatusUpdateBtn">Cancel</button>
+                <button class="btn-primary" id="confirmStatusUpdateBtn">Update Status</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/admin/auth-utils.js"></script>
+    <script src="/js/admin/sidebar.js"></script>
+    <script src="/js/admin/orders-badge.js"></script>
+    <script src="/js/admin/admin-orders.api.js"></script>
+    <script src="/js/admin/orders.js"></script>
+</body>
+</html>
+

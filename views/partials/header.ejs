@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Primary Meta Tags -->
+    <title><%= typeof title !== 'undefined' ? title : 'Qualitick Collections | Luxury Watches' %></title>
+    <meta name="title" content="<%= typeof title !== 'undefined' ? title : 'Qualitick Collections | Luxury Watches' %>">
+    <meta name="description" content="<%= typeof description !== 'undefined' ? description : 'Premium triple-A luxury watches with worldwide shipping and guaranteed satisfaction. Shop Rolex, Omega, Tag Heuer, Cartier and more.' %>">
+    <meta name="keywords" content="<%= typeof keywords !== 'undefined' ? keywords : 'luxury watches, AAA replica watches, premium watches, Rolex, Omega, Tag Heuer, Cartier, men watches, women watches' %>">
+    <meta name="author" content="Qualitick Collections">
+    <meta name="robots" content="<%= typeof robots !== 'undefined' ? robots : 'index, follow' %>">
+    <meta name="language" content="English">
+    <meta name="revisit-after" content="7 days">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="<%= typeof ogType !== 'undefined' ? ogType : 'website' %>">
+    <meta property="og:url" content="<%= typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com' + (typeof url !== 'undefined' ? url : '') %>">
+    <meta property="og:title" content="<%= typeof title !== 'undefined' ? title : 'Qualitick Collections | Luxury Watches' %>">
+    <meta property="og:description" content="<%= typeof description !== 'undefined' ? description : 'Premium triple-A luxury watches with worldwide shipping and guaranteed satisfaction.' %>">
+    <meta property="og:image" content="<%= typeof ogImage !== 'undefined' ? ogImage : 'https://qualitick-collections.com/images/og-image.jpg' %>">
+    <meta property="og:site_name" content="Qualitick Collections">
+    <meta property="og:locale" content="en_US">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="<%= typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com' + (typeof url !== 'undefined' ? url : '') %>">
+    <meta property="twitter:title" content="<%= typeof title !== 'undefined' ? title : 'Qualitick Collections | Luxury Watches' %>">
+    <meta property="twitter:description" content="<%= typeof description !== 'undefined' ? description : 'Premium triple-A luxury watches with worldwide shipping and guaranteed satisfaction.' %>">
+    <meta property="twitter:image" content="<%= typeof ogImage !== 'undefined' ? ogImage : 'https://qualitick-collections.com/images/og-image.jpg' %>">
+    
+    <!-- Canonical URL -->
+    <% if (typeof canonicalUrl !== 'undefined') { %>
+        <link rel="canonical" href="<%= canonicalUrl %>">
+    <% } %>
+    
+    <!-- CSRF Token (server-generated, required for secure form submissions) -->
+    <% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
+        <meta name="csrf-token" content="<%= csrfToken %>">
+    <% } %>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
+    <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
+
+    <!-- Local Font: Satoshi -->
+    <link rel="stylesheet" href="/fonts/WEB/css/satoshi.css">
+
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Cookie Utils (load before other scripts that need it) -->
+    <script src="/js/cookie-utils.js"></script>
+    <!-- Cookie Consent Banner (load before session.js to ensure consent is checked first) -->
+    <script src="/js/cookie-consent.js"></script>
+    <!-- Session Management (load after cookie-utils and cookie-consent) -->
+    <script src="/js/session.js"></script>
+
+    <!-- Google Analytics (GA4) - Only loads if user consented to Analytics cookies -->
+    <% if (typeof GA4_MEASUREMENT_ID !== 'undefined' && GA4_MEASUREMENT_ID) { %>
+        <script>
+            // Google Analytics (GA4) loading function
+            // Only loads if user has consented to Analytics cookies
+            (function() {
+                const GA4_MEASUREMENT_ID = '<%= GA4_MEASUREMENT_ID %>';
+                let ga4Loaded = false; // Track if GA4 has been loaded to prevent duplicate loading
+                
+                /**
+                 * Load Google Analytics (GA4) script and initialize tracking
+                 */
+                function loadGA4() {
+                    // Prevent duplicate loading
+                    if (ga4Loaded || typeof window.gtag !== 'undefined') {
+                        return;
+                    }
+                    
+                        // Store GA4 Measurement ID for use in analytics-events.js
+                    window.GA4_MEASUREMENT_ID = GA4_MEASUREMENT_ID;
+                        
+                    // Initialize dataLayer and gtag function
+                        window.dataLayer = window.dataLayer || [];
+                        function gtag(){dataLayer.push(arguments);}
+                    window.gtag = gtag;
+                        gtag('js', new Date());
+                    gtag('config', GA4_MEASUREMENT_ID, {
+                            'anonymize_ip': true,
+                            'cookie_flags': 'SameSite=None;Secure'
+                        });
+
+                    // Load GA4 script dynamically
+                        const script = document.createElement('script');
+                        script.async = true;
+                    script.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA4_MEASUREMENT_ID;
+                        document.head.appendChild(script);
+                    
+                    ga4Loaded = true;
+                }
+                
+                /**
+                 * Check if user has consented to Analytics and load GA4 if so
+                 */
+                function checkAndLoadGA4() {
+                    if (typeof window.CookieUtils !== 'undefined') {
+                        const hasAnalyticsConsent = window.CookieUtils.isCategoryAllowed(
+                            window.CookieUtils.COOKIE_CATEGORIES.ANALYTICS
+                        );
+                        
+                        if (hasAnalyticsConsent) {
+                            loadGA4();
+                        }
+                    }
+                }
+                
+                // Try to load GA4 immediately if CookieUtils is available
+                if (typeof window.CookieUtils !== 'undefined') {
+                    checkAndLoadGA4();
+                } else {
+                    // If CookieUtils not loaded yet, check on DOMContentLoaded
+                    document.addEventListener('DOMContentLoaded', function() {
+                        checkAndLoadGA4();
+                    });
+                }
+                
+                // Listen for consent updates to load GA4 when user grants analytics consent
+                window.addEventListener('cookieConsentUpdated', function(event) {
+                    const consentData = event.detail;
+                                
+                    // Check if analytics consent was just granted
+                    if (consentData && consentData.analytics === true) {
+                        // User just granted analytics consent - load GA4 now
+                        checkAndLoadGA4();
+                        }
+                    });
+            })();
+        </script>
+    <% } %>
+
+    <!-- Main Stylesheet (Global) -->
+    <link rel="stylesheet" href="/css/main.css">
+
+    <!-- Responsive Stylesheet -->
+    <link rel="stylesheet" href="/css/responsive.css">
+    
+    <!-- Cookie Consent Stylesheet -->
+    <link rel="stylesheet" href="/css/cookie-consent.css">
+    
+    <% if (typeof page !=='undefined' && page==='home' ) { %>
+        <!-- Home Page Stylesheet -->
+        <link rel="stylesheet" href="/css/home.css">
+    <% } %>
+
+    <% if (typeof page !=='undefined' && page==='shop' ) { %>
+        <!-- Shop Stylesheet -->
+        <link rel="stylesheet" href="/css/shop.css">
+    <% } %>
+    
+    <% if (typeof page !=='undefined' && page==='cart' ) { %>
+        <!-- Cart Stylesheet -->
+        <link rel="stylesheet" href="/css/cart.css">
+    <% } %>
+    
+    <% if (typeof page !=='undefined' && page==='product' ) { %>
+        <!-- Product Details Stylesheet -->
+        <link rel="stylesheet" href="/css/productdetails.css">
+        <link rel="stylesheet" href="/css/productdetails-responsive.css">
+    <% } %>
+    
+    <% if (typeof page !=='undefined' && page==='checkout' ) { %>
+        <!-- Checkout Stylesheet -->
+        <link rel="stylesheet" href="/css/checkout.css">
+    <% } %>
+    
+    <% if (typeof page !=='undefined' && page==='order-success' ) { %>
+        <!-- Order Success uses inline styles -->
+    <% } %>
+    
+    <% if (typeof page !=='undefined' && page==='admin' ) { %>
+        <!-- Admin Dashboard Stylesheet -->
+        <link rel="stylesheet" href="/css/admin/dashboard.css">
+    <% } %>
+    
+    <% if (typeof page !=='undefined' && page==='about' ) { %>
+        <!-- About Page Stylesheet -->
+        <link rel="stylesheet" href="/css/about.css">
+    <% } %>
+    
+    <% if (typeof page !=='undefined' && page==='contact' ) { %>
+        <!-- Contact Page Stylesheet -->
+        <link rel="stylesheet" href="/css/contact.css">
+    <% } %>
+    
+    <% if (typeof page !=='undefined' && page==='terms' ) { %>
+        <!-- Terms Page Stylesheet -->
+        <link rel="stylesheet" href="/css/about.css">
+    <% } %>
+    
+    <% if (typeof page !=='undefined' && page==='privacy' ) { %>
+        <!-- Privacy Policy Page Stylesheet -->
+        <link rel="stylesheet" href="/css/about.css">
+    <% } %>
+
+    <!-- Analytics Events Helper (load after cookie-utils) -->
+    <% if (typeof GA4_MEASUREMENT_ID !== 'undefined' && GA4_MEASUREMENT_ID) { %>
+        <script src="/js/analytics-events.js"></script>
+    <% } %>
+</head>
+
+<body class="<%= typeof page !== 'undefined' ? page + '-page' : '' %>">
+    <!-- Include Navbar -->
+    <%- include('navbar', {page: page}) %>

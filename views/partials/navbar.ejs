@@ -1,0 +1,28 @@
+<!-- HEADER -->
+<header>
+    <a href="/" class="nav-brand">
+        <img src="/images/icons/logo_black name.svg" alt="Qualitick Collections" class="nav-logo">
+    </a>
+
+    <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <nav id="mainNav">
+        <a href="/" class="<%= page === 'home' ? 'active' : '' %>">Home</a>
+        <a href="/shop" class="<%= page === 'shop' ? 'active' : '' %>">Watches</a>
+        <a href="/shop?gender=accessories" class="<%= page === 'accessories' ? 'active' : '' %>">Accessories</a>
+        <a href="/about" class="<%= page === 'about' ? 'active' : '' %>">About us</a>
+        <a href="/contact" class="<%= page === 'contact' ? 'active' : '' %>">Contact us</a>
+    </nav>
+
+    <div class="nav-right">
+        <a href="/cart" class="btn-cart" title="Cart">
+            Cart <span id="cartCount">0</span>
+            <img src="/images/icons/Cart-icon.svg" alt="Cart">
+        </a>
+        <a href="/account" class="login-icon" title="Account">
+            <img src="/images/icons/login.svg" alt="Login / Account">
+        </a>
+    </div>
+</header>

@@ -1,0 +1,258 @@
+<%- include('partials/header', {title: 'Cart | Qualitick Collections', page: 'cart'}) %>
+
+    <!-- BREADCRUMB -->
+    <div class="breadcrumb">
+        <div class="breadcrumb-container">
+            <a href="/">Home</a>
+            <span class="breadcrumb-separator">›</span>
+            <span class="breadcrumb-current">Shopping Cart</span>
+        </div>
+    </div>
+
+    <!-- CART PAGE -->
+    <section class="cart-section">
+        <div class="cart-container">
+            <!-- Cart Header -->
+            <div class="cart-header">
+                <h1 class="cart-title">Shopping Cart</h1>
+                <div class="cart-item-count" id="cartItemCount">
+                    <% 
+                    if (typeof initialCartItems !== 'undefined' && initialCartItems && initialCartItems.length > 0) {
+                        const totalItems = initialCartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+                    %>
+                        <%= totalItems %> <%= totalItems === 1 ? 'item' : 'items' %>
+                    <% } else { %>
+                        0 items
+                    <% } %>
+                </div>
+            </div>
+            
+            <% if (typeof cartWarnings !== 'undefined' && cartWarnings && cartWarnings.length > 0) { %>
+                <div class="cart-warnings" style="background: #fff3cd; border: 1px solid #ffc107; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+                    <strong>Please note:</strong>
+                    <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+                        <% cartWarnings.forEach(warning => { %>
+                            <li><%= warning.message %></li>
+                        <% }); %>
+                    </ul>
+                </div>
+            <% } %>
+
+            <div class="cart-layout">
+                <!-- Cart Items Section (70%) -->
+                <div class="cart-items-section">
+                    <!-- Empty Cart State -->
+                    <div class="empty-cart" id="emptyCart" style="display: <%= (typeof initialCartItems !== 'undefined' && initialCartItems && initialCartItems.length > 0) ? 'none' : 'block' %>;">
+                        <div class="empty-cart-icon">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <h2>Your cart is empty</h2>
+                        <p>Looks like you haven't added anything to your cart yet.</p>
+                        <a href="/shop" class="btn-primary">Continue Shopping</a>
+                    </div>
+
+                    <!-- Cart Items Table -->
+                    <div class="cart-items-container" id="cartItemsContainer" style="display: <%= (typeof initialCartItems !== 'undefined' && initialCartItems && initialCartItems.length > 0) ? 'block' : 'none' %>;">
+                        <table class="cart-table">
+                            <thead>
+                                <tr>
+                                    <th class="product-col">Product</th>
+                                    <th class="variant-col">Variants</th>
+                                    <th class="price-col">Price</th>
+                                    <th class="quantity-col">Quantity</th>
+                                    <th class="subtotal-col">Subtotal</th>
+                                    <th class="action-col">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cartItemsBody">
+                                <% if (typeof initialCartItems !== 'undefined' && initialCartItems && initialCartItems.length > 0) { %>
+                                    <% 
+                                    // Helper function to get color hex (simple mapping)
+                                    function getColorHex(colorName) {
+                                        if (!colorName) return '#000000';
+                                        const colorMap = {
+                                            'black': '#000000',
+                                            'white': '#FFFFFF',
+                                            'silver': '#C0C0C0',
+                                            'gold': '#FFD700',
+                                            'rose gold': '#E8B4B8',
+                                            'blue': '#0000FF',
+                                            'brown': '#A52A2A',
+                                            'green': '#008000',
+                                            'red': '#FF0000'
+                                        };
+                                        return colorMap[colorName.toLowerCase()] || '#000000';
+                                    }
+                                    
+                                    initialCartItems.forEach((item, index) => {
+                                        const finalPrice = typeof item.price === 'number' ? item.price : (parseFloat(item.price) || 0);
+                                        const originalPrice = item.originalPrice || finalPrice;
+                                        const subtotal = finalPrice * item.quantity;
+                                        const itemId = item.id || item.productId;
+                                    %>
+                                    <tr class="cart-item-row" data-item-id="<%= itemId %>">
+                                        <td class="product-col" data-label="Product">
+                                            <div class="cart-product">
+                                                <img src="<%= item.image || '/images/placeholder.jpg' %>" alt="<%= item.name %>" class="cart-product-image">
+                                                <div class="cart-product-info">
+                                                    <a href="/product/<%= item.productId || item.id %>" class="cart-product-name"><%= item.name %></a>
+                                                    <% if (item.variant && (item.variant.color || item.variant.strap)) { %>
+                                                        <div class="cart-product-variants">
+                                                            <% if (item.variant.color) { %><span>Color: <%= item.variant.color %></span><% } %>
+                                                            <% if (item.variant.strap) { %><span>Strap: <%= item.variant.strap %></span><% } %>
+                                                        </div>
+                                                    <% } %>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="variant-col" data-label="Variants">
+                                            <div class="variant-display">
+                                                <% if (item.variant && item.variant.color) { %>
+                                                    <div class="color-swatch" style="background-color: <%= getColorHex(item.variant.color) %>"></div>
+                                                <% } %>
+                                            </div>
+                                        </td>
+                                        <td class="price-col" data-label="Price">
+                                            <div class="price-display">
+                                                <% if (item.discount > 0 && originalPrice > finalPrice) { %>
+                                                    <span class="original-price">K<%= originalPrice.toLocaleString() %></span>
+                                                    <span class="discount-badge">-<%= item.discount %>%</span>
+                                                <% } %>
+                                                <span class="current-price">K<%= finalPrice.toLocaleString() %></span>
+                                            </div>
+                                        </td>
+                                        <td class="quantity-col" data-label="Quantity">
+                                            <div class="quantity-controls">
+                                                <button class="quantity-btn" data-action="decrease" data-item-id="<%= itemId %>" aria-label="Decrease quantity">
+                                                    <i class="fas fa-minus"></i>
+                                                </button>
+                                                <input 
+                                                    type="number" 
+                                                    class="quantity-input" 
+                                                    data-action="update"
+                                                    data-item-id="<%= itemId %>"
+                                                    value="<%= item.quantity %>" 
+                                                    min="1" 
+                                                    max="99"
+                                                >
+                                                <button class="quantity-btn" data-action="increase" data-item-id="<%= itemId %>" aria-label="Increase quantity">
+                                                    <i class="fas fa-plus"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td class="subtotal-col" data-label="Subtotal">
+                                            <span class="subtotal-amount">K<%= subtotal.toLocaleString() %></span>
+                                        </td>
+                                        <td class="action-col" data-label="Actions">
+                                            <div class="cart-item-actions">
+                                                <button class="action-btn remove-btn" data-action="remove" data-item-id="<%= itemId %>" title="Remove Item">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <% }); %>
+                                <% } else { %>
+                                    <!-- Cart items will be dynamically inserted here by JavaScript -->
+                                <% } %>
+                            </tbody>
+                        </table>
+
+                        <!-- Cart Actions -->
+                        <div class="cart-actions">
+                            <a href="/shop" class="btn-outline">
+                                <i class="fas fa-arrow-left"></i> Continue Shopping
+                            </a>
+                            <div class="cart-actions-right">
+                                <button class="btn-outline" id="restoreCartBtn" style="display: none;">
+                                    <i class="fas fa-undo"></i> Restore Saved Cart
+                                </button>
+                                <button class="btn-outline" id="saveCartBtn">
+                                    <i class="fas fa-bookmark"></i> Save for Later
+                                </button>
+                                <button class="btn-outline" id="clearCartBtn">
+                                    <i class="fas fa-trash"></i> Clear Cart
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Order Summary Section (30%) -->
+                <aside class="order-summary-section">
+                    <div class="order-summary-card" id="orderSummaryCard">
+                        <h2 class="summary-title">Order Summary</h2>
+
+                        <!-- Summary Details -->
+                        <div class="summary-details">
+                            <div class="summary-row">
+                                <span>Subtotal</span>
+                                <span id="subtotal">K<%= (typeof initialCartTotals !== 'undefined' && initialCartTotals) ? initialCartTotals.subtotal.toLocaleString() : '0' %></span>
+                            </div>
+                            <div class="summary-row">
+                                <span>Shipping</span>
+                                <span id="shippingFee">K<%= (typeof initialCartTotals !== 'undefined' && initialCartTotals) ? initialCartTotals.delivery.toLocaleString() : '0' %></span>
+                            </div>
+                            <div class="summary-row" id="taxRow" style="display: none;">
+                                <span>Tax</span>
+                                <span id="taxAmount">K0</span>
+                            </div>
+                            <div class="summary-divider"></div>
+                            <div class="summary-row total-row">
+                                <span><strong>Total</strong></span>
+                                <span class="total-amount" id="totalAmount"><strong>K<%= (typeof initialCartTotals !== 'undefined' && initialCartTotals) ? initialCartTotals.total.toLocaleString() : '0' %></strong></span>
+                            </div>
+                        </div>
+
+                        <!-- Checkout Button -->
+                        <button class="btn-primary btn-checkout" id="checkoutBtn" <%= (typeof initialCartItems !== 'undefined' && initialCartItems && initialCartItems.length > 0) ? '' : 'disabled' %>>
+                            <i class="fas fa-lock"></i> Proceed to Checkout
+                        </button>
+
+                        <!-- Trust Badges -->
+                        <div class="trust-badges-summary">
+                            <div class="trust-badge-item">
+                                <i class="fas fa-shield-alt"></i>
+                                <span>Secure Checkout</span>
+                            </div>
+                            <div class="trust-badge-item">
+                                <i class="fas fa-truck"></i>
+                                <span>Free Shipping</span>
+                            </div>
+                            <div class="trust-badge-item">
+                                <i class="fas fa-undo"></i>
+                                <span>30-Day Returns</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mobile Sticky Checkout -->
+                    <div class="mobile-sticky-checkout" id="mobileStickyCheckout">
+                        <div class="sticky-total">
+                            <span>Total: <strong id="mobileTotal">K<%= (typeof initialCartTotals !== 'undefined' && initialCartTotals) ? initialCartTotals.total.toLocaleString() : '0' %></strong></span>
+                        </div>
+                        <button class="btn-primary btn-checkout-mobile" id="checkoutBtnMobile" <%= (typeof initialCartItems !== 'undefined' && initialCartItems && initialCartItems.length > 0) ? '' : 'disabled' %>>
+                            Checkout
+                        </button>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </section>
+
+    <!-- Clear Cart Confirmation Modal -->
+    <div class="modal" id="clearCartModal" style="display: none;">
+        <div class="modal-content">
+            <button class="modal-close" id="closeClearCartModal">&times;</button>
+            <h3>Clear Cart</h3>
+            <p>Are you sure you want to remove all items from your cart?</p>
+            <div class="modal-actions">
+                <button class="btn-outline" id="cancelClearCartBtn">Cancel</button>
+                <button class="btn-primary" id="confirmClearCartBtn">Clear Cart</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/cart.js"></script>
+<%- include('partials/footer') %>
+

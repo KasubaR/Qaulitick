@@ -1,0 +1,73 @@
+<!-- FOOTER -->
+<footer>
+    <div class="footer-content">
+        <div class="footer-column">
+            <a href="/" class="footer-logo-link">
+                <img src="/images/icons/Qualitick-01.svg" alt="Qualitick Collections" class="footer-logo">
+            </a>
+            <p>Premium triple-A luxury watches with country-wide shipping and guaranteed satisfaction.</p>
+            <div class="social-icons">
+                <a href="https://www.instagram.com/qualitick_collections" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+                <a href="https://www.facebook.com/profile.php?id=61552156502774" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
+                <a href="https://www.tiktok.com/@qualitick_collections?_r=1&_t=ZS-93sydbZvxVV" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><i class="fab fa-tiktok"></i></a>
+            </div>
+        </div>
+        <div class="footer-column">
+            <h4>Shop</h4>
+            <a href="/shop?category=men">Men's Watches</a>
+            <a href="/shop?category=women">Women's Watches</a>
+            <a href="/shop?category=unisex">Unisex Collection</a>
+            <a href="/shop?category=accessories">Accessories</a>
+            <a href="/shop?category=gift picks">Gift Picks</a>
+        </div>
+        <div class="footer-column">
+            <h4>Support</h4>
+            <a href="/contact">Contact Us</a>
+            <a href="#">Shipping Policy</a>
+            <a href="#">Returns & Warranty</a>
+            <a href="#">FAQ</a>
+        </div>
+        <div class="footer-column">
+            <h4>Business</h4>
+            <a href="/about">About Us</a>
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/privacy#cookies">Cookie Policy</a>
+            <a href="/terms">Terms & Conditions</a>
+            <a href="#">Bulk Orders</a>
+            <a href="/admin/dashboard">Admin Panel</a>
+        </div>
+    </div>
+    <div class="copyright">
+        <p>© 2026 Qualitick Collections. All rights reserved.</p>
+        <p>Luxury watches | Triple-A quality | Country-wide shipping</p>
+    </div>
+</footer>
+
+<!-- JavaScript -->
+<!-- Error Handler (load first for global error handling) -->
+<script src="/js/error-handler.js"></script>
+<!-- Cookie Consent (load after cookie-utils.js which is in header) -->
+<!-- Cookie Consent is now loaded in header.ejs before session.js -->
+<!-- Global JavaScript -->
+<script src="/js/main.js"></script>
+
+<% if (typeof page !=='undefined' && page==='home' ) { %>
+    <!-- Home Page JavaScript -->
+    <script src="/js/home.js"></script>
+<% } %>
+
+<% if (typeof page !=='undefined' && page==='shop' ) { %>
+    <script src="/js/shop.js"></script>
+<% } %>
+
+<% if (typeof page !=='undefined' && page==='checkout' ) { %>
+    <script src="/js/checkout.js"></script>
+<% } %>
+
+<% if (typeof page !=='undefined' && page==='contact' ) { %>
+    <script src="/js/contact.js"></script>
+<% } %>
+
+        </body>
+
+        </html>

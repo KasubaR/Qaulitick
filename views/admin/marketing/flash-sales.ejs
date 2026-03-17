@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flash Sales Management | Admin Panel</title>
+    
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
+    <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
+    
+    <!-- Professional Admin Styles -->
+    <link rel="stylesheet" href="/css/admin/admin-professional.css">
+    <link rel="stylesheet" href="/css/admin/admin-components.css">
+    <link rel="stylesheet" href="/css/admin/admin-responsive.css">
+    <!-- Admin Dashboard Stylesheet -->
+    <link rel="stylesheet" href="/css/admin/dashboard.css">
+    <!-- Flash Sales Admin Stylesheet -->
+    <link rel="stylesheet" href="/css/admin/flash-sales.css">
+</head>
+<body class="admin-page">
+
+    <!-- ADMIN DASHBOARD -->
+    <div class="admin-container">
+        <!-- Sidebar Navigation -->
+        <%- include('../../partials/admin-sidebar', { activePage: 'marketing', activeSubPage: 'flash-sales' }) %>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <!-- Flash Sales Content -->
+            <div class="flash-sales-content">
+                <div class="flash-sales-header">
+                <h1><i class="fas fa-bolt"></i> Flash Sales Management</h1>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button class="btn-primary" onclick="openCreateFlashSaleModal()">
+                        <i class="fas fa-plus"></i> Create Flash Sale
+                    </button>
+                </div>
+            </div>
+
+            <!-- Flash Sales List -->
+                <div class="admin-card flash-sales-card">
+                <div class="card-header">
+                    <h2>Active Flash Sales</h2>
+                    <div class="filter-group">
+                        <select id="statusFilter" class="form-select">
+                            <option value="all">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="scheduled">Scheduled</option>
+                            <option value="ended">Ended</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="table-container flash-sales-table">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Sale Name</th>
+                                <th>Products</th>
+                                <th>Discount</th>
+                                <th>Start Date</th>
+                                <th>End Date</th>
+                                <th>Countdown</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="flashSalesTableBody">
+                            <!-- Flash sales are loaded via JavaScript from /api/admin/marketing/flash-sales -->
+                            <tr>
+                                <td colspan="8" class="text-center">Loading flash sales...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Features Overview -->
+            <div class="flash-sales-features">
+                <div class="admin-card">
+                    <h3><i class="fas fa-clock"></i> Countdown Timers</h3>
+                    <p>Automatic countdown timers displayed on home page. Timers update in real-time.</p>
+                    <div class="status-badge success">Active</div>
+                </div>
+                <div class="admin-card">
+                    <h3><i class="fas fa-exclamation-triangle"></i> Limited Stock Alerts</h3>
+                    <p>Show stock alerts when products are running low during flash sales.</p>
+                    <div class="status-badge success">Active</div>
+                </div>
+                <div class="admin-card">
+                    <h3><i class="fas fa-calendar-alt"></i> Product Scheduling</h3>
+                    <p>Schedule flash sales to start and end automatically at specific dates/times.</p>
+                    <div class="status-badge success">Active</div>
+                </div>
+                <div class="admin-card">
+                    <h3><i class="fas fa-play-circle"></i> Auto Start & Stop</h3>
+                    <p>Flash sales automatically start and stop based on scheduled times.</p>
+                    <div class="status-badge success">Active</div>
+                </div>
+                <div class="admin-card">
+                    <h3><i class="fas fa-image"></i> Banner Auto Display</h3>
+                    <p>Flash sale banners automatically appear on home page when active.</p>
+                    <div class="status-badge success">Active</div>
+                </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteFlashSaleModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Delete Flash Sale</h2>
+                <button class="modal-close" id="closeDeleteModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this flash sale? This action cannot be undone.</p>
+                <p class="warning-text"><strong>Flash Sale:</strong> <span id="deleteFlashSaleName"></span></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" id="cancelDeleteBtn">Cancel</button>
+                <button type="button" class="btn-danger" id="confirmDeleteBtn">
+                    <i class="fas fa-trash"></i> Delete Flash Sale
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Flash Sale Modal -->
+    <div id="flashSaleModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Create Flash Sale</h2>
+                <button class="modal-close" onclick="closeFlashSaleModal()">&times;</button>
+            </div>
+            <form id="flashSaleForm" onsubmit="saveFlashSale(event)">
+                <div class="form-group">
+                    <label>Sale Name *</label>
+                    <input type="text" id="saleName" class="form-input" required placeholder="e.g., Summer Flash Sale">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Start Date & Time *</label>
+                        <input type="datetime-local" id="startDate" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label>End Date & Time *</label>
+                        <input type="datetime-local" id="endDate" class="form-input" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Discount Percentage *</label>
+                    <input type="number" id="discount" class="form-input" min="1" max="99" required placeholder="e.g., 30">
+                    <small>Enter discount percentage (1-99%)</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Select Products *</label>
+                    <div class="product-selector">
+                        <input type="text" id="productSearch" class="form-input" placeholder="Search products...">
+                        <div id="productList" class="product-list">
+                            <!-- Products are loaded via JavaScript when user searches -->
+                        </div>
+                    </div>
+                </div>
+                
+                <input type="hidden" id="flashSaleId">
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="showBanner" checked>
+                        Auto-display banner on home page
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="showStockAlert">
+                        Show limited stock alerts
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label>Banner Text (Optional)</label>
+                    <input type="text" id="bannerText" class="form-input" placeholder="e.g., Limited Time Only!">
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" onclick="closeFlashSaleModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Flash Sale</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/admin/auth-utils.js"></script>
+    <script src="/js/admin/flash-sales.js"></script>
+
+</body>
+</html>
+
