@@ -36,7 +36,7 @@ exports.submitContactForm = async (req, res) => {
         const submission = await contactService.createSubmission(submissionData);
 
         // Send emails (don't fail if email sending fails)
-        const submissionObj = submission.toObject ? submission.toObject() : submission;
+        const submissionObj = submission.toJSON();
         try {
             await emailService.sendContactNotificationToAdmin(submissionObj);
         } catch (emailError) {

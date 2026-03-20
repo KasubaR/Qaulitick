@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const orderController = require('../controllers/order.controller');
+const { authenticateAdmin } = require('../middlewares/auth.middleware');
 
 // Create a new order
 router.post('/create', orderController.createOrder);
@@ -8,8 +9,13 @@ router.post('/create', orderController.createOrder);
 // Get all orders
 router.get('/', orderController.getAllOrders);
 
-// Export orders
-router.get('/export', orderController.exportOrders);
+// Export orders — admin only regardless of which router prefix this file is mounted under
+router.get('/export', authenticateAdmin, orderController.exportOrders);
+
+// Unread orders count for sidebar badge — returns { count } only, no PII
+// authenticateAdmin is inherited from the /api/admin/orders mount in app.js;
+// the explicit guard here ensures it cannot be reached via the public /api/orders prefix.
+router.get('/unread-count', authenticateAdmin, orderController.getUnreadOrderCount);
 
 // Get order by order number
 router.get('/:orderNumber', orderController.getOrderByNumber);

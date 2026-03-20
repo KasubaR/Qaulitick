@@ -314,25 +314,42 @@ function validateOrder(orderData) {
  * @param {object} productData - Product data to validate
  * @returns {object} - Validation result { valid: boolean, errors: array }
  */
-function validateProduct(productData) {
+function validateProduct(productData, { partial = false } = {}) {
     const errors = [];
-    
-    if (!productData.model || typeof productData.model !== 'string' || productData.model.trim().length < 2) {
-        errors.push('Product model is required (min 2 characters)');
+
+    // Required-field checks are skipped in partial mode (updates)
+    if (!partial || productData.model !== undefined) {
+        if (!productData.model || typeof productData.model !== 'string' || productData.model.trim().length < 2) {
+            errors.push('Product model is required (min 2 characters)');
+        }
     }
-    
-    if (!productData.brand || typeof productData.brand !== 'string' || productData.brand.trim().length < 2) {
-        errors.push('Product brand is required');
+
+    if (!partial || productData.brand !== undefined) {
+        if (!productData.brand || typeof productData.brand !== 'string' || productData.brand.trim().length < 2) {
+            errors.push('Product brand is required');
+        }
     }
-    
-    if (!productData.sku || typeof productData.sku !== 'string' || productData.sku.trim().length === 0) {
-        errors.push('SKU is required');
+
+    if (!partial || productData.sku !== undefined) {
+        if (!productData.sku || typeof productData.sku !== 'string' || productData.sku.trim().length === 0) {
+            errors.push('SKU is required');
+        }
     }
-    
-    if (!validatePrice(productData.price)) {
-        errors.push('Valid price is required');
+
+    if (!partial || productData.price !== undefined) {
+        if (!validatePrice(productData.price)) {
+            errors.push('Valid price is required');
+        }
     }
-    
+
+    if (productData.originalPrice !== undefined && productData.originalPrice !== null && productData.originalPrice !== '') {
+        const origPrice = parseFloat(productData.originalPrice);
+        const currPrice = parseFloat(productData.price);
+        if (!isNaN(origPrice) && !isNaN(currPrice) && origPrice <= currPrice) {
+            errors.push('Original price must be greater than the current price');
+        }
+    }
+
     if (productData.stock !== undefined && !validateStock(productData.stock)) {
         errors.push('Valid stock quantity is required');
     }

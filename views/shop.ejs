@@ -1,4 +1,4 @@
-﻿<%- include('partials/header', {
+<%- include('partials/header', {
     title: typeof title !== 'undefined' ? title : 'Shop | Qualitick Collections',
     page: 'shop',
     description: typeof description !== 'undefined' ? description : 'Shop premium triple-A luxury watches. Browse Rolex, Omega, Tag Heuer, Cartier and more.',
@@ -249,61 +249,10 @@
                             <button onclick="if (typeof clearAllFilters === 'function') { clearAllFilters(); } else { window.location.href = '/shop'; }" class="btn-primary" style="padding: 12px 25px; background: var(--gold-gradient-horizontal); color: #000; border: none; border-radius: 5px; font-weight: 600; cursor: pointer;">
                                 <i class="fas fa-redo"></i> Clear All Filters
                             </button>
-                        </div>
+                        </div>   
                     <% } else if (typeof products !== 'undefined' && products && products.length > 0) { %>
                         <% products.forEach(product => { %>
-                            <div class="shop-product-card">
-                                <a href="/product/<%= product._id %>" class="product-link">
-                                    <div class="product-image-wrapper">
-                                        <% if (product.discount > 0) { %>
-                                            <span class="discount-badge">-<%= product.discount %>%</span>
-                                        <% } %>
-                                        <% if (product.stock === 0) { %>
-                                            <div class="out-of-stock-overlay">Out of Stock</div>
-                                        <% } %>
-                                        <img 
-                                            src="<%= product.images && product.images[0] ? product.images[0] : '/images/placeholder.jpg' %>" 
-                                            alt="<%= product.model %>"
-                                            class="product-image"
-                                            loading="lazy"
-                                            decoding="async"
-                                            width="400"
-                                            height="400"
-                                            style="aspect-ratio: 1 / 1; object-fit: cover;"
-                                        >
-                                    </div>
-                                    <div class="product-info">
-                                        <div class="product-brand"><%= product.brand || 'Brand' %></div>
-                                        <h3 class="product-name"><%= product.model %></h3>
-                                        <div class="product-rating">
-                                            <% for(let i = 1; i <= 5; i++) { %>
-                                                <% if (i <= Math.floor(product.rating || 0)) { %>
-                                                    <i class="fas fa-star"></i>
-                                                <% } else if (i === Math.ceil(product.rating || 0) && (product.rating || 0) % 1 !== 0) { %>
-                                                    <i class="fas fa-star-half-alt"></i>
-                                                <% } else { %>
-                                                    <i class="far fa-star"></i>
-                                                <% } %>
-                                            <% } %>
-                                            <span class="rating-value">(<%= product.rating || 0 %>)</span>
-                                        </div>
-                                        <div class="product-price">
-                                            <% if (product.discount > 0) { %>
-                                                <span class="original-price">K<%= (product.originalPrice || product.price || 0).toLocaleString() %></span>
-                                                <span class="current-price" data-final-price="<%= product.finalPrice || product.price || 0 %>">K<%= (product.finalPrice || product.price || 0).toLocaleString() %></span>
-                                            <% } else { %>
-                                                <span class="current-price" data-final-price="<%= product.finalPrice || product.price || 0 %>">K<%= (product.finalPrice || product.price || 0).toLocaleString() %></span>
-                                            <% } %>
-                                        </div>
-                                        <div class="product-meta">
-                                            <span class="product-strap">
-                                                <i class="fas fa-link"></i>
-                                                <%= product.strapType || 'N/A' %>
-                                            </span>
-                                        </div>
-                                    </div>
-                                </a>
-                            </div>
+                            <%- include('partials/product-card', { product: product }) %>
                         <% }) %>
                     <% } else { %>
                         <div class="no-products">
@@ -347,7 +296,12 @@
             "numberOfItems": "<%= typeof products !== 'undefined' && products ? products.length : 0 %>",
             "itemListElement": [
                 <% if (typeof products !== 'undefined' && products) { %>
-                    <% products.forEach((product, index) => { %>
+                    <% products.forEach((product, index) => {
+                        let _imgsLd = product.images;
+                        if (typeof _imgsLd === 'string') { try { _imgsLd = JSON.parse(_imgsLd); } catch(e) { _imgsLd = []; } }
+                        if (!Array.isArray(_imgsLd)) _imgsLd = [];
+                        const _firstImageLd = _imgsLd[0] || '/images/placeholder.jpg';
+                    %>
                     {
                         "@type": "ListItem",
                         "position": <%= index + 1 %>,
@@ -355,7 +309,7 @@
                             "@type": "Product",
                             "name": "<%= product.model %>",
                             "url": "https://qualitick-collections.com/product/<%= product._id %>",
-                            "image": "<%= product.images && product.images[0] ? product.images[0] : '' %>",
+                            "image": "<%= _firstImageLd %>",
                             "brand": {
                                 "@type": "Brand",
                                 "name": "<%= product.brand %>"

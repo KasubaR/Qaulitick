@@ -1,17 +1,10 @@
 // Payment Controller
+const { Op } = require('sequelize');
 const Payment = require('../models/Payment.model');
 const Order = require('../models/Order.model');
 const lencoService = require('../services/lenco.service');
-const redisStore = require('../utils/redis.store');
 const orderService = require('../services/order.service');
-
-// Redis cache keys
-const BANKS_CACHE_KEY = 'lenco:banks:cache';
-const BANKS_LOCK_KEY = 'lenco:banks:lock';
-const BANKS_CACHE_TTL_SECONDS = 86400; // 24 hours in seconds
-const LOCK_TTL_SECONDS = 30; // Lock expires after 30 seconds (prevents deadlock)
-const LOCK_RETRY_DELAY_MS = 100; // Wait 100ms before retrying cache read
-const MAX_LOCK_RETRIES = 10; // Maximum retries before giving up
+const logger = require('../utils/logger').child({ module: 'PaymentController' });
 
 // Payment retry limit (configurable via environment variable)
 const MAX_PAYMENT_RETRIES = parseInt(process.env.MAX_PAYMENT_RETRIES || '3', 10);
@@ -21,14 +14,17 @@ const ENABLE_BANK_TRANSFER = process.env.ENABLE_BANK_TRANSFER === 'true' || proc
 
 /**
  * Process Payment
- * Handles payment initiation for Lenco payment methods (mobile money and bank transfer)
+ * Handles payment initiation for Lenco payment methods (mobile money and bank transfer).
+ *
+ * Amount is always fetched from the database — do not send it from the client.
+ * The orderNumber is the sole key; the server derives every financial value from
+ * the persisted order record to prevent client-side price manipulation.
  */
 exports.processPayment = async (req, res) => {
     try {
         const {
             orderNumber,
             paymentMethod,
-            amount,
             customerInfo,
             // Lenco-specific fields
             provider, // For mobile money: 'airtel', 'mtn'
@@ -44,10 +40,9 @@ exports.processPayment = async (req, res) => {
             });
         }
 
-        // SECURITY: Always fetch order from database to get authoritative amount
-        // Never trust amount from request body - prevents payment manipulation attacks
+        // Fetch order from database — this is the sole source of the charge amount.
         const order = await Order.findByOrderNumber(orderNumber);
-        
+
         if (!order) {
             return res.status(404).json({
                 success: false,
@@ -55,13 +50,8 @@ exports.processPayment = async (req, res) => {
             });
         }
 
-        // Use authoritative amount from database order
+        // Authoritative amount — never derived from req.body.
         const authoritativeAmount = order.totals.total;
-        
-        // Log warning if client-provided amount differs (for security monitoring)
-        if (req.body.amount && Math.abs(req.body.amount - authoritativeAmount) > 0.01) {
-            console.warn(`[Payment Controller] Amount mismatch for order ${orderNumber}: client sent ${req.body.amount}, database has ${authoritativeAmount}`);
-        }
 
         // Validate payment method based on feature flags
         const validPaymentMethods = ['mobile_money'];
@@ -86,10 +76,22 @@ exports.processPayment = async (req, res) => {
 
         // Use order data from database (authoritative source)
         // Convert Mongoose document to plain object for Lenco service
-        const orderData = order.toObject ? order.toObject() : order;
+        const orderData = order.toJSON();
 
         let lencoResponse;
         let paymentRecord;
+
+        // Idempotency: reject if a pending/processing payment already exists for this order
+        const existingPending = await Payment.findOne({
+            where: { orderNumber, status: { [Op.in]: ['pending', 'processing'] } }
+        });
+        if (existingPending) {
+            return res.status(409).json({
+                success: false,
+                message: 'A payment is already pending for this order',
+                transactionId: existingPending.lencoTransactionId
+            });
+        }
 
         // Handle Mobile Money Payment
         if (paymentMethod === 'mobile_money') {
@@ -155,7 +157,7 @@ exports.processPayment = async (req, res) => {
                     }
                 });
 
-                console.log(`[Payment Controller] Mobile money payment initiated for order ${orderNumber} via ${provider}`);
+                logger.debug({ orderNumber, provider }, 'Mobile money payment initiated');
 
             } catch (error) {
                 console.error('[Payment Controller] Error initiating mobile money payment:', error);
@@ -244,7 +246,7 @@ exports.processPayment = async (req, res) => {
                     }
                 });
 
-                console.log(`[Payment Controller] Bank transfer payment initiated for order ${orderNumber} via ${bankDetails.bankName}`);
+                logger.debug({ orderNumber, bankName: bankDetails.bankName }, 'Bank transfer payment initiated');
 
             } catch (error) {
                 console.error('[Payment Controller] Error initiating bank transfer:', error);
@@ -253,7 +255,7 @@ exports.processPayment = async (req, res) => {
                 paymentRecord = await Payment.create({
                     orderNumber,
                     paymentMethod: 'bank_transfer',
-                    amount,
+                    amount: authoritativeAmount, // Use authoritative amount from database order
                     currency: 'ZMW',
                     status: 'failed',
                     customerInfo,
@@ -316,7 +318,7 @@ exports.verifyPayment = async (req, res) => {
     try {
         const { transactionId } = req.params;
         
-        console.log(`[Payment Controller] Verifying payment: ${transactionId}`);
+        logger.debug({ transactionId }, 'Verifying payment');
 
         // First, check the database for payment record
         // transactionId could be: collection ID, Lenco reference, or your reference
@@ -333,23 +335,26 @@ exports.verifyPayment = async (req, res) => {
         }
         
         if (!payment) {
-            console.log(`[Payment Controller] Payment not found in database: ${transactionId}`);
+            logger.debug({ transactionId }, 'Payment not found in database');
             return res.status(404).json({
                 success: false,
                 message: 'Payment not found'
             });
         }
 
-        console.log(`[Payment Controller] Found payment in database:`, {
-            transactionId: payment.lencoTransactionId,
-            reference: payment.lencoReference,
-            currentStatus: payment.status,
-            lencoStatus: payment.lencoStatus
-        });
+        logger.debug(
+            {
+                transactionId: payment.lencoTransactionId,
+                reference: payment.lencoReference,
+                currentStatus: payment.status,
+                lencoStatus: payment.lencoStatus
+            },
+            'Found payment in database'
+        );
         
         // If payment is already completed or failed, return current status
         if (payment.status === 'completed' || payment.status === 'failed') {
-            console.log(`[Payment Controller] Payment already finalized: ${payment.status}`);
+            logger.debug({ status: payment.status }, 'Payment already finalized');
             return res.json({
                 success: true,
                 transactionId: payment.lencoTransactionId || payment.transactionId,
@@ -372,24 +377,30 @@ exports.verifyPayment = async (req, res) => {
                     payment.lencoReference
                 );
                 
-                console.log(`[Payment Controller] Lenco verification result:`, {
-                    status: lencoResult.status,
-                    transactionId: lencoResult.transactionId
-                });
+                logger.debug(
+                    {
+                        status: lencoResult.status,
+                        transactionId: lencoResult.transactionId
+                    },
+                    'Lenco verification result'
+                );
                 
-                // Update payment status based on Lenco response
-                payment.lencoStatus = lencoResult.status;
-                payment.status = payment.mapLencoStatusToPaymentStatus(lencoResult.status);
-                payment.lencoResponse = lencoResult.rawResponse || lencoResult;
-                
-                // Store previous status for notification check
+                // Capture DB status BEFORE any mutations so notification checks are accurate
                 const previousPaymentStatus = payment.status;
-                
+
+                const newStatus = payment.mapLencoStatusToPaymentStatus(lencoResult.status);
+                const updatePayload = {
+                    lencoStatus: lencoResult.status,
+                    status: newStatus,
+                    lencoResponse: lencoResult.rawResponse || lencoResult
+                };
+
                 // Update order status if payment completed or failed
                 if (lencoResult.status === 'successful' || lencoResult.status === 'completed') {
-                    payment.completedAt = lencoResult.completedAt ? new Date(lencoResult.completedAt) : new Date();
-                    
-                    // Update order status
+                    updatePayload.completedAt = lencoResult.completedAt
+                        ? new Date(lencoResult.completedAt)
+                        : new Date();
+
                     try {
                         await orderService.updateOrderStatusFromPayment(
                             payment.orderNumber,
@@ -397,56 +408,45 @@ exports.verifyPayment = async (req, res) => {
                             payment.lencoTransactionId,
                             'Payment completed via Lenco verification'
                         );
-                        console.log(`[Payment Controller] Order ${payment.orderNumber} status updated to 'paid'`);
+                        logger.debug({ orderNumber: payment.orderNumber }, 'Order status updated to paid');
                     } catch (orderError) {
                         console.error(`[Payment Controller] Error updating order status:`, orderError);
-                        // Don't fail verification if order update fails
-                    }
-                    
-                    // Send payment notification if status changed
-                    if (previousPaymentStatus !== 'completed') {
-                        try {
-                            const emailService = require('../services/email.service');
-                            const paymentObj = payment.toObject ? payment.toObject() : payment;
-                            await emailService.sendPaymentNotificationToAdmin(paymentObj);
-                        } catch (emailError) {
-                            console.error('[Payment Controller] Error sending payment notification:', emailError);
-                            // Continue even if email fails
-                        }
                     }
                 } else if (lencoResult.status === 'failed') {
-                    payment.failedAt = lencoResult.failedAt ? new Date(lencoResult.failedAt) : new Date();
-                    payment.failureReason = lencoResult.failureReason || 'Payment failed';
-                    
-                    // Update order status
+                    updatePayload.failedAt = lencoResult.failedAt
+                        ? new Date(lencoResult.failedAt)
+                        : new Date();
+                    updatePayload.failureReason = lencoResult.failureReason || 'Payment failed';
+
                     try {
                         await orderService.updateOrderStatusFromPayment(
                             payment.orderNumber,
                             'failed',
                             payment.lencoTransactionId,
-                            `Payment failed: ${payment.failureReason}`
+                            `Payment failed: ${updatePayload.failureReason}`
                         );
-                        console.log(`[Payment Controller] Order ${payment.orderNumber} status updated to 'payment_failed'`);
+                        logger.debug({ orderNumber: payment.orderNumber }, 'Order status updated to payment_failed');
                     } catch (orderError) {
                         console.error(`[Payment Controller] Error updating order status:`, orderError);
-                        // Don't fail verification if order update fails
-                    }
-                    
-                    // Send payment notification if status changed
-                    if (previousPaymentStatus !== 'failed') {
-                        try {
-                            const emailService = require('../services/email.service');
-                            const paymentObj = payment.toObject ? payment.toObject() : payment;
-                            await emailService.sendPaymentNotificationToAdmin(paymentObj);
-                        } catch (emailError) {
-                            console.error('[Payment Controller] Error sending payment notification:', emailError);
-                            // Continue even if email fails
-                        }
                     }
                 }
-                
-                // Save payment after all updates
-                await payment.save();
+
+                // Atomic update — if this throws, DB and in-memory state can't desync
+                // because we haven't mutated the instance yet
+                await Payment.update(updatePayload, { where: { id: payment.id } });
+                payment = await Payment.findByPk(payment.id);
+
+                // Send notification now that DB is confirmed updated
+                if (previousPaymentStatus !== newStatus &&
+                    (newStatus === 'completed' || newStatus === 'failed')) {
+                    try {
+                        const emailService = require('../services/email.service');
+                        const paymentObj = payment.toJSON();
+                        await emailService.sendPaymentNotificationToAdmin(paymentObj);
+                    } catch (emailError) {
+                        console.error('[Payment Controller] Error sending payment notification:', emailError);
+                    }
+                }
 
                 return res.json({
                     success: true,
@@ -469,11 +469,14 @@ exports.verifyPayment = async (req, res) => {
                                       (lencoError.details?.data?.errorCode === '10');
                 
                 if (isNotFoundError) {
-                    console.log(`[Payment Controller] Payment not yet available in Lenco (still processing). Using database status.`, {
-                        transactionId: payment.lencoTransactionId,
-                        lencoReference: payment.lencoReference,
-                        currentStatus: payment.status
-                    });
+                    logger.debug(
+                        {
+                            transactionId: payment.lencoTransactionId,
+                            lencoReference: payment.lencoReference,
+                            currentStatus: payment.status
+                        },
+                        'Payment not yet available in Lenco; using database status'
+                    );
                     
                     // Return current database status with special message
                     return res.json({
@@ -552,39 +555,40 @@ exports.handleLencoWebhook = async (req, res) => {
         const payload = req.body;
         
         // Log full payload for debugging
-        console.log('[Payment Controller] Webhook payload:', JSON.stringify(payload, null, 2));
+        // Do not log full webhook payloads (may contain customer PII).
+        logger.debug(
+            { webhookStatus: payload?.status, webhookMessage: payload?.message },
+            'Lenco webhook received'
+        );
 
-        // Verify webhook signature (skip if webhook secret not configured for development)
-        // This is the single point of signature validation - service only parses payload
+        // Verify webhook signature.
+        // In production, LENCO_WEBHOOK_SECRET is guaranteed non-empty by the startup check in app.js.
+        // In development, missing secret logs a warning and skips validation to allow local testing.
         const webhookSecret = process.env.LENCO_WEBHOOK_SECRET;
-        
-        if (webhookSecret && webhookSecret !== 'xxxxxxxxxxxxxxxxxxxxxxx') {
-            const isValidSignature = lencoService.validateWebhookSignature(payload, signature);
-            
+        if (webhookSecret) {
+            // Use req.rawBody (original bytes) so the HMAC is computed over the exact
+            // bytes Lenco signed — not a re-serialised JS object.
+            const isValidSignature = lencoService.validateWebhookSignature(req.rawBody || payload, signature);
             if (!isValidSignature) {
                 console.error('[Payment Controller] Invalid webhook signature');
-                // In development, log but don't block (for testing)
-                if (process.env.NODE_ENV === 'production') {
-                    return res.status(401).json({
-                        success: false,
-                        message: 'Invalid webhook signature'
-                    });
-                } else {
-                    console.warn('[Payment Controller] Signature validation failed, but continuing in development mode');
-                }
+                return res.status(401).json({
+                    success: false,
+                    message: 'Invalid webhook signature'
+                });
             }
         } else {
-            console.warn('[Payment Controller] Webhook secret not configured, skipping signature validation');
+            console.warn('[Payment Controller] LENCO_WEBHOOK_SECRET not set — skipping signature validation (dev only)');
         }
 
         // Process webhook (service only parses payload, validation already done above)
         const webhookResult = await lencoService.handleWebhook(payload);
 
         if (!webhookResult.success) {
-            console.error('[Payment Controller] Webhook processing failed:', webhookResult.error);
-            return res.status(400).json({
+            // Return 200 so Lenco does not retry — parse failures are logged, not retryable
+            console.error('[Payment Controller] Webhook payload parse failure:', webhookResult.error);
+            return res.status(200).json({
                 success: false,
-                message: webhookResult.error || 'Failed to process webhook'
+                message: 'Payload error logged'
             });
         }
 
@@ -606,7 +610,7 @@ exports.handleLencoWebhook = async (req, res) => {
         
         // Method 3: Find by your reference
         if (!payment && webhookData.reference) {
-            payment = await Payment.findOne({ transactionId: webhookData.reference });
+            payment = await Payment.findOne({ where: { transactionId: webhookData.reference } });
         }
 
         if (!payment) {
@@ -624,79 +628,58 @@ exports.handleLencoWebhook = async (req, res) => {
         }
         
         // Log payment record details for debugging
-        console.log(`[Payment Controller] Found payment record:`, {
-            paymentId: payment._id,
-            orderNumber: payment.orderNumber,
-            currentStatus: payment.status,
-            lencoStatus: payment.lencoStatus,
-            transactionId: payment.transactionId,
-            lencoTransactionId: payment.lencoTransactionId,
-            webhookReceived: payment.webhookReceived
-        });
-
-        // Idempotency check: If webhook already received and payment is in terminal state, skip processing
-        const terminalStatuses = ['completed', 'failed', 'cancelled', 'refunded'];
-        const isTerminalStatus = terminalStatuses.includes(payment.status);
-        
-        if (payment.webhookReceived && isTerminalStatus) {
-            console.log(`[Payment Controller] Webhook already processed for payment ${payment.orderNumber} with terminal status ${payment.status}. Returning 200 (idempotent).`);
-            return res.status(200).json({
-                success: true,
-                message: 'Webhook already processed',
-                payment: {
-                    orderNumber: payment.orderNumber,
-                    status: payment.status,
-                    transactionId: payment.transactionId
-                }
-            });
-        }
-
-        // Use atomic findOneAndUpdate to prevent race conditions
-        // Only update if webhook not received OR status is not terminal
-        // This ensures only one webhook processing happens even with concurrent requests
-        const newStatus = payment.mapLencoStatusToPaymentStatus(webhookData.status);
-        const updateData = {
-            $set: {
-                webhookReceived: true,
-                webhookPayload: payload,
-                webhookReceivedAt: new Date(),
-                lencoStatus: webhookData.status,
-                status: newStatus,
-                lencoResponse: webhookData.rawPayload || payload
+        logger.debug(
+            {
+                paymentId: payment.id,
+                orderNumber: payment.orderNumber,
+                currentStatus: payment.status,
+                lencoStatus: payment.lencoStatus,
+                transactionId: payment.transactionId,
+                lencoTransactionId: payment.lencoTransactionId,
+                webhookReceived: payment.webhookReceived
             },
-            $setOnInsert: {
-                // These fields are only set if document is being inserted (shouldn't happen, but safety)
-            }
+            'Found payment record'
+        );
+
+        // Terminal statuses used in atomic gate below
+        const terminalStatuses = ['completed', 'failed', 'cancelled', 'refunded'];
+
+        // Use atomic findOneAndUpdate as the SINGLE idempotency gate.
+        // Removing the soft pre-check above eliminates the race window where two
+        // concurrent webhooks both pass the read-then-check and proceed to update.
+        const newStatus = payment.mapLencoStatusToPaymentStatus(webhookData.status);
+        const updatePayload = {
+            webhookReceived: true,
+            webhookPayload: payload,
+            webhookReceivedAt: new Date(),
+            lencoStatus: webhookData.status,
+            status: newStatus,
+            lencoResponse: webhookData.rawPayload || payload
         };
 
         // Add conditional fields based on webhook data
         if (webhookData.completedAt) {
-            updateData.$set.completedAt = new Date(webhookData.completedAt);
+            updatePayload.completedAt = new Date(webhookData.completedAt);
         }
         if (webhookData.failedAt) {
-            updateData.$set.failedAt = new Date(webhookData.failedAt);
-            updateData.$set.failureReason = webhookData.failureReason;
+            updatePayload.failedAt = new Date(webhookData.failedAt);
+            updatePayload.failureReason = webhookData.failureReason;
         }
 
-        // Atomic update: only succeeds if webhook not received OR status is not terminal
-        const updatedPayment = await Payment.findOneAndUpdate(
-            {
-                _id: payment._id,
-                $or: [
+        // Atomic update via native Sequelize — no MongoDB shim.
+        // rowsAffected === 0 means another concurrent webhook already processed this record.
+        const [rowsAffected] = await Payment.update(updatePayload, {
+            where: {
+                id: payment.id,
+                [Op.or]: [
                     { webhookReceived: false },
-                    { status: { $nin: terminalStatuses } }
+                    { status: { [Op.notIn]: terminalStatuses } }
                 ]
-            },
-            updateData,
-            {
-                new: true, // Return updated document
-                runValidators: true
             }
-        );
+        });
 
-        // If update returned null, another process already processed this webhook
-        if (!updatedPayment) {
-            console.log(`[Payment Controller] Webhook already processed by another request for payment ${payment.orderNumber}. Returning 200 (idempotent).`);
+        if (rowsAffected === 0) {
+            logger.debug({ orderNumber: payment.orderNumber }, 'Webhook already processed (idempotent)');
             return res.status(200).json({
                 success: true,
                 message: 'Webhook already processed by another request',
@@ -708,17 +691,26 @@ exports.handleLencoWebhook = async (req, res) => {
             });
         }
 
+        const updatedPayment = await Payment.findByPk(payment.id);
+
         // Get previous status for comparison
         const previousStatus = payment.status;
         payment = updatedPayment; // Use the updated payment document
 
-        console.log(`[Payment Controller] Payment ${payment.orderNumber} status updated from ${previousStatus} to ${payment.status} via webhook`);
+        logger.debug(
+            {
+                orderNumber: payment.orderNumber,
+                previousStatus,
+                status: payment.status
+            },
+            'Payment status updated via webhook'
+        );
         
         // Send payment notification if status changed to completed or failed
         if (previousStatus !== payment.status && (payment.status === 'completed' || payment.status === 'failed')) {
             try {
                 const emailService = require('../services/email.service');
-                const paymentObj = payment.toObject ? payment.toObject() : payment;
+                const paymentObj = payment.toJSON();
                 await emailService.sendPaymentNotificationToAdmin(paymentObj);
             } catch (emailError) {
                 console.error('[Payment Controller] Error sending payment notification:', emailError);
@@ -756,7 +748,14 @@ exports.handleLencoWebhook = async (req, res) => {
                 );
                 
                 if (updatedOrder) {
-                    console.log(`[Payment Controller] Order ${orderNumberToUpdate} status updated successfully from "${updatedOrder.status}" (payment: "${updatedOrder.paymentStatus}")`);
+                    logger.debug(
+                        {
+                            orderNumber: orderNumberToUpdate,
+                            status: updatedOrder.status,
+                            paymentStatus: updatedOrder.paymentStatus
+                        },
+                        'Order status updated successfully'
+                    );
                 } else {
                     console.warn(`[Payment Controller] Order ${orderNumberToUpdate} not found for status update`);
                 }
@@ -765,7 +764,7 @@ exports.handleLencoWebhook = async (req, res) => {
                 // Don't fail webhook if order update fails - log error but continue
             }
         } else {
-            console.warn(`[Payment Controller] No order number found in payment record or webhook data. Payment ID: ${payment._id}`);
+            console.warn(`[Payment Controller] No order number found in payment record or webhook data. Payment ID: ${payment.id}`);
         }
 
         // Return 200 OK to Lenco
@@ -848,125 +847,19 @@ exports.getPaymentMethods = async (req, res) => {
 };
 
 /**
- * Get list of supported banks from Lenco (with caching)
+ * Get list of supported banks from Lenco
  * GET /api/payments/banks
  */
 exports.getBanks = async (req, res) => {
     try {
-        // Try to get cached data from Redis
-        const cachedData = await redisStore.get(BANKS_CACHE_KEY);
-        
-        if (cachedData && cachedData.banks) {
-            return res.json({
-                success: true,
-                banks: cachedData.banks,
-                count: cachedData.banks.length,
-                cached: true
-            });
-        }
-        
-        // Cache miss - acquire distributed lock to prevent thundering herd
-        const lockAcquired = await redisStore.acquireLock(BANKS_LOCK_KEY, LOCK_TTL_SECONDS);
-        
-        if (lockAcquired) {
-            try {
-                // Double-check cache after acquiring lock (another process might have populated it)
-                const doubleCheckCache = await redisStore.get(BANKS_CACHE_KEY);
-                if (doubleCheckCache && doubleCheckCache.banks) {
-                    await redisStore.releaseLock(BANKS_LOCK_KEY);
-                    return res.json({
-                        success: true,
-                        banks: doubleCheckCache.banks,
-                        count: doubleCheckCache.banks.length,
-                cached: true
-            });
-        }
-        
-        // Fetch from Lenco API
         const result = await lencoService.getBanks();
-        
-                // Store in Redis cache with 24-hour expiration
-                await redisStore.set(BANKS_CACHE_KEY, {
-                    banks: result.banks,
-                    count: result.count,
-                    cachedAt: Date.now()
-                }, BANKS_CACHE_TTL_SECONDS * 1000); // Convert to milliseconds for redisStore.set
-                
-                // Release lock
-                await redisStore.releaseLock(BANKS_LOCK_KEY);
-                
-                return res.json({
+        return res.json({
             success: true,
             banks: result.banks,
-            count: result.count,
-            cached: false
+            count: result.count
         });
-            } catch (error) {
-                // Release lock on error
-                await redisStore.releaseLock(BANKS_LOCK_KEY);
-                throw error;
-            }
-        } else {
-            // Lock not acquired - another process is fetching, wait and retry cache read
-            let retries = 0;
-            while (retries < MAX_LOCK_RETRIES) {
-                await new Promise(resolve => setTimeout(resolve, LOCK_RETRY_DELAY_MS));
-                
-                const retryCache = await redisStore.get(BANKS_CACHE_KEY);
-                if (retryCache && retryCache.banks) {
-                    return res.json({
-                        success: true,
-                        banks: retryCache.banks,
-                        count: retryCache.banks.length,
-                        cached: true
-                    });
-                }
-                
-                retries++;
-            }
-            
-            // If still no cache after retries, fetch directly (lock might have expired)
-            console.warn('[Payment Controller] Lock retry failed, fetching banks directly');
-            const result = await lencoService.getBanks();
-            
-            // Try to cache it (might fail if another process is caching, but that's okay)
-            try {
-                await redisStore.set(BANKS_CACHE_KEY, {
-                    banks: result.banks,
-                    count: result.count,
-                    cachedAt: Date.now()
-                }, BANKS_CACHE_TTL_SECONDS * 1000);
-            } catch (cacheError) {
-                console.warn('[Payment Controller] Failed to cache banks:', cacheError.message);
-            }
-            
-            return res.json({
-                success: true,
-                banks: result.banks,
-                count: result.count,
-                cached: false
-            });
-        }
     } catch (error) {
-        console.error('Error fetching banks:', error);
-        
-        // Try to return cached data even if expired, as fallback
-        try {
-            const fallbackCache = await redisStore.get(BANKS_CACHE_KEY);
-            if (fallbackCache && fallbackCache.banks) {
-            return res.json({
-                success: true,
-                    banks: fallbackCache.banks,
-                    count: fallbackCache.banks.length,
-                cached: true,
-                warning: 'Using cached data due to API error'
-            });
-            }
-        } catch (cacheError) {
-            console.error('[Payment Controller] Error reading fallback cache:', cacheError.message);
-        }
-        
-        // If no cache and API fails, return error
+        console.error('[Payment Controller] Error fetching banks:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to fetch banks list',
@@ -1088,13 +981,13 @@ exports.retryPayment = async (req, res) => {
                     expiresAt: lencoResponse.expiresAt ? new Date(lencoResponse.expiresAt) : null,
                     
                     // Link to original payment
-                    retryOf: existingPayment._id,
+                    retryOf: existingPayment.id,
                     retryCount: (existingPayment.retryCount || 0) + 1,
-                    
+
                     // Metadata
                     metadata: {
                         isRetry: true,
-                        originalPaymentId: existingPayment._id.toString(),
+                        originalPaymentId: String(existingPayment.id),
                         originalTransactionId: existingPayment.lencoTransactionId
                     }
                 });
@@ -1142,13 +1035,13 @@ exports.retryPayment = async (req, res) => {
                     expiresAt: lencoResponse.expiresAt ? new Date(lencoResponse.expiresAt) : null,
                     
                     // Link to original payment
-                    retryOf: existingPayment._id,
+                    retryOf: existingPayment.id,
                     retryCount: (existingPayment.retryCount || 0) + 1,
-                    
+
                     // Metadata
                     metadata: {
                         isRetry: true,
-                        originalPaymentId: existingPayment._id.toString(),
+                        originalPaymentId: String(existingPayment.id),
                         originalTransactionId: existingPayment.lencoTransactionId
                     }
                 });
@@ -1197,11 +1090,11 @@ exports.retryPayment = async (req, res) => {
                     customerInfo,
                     failureReason: error.message || 'Failed to initiate payment retry',
                     failedAt: new Date(),
-                    retryOf: existingPayment._id,
+                    retryOf: existingPayment.id,
                     retryCount: (existingPayment.retryCount || 0) + 1,
                     metadata: {
                         isRetry: true,
-                        originalPaymentId: existingPayment._id.toString(),
+                        originalPaymentId: String(existingPayment.id),
                         retryError: error.message
                     }
                 });

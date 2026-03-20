@@ -30,10 +30,11 @@ FeaturedProduct.findByProductId = function(productId) {
 
 FeaturedProduct.reorderAll = async function() {
     const list = await this.findAll({ where: { isActive: true }, order: [['order', 'ASC']] });
-    for (let i = 0; i < list.length; i++) {
-        list[i].order = i + 1;
-        await list[i].save();
-    }
+    await sequelize.transaction(async (t) => {
+        await Promise.all(list.map((item, i) =>
+            item.update({ order: i + 1 }, { transaction: t })
+        ));
+    });
     return list;
 };
 

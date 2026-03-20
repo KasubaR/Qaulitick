@@ -785,8 +785,11 @@ function validateWebhookSignature(payload, signature) {
     }
 
     try {
-        // Convert payload to string if it's an object
-        const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
+        // Use raw bytes when available (Buffer from req.rawBody) so the HMAC matches
+        // what Lenco signed. Fall back to re-serialisation only when no raw body exists.
+        const payloadString = Buffer.isBuffer(payload)
+            ? payload.toString('utf8')
+            : typeof payload === 'string' ? payload : JSON.stringify(payload);
         
         // HMAC-SHA256 signature verification
         const expectedSignature = crypto
@@ -798,21 +801,26 @@ function validateWebhookSignature(payload, signature) {
         const normalizedSignature = signature.replace(/^sha256=/, '').trim();
         const normalizedExpected = expectedSignature.trim();
         
-        // Use timing-safe comparison if lengths match, otherwise use string comparison
+        // Timing-safe comparison only — any length mismatch means invalid, no fallback
         let isValid = false;
         try {
             const sigBuffer = Buffer.from(normalizedSignature, 'hex');
             const expectedBuffer = Buffer.from(normalizedExpected, 'hex');
-            
-            if (sigBuffer.length === expectedBuffer.length) {
-                isValid = crypto.timingSafeEqual(sigBuffer, expectedBuffer);
-            } else {
-                // If buffer lengths don't match, try string comparison
-                isValid = normalizedSignature.toLowerCase() === normalizedExpected.toLowerCase();
+
+            if (sigBuffer.length !== expectedBuffer.length) {
+                log('error', 'Webhook signature length mismatch — rejecting', {
+                    function: 'validateWebhookSignature'
+                });
+                return false;
             }
+
+            isValid = crypto.timingSafeEqual(sigBuffer, expectedBuffer);
         } catch (bufferError) {
-            // If signature is not in hex format, use string comparison
-            isValid = normalizedSignature.toLowerCase() === normalizedExpected.toLowerCase();
+            log('error', 'Webhook signature buffer error — rejecting', {
+                function: 'validateWebhookSignature',
+                error: bufferError.message
+            });
+            return false;
         }
         
         if (!isValid) {

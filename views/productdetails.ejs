@@ -1,10 +1,17 @@
+<%
+// Normalize product.images to always be an array (MySQL JSON field can return a string)
+if (typeof product.images === 'string') {
+    try { product.images = JSON.parse(product.images); } catch(e) { product.images = []; }
+}
+if (!Array.isArray(product.images)) product.images = [];
+%>
 <%- include('partials/header', {
     title: typeof title !== 'undefined' ? title : 'Product Details - ' + product.model,
     page: 'product',
     description: typeof description !== 'undefined' ? description : product.description,
     keywords: typeof keywords !== 'undefined' ? keywords : '',
     canonicalUrl: typeof canonicalUrl !== 'undefined' ? canonicalUrl : '',
-    ogImage: typeof ogImage !== 'undefined' ? ogImage : (product.images && product.images[0] ? product.images[0] : ''),
+    ogImage: typeof ogImage !== 'undefined' ? ogImage : (product.images[0] || ''),
     ogType: typeof ogType !== 'undefined' ? ogType : 'product',
     url: typeof url !== 'undefined' ? url : ''
 }) %>
@@ -89,7 +96,13 @@
                     <div class="product-meta">
                         <span class="sku">SKU: <span class="meta-value"><%= product.sku || product._id %></span></span>
                         <span class="availability">
-                            <% if (product.stock > 10) { %>
+                            <%
+                                // Use product-specific low stock threshold when available, fallback to 5
+                                const lowStockThreshold = typeof product.lowStockThreshold === 'number'
+                                    ? product.lowStockThreshold
+                                    : 5;
+                            %>
+                            <% if (product.stock > lowStockThreshold) { %>
                                 <i class="fas fa-check-circle"></i> In Stock
                             <% } else if (product.stock > 0) { %>
                                 <i class="fas fa-exclamation-circle"></i> Low Stock (<%= product.stock %> left)
@@ -321,10 +334,14 @@
         <section class="related-products-section">
             <h2 class="section-title">You May Also Like</h2>
             <div class="related-products-grid">
-                <% relatedProducts.forEach(related => { %>
+                <% relatedProducts.forEach(related => {
+                    let _rImgs = related.images;
+                    if (typeof _rImgs === 'string') { try { _rImgs = JSON.parse(_rImgs); } catch(e) { _rImgs = []; } }
+                    if (!Array.isArray(_rImgs)) _rImgs = [];
+                %>
                     <a href="/product/<%= related._id %>" class="related-product-card">
                         <div class="related-product-image">
-                            <img src="<%= related.images[0] %>" alt="<%= related.model %>">
+                            <img src="<%= _rImgs[0] || '/images/placeholder.jpg' %>" alt="<%= related.model %>">
                             <% if (related.discount > 0) { %>
                                 <div class="discount-badge-small">-<%= related.discount %>%</div>
                             <% } %>
@@ -404,7 +421,10 @@
 
     <!-- Pass product data to JavaScript -->
     <script>
-        window.productData = <%- JSON.stringify(product) %>;
+        window.productData = JSON.parse(<%= JSON.stringify(JSON.stringify(product))
+            .replace(/&/g, '\\u0026')
+            .replace(/</g, '\\u003c')
+            .replace(/>/g, '\\u003e') %>);
     </script>
 
     <!-- Schema.org Product Structured Data (JSON-LD) -->

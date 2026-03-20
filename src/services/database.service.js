@@ -18,7 +18,32 @@ class DatabaseService {
 
         try {
             await sequelize.authenticate();
-            await sequelize.sync({ alter: true }); // alter: true adds missing columns to existing tables
+            const shouldAlter = process.env.DB_SYNC_ALTER === 'true';
+            try {
+                // alter: true can repeatedly try to add indexes/constraints on every boot.
+                // This eventually hits MySQL's "Too many keys" limit.
+                await sequelize.sync({ alter: shouldAlter });
+            } catch (syncError) {
+                // If we still hit index/keys limits, fall back to a safe sync mode.
+                const code = syncError?.original?.code || syncError?.parent?.code;
+                if (code === 'ER_TOO_MANY_KEYS') {
+                    console.warn('⚠️ Too many keys detected during sync; retrying with alter:false');
+                    try {
+                        await sequelize.sync({ alter: false });
+                    } catch (syncError2) {
+                        const code2 = syncError2?.original?.code || syncError2?.parent?.code;
+                        if (code2 === 'ER_TOO_MANY_KEYS') {
+                            // If the DB is already saturated with indexes, any further sync may fail.
+                            // Proceed without syncing so the app can boot.
+                            console.warn('⚠️ Sync still failed due to too many keys; continuing without sync');
+                        } else {
+                            throw syncError2;
+                        }
+                    }
+                } else {
+                    throw syncError;
+                }
+            }
             this.isConnected = true;
             this.connectionAttempts = 0;
             console.log('✅ Connected to MySQL successfully');

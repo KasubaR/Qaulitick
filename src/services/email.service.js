@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 const settingsService = require('./settings.service');
+const logger = require('../utils/logger').child({ module: 'EmailService' });
 
 /**
  * Email Service
@@ -16,7 +17,7 @@ const createTransporter = () => {
     const adminEmail = process.env.CONTACT_ADMIN_EMAIL || process.env.GMAIL_USER;
 
     if (!gmailUser || !gmailPassword) {
-        console.warn('[Email Service] Gmail credentials not configured. Email functionality will be disabled.');
+        logger.warn('Gmail credentials not configured. Email functionality will be disabled.');
         return null;
     }
 
@@ -29,7 +30,7 @@ const createTransporter = () => {
     // WARNING: Only use this in development. In production, fix SSL certificate issues properly.
     if (process.env.NODE_ENV === 'development' || process.env.ALLOW_INSECURE_EMAIL === 'true') {
         tlsOptions.rejectUnauthorized = false;
-        console.warn('[Email Service] WARNING: SSL certificate validation is disabled. This should only be used in development.');
+        logger.warn('WARNING: SSL certificate validation is disabled. This should only be used in development.');
     }
 
     // Use explicit Gmail SMTP configuration for better reliability
@@ -45,9 +46,50 @@ const createTransporter = () => {
     });
 };
 
-const transporter = createTransporter();
+// Lazy transporter: created on first use so env vars loaded after this module is
+// first imported (e.g. via dotenv in a different require order) are always visible.
+let _transporter;
+let _transporterInitialized = false;
+
+function getTransporter() {
+    if (!_transporterInitialized) {
+        _transporter = createTransporter();
+        _transporterInitialized = true;
+    }
+    return _transporter;
+}
+
+/**
+ * Verify SMTP credentials eagerly at startup.
+ * Call once during app initialisation so auth failures are caught before the
+ * first real email rather than silently failing later.
+ * Throws if credentials are missing or nodemailer.verify() rejects.
+ */
+async function verifyTransporter() {
+    const t = getTransporter();
+    if (!t) {
+        throw new Error('Email service not configured: GMAIL_USER or GMAIL_APP_PASSWORD missing');
+    }
+    await t.verify();
+    logger.info('Email transporter verified successfully');
+}
+
 // Fallback admin email (will be overridden by settings)
 const fallbackAdminEmail = process.env.CONTACT_ADMIN_EMAIL || process.env.GMAIL_USER || 'support@qualitick-collections.com';
+
+/**
+ * Escape user-supplied strings before interpolating into HTML.
+ * Must be applied to every value that originates outside the application
+ * (customer names, emails, messages, product names, addresses, etc.).
+ */
+function esc(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+}
 
 /**
  * Get subject label from subject code
@@ -70,8 +112,9 @@ function getSubjectLabel(subject) {
  * @returns {Promise<Object>} - Email send result
  */
 async function sendContactNotificationToAdmin(submission) {
+    const transporter = getTransporter();
     if (!transporter) {
-        console.warn('[Email Service] Cannot send email: Transporter not configured');
+        logger.warn('Cannot send email: Transporter not configured');
         return { success: false, error: 'Email service not configured' };
     }
 
@@ -79,11 +122,11 @@ async function sendContactNotificationToAdmin(submission) {
     try {
         const shouldSend = await settingsService.shouldSendNotification('contactSubmission');
         if (!shouldSend) {
-            console.log('[Email Service] Contact submission notifications are disabled in settings');
+            logger.debug('Contact submission notifications are disabled in settings');
             return { success: false, error: 'Contact submission notifications are disabled' };
         }
     } catch (settingsError) {
-        console.warn('[Email Service] Error checking notification settings, proceeding with send:', settingsError.message);
+        logger.warn({ settingsErrorMessage: settingsError.message }, 'Error checking notification settings, proceeding with send');
         // Continue with send if settings check fails (fail open)
     }
 
@@ -125,21 +168,21 @@ async function sendContactNotificationToAdmin(submission) {
                         </div>
                         <div class="field">
                             <div class="label">Name:</div>
-                            <div class="value">${submission.name}</div>
+                            <div class="value">${esc(submission.name)}</div>
                         </div>
                         <div class="field">
                             <div class="label">Email:</div>
-                            <div class="value"><a href="mailto:${submission.email}">${submission.email}</a></div>
+                            <div class="value"><a href="mailto:${esc(submission.email)}">${esc(submission.email)}</a></div>
                         </div>
                         ${submission.phone ? `
                         <div class="field">
                             <div class="label">Phone:</div>
-                            <div class="value">${submission.phone}</div>
+                            <div class="value">${esc(submission.phone)}</div>
                         </div>
                         ` : ''}
                         <div class="field">
                             <div class="label">Message:</div>
-                            <div class="message-box">${submission.message.replace(/\n/g, '<br>')}</div>
+                            <div class="message-box">${esc(submission.message).replace(/\n/g, '<br>')}</div>
                         </div>
                         <div class="field">
                             <div class="label">Submitted:</div>
@@ -147,7 +190,7 @@ async function sendContactNotificationToAdmin(submission) {
                         </div>
                         <div class="footer">
                             <p>This is an automated notification from Qualitick Collections contact form.</p>
-                            <p>Please respond to the customer at: <a href="mailto:${submission.email}">${submission.email}</a></p>
+                            <p>Please respond to the customer at: <a href="mailto:${esc(submission.email)}">${esc(submission.email)}</a></p>
                         </div>
                     </div>
                 </div>
@@ -164,10 +207,10 @@ async function sendContactNotificationToAdmin(submission) {
         };
 
         const info = await transporter.sendMail(mailOptions);
-        console.log(`[Email Service] Admin notification sent: ${info.messageId}`);
+        logger.info({ messageId: info.messageId }, 'Admin notification sent');
         return { success: true, messageId: info.messageId };
     } catch (error) {
-        console.error('[Email Service] Error sending admin notification:', error);
+        logger.error({ err: error }, 'Error sending admin notification');
         return { success: false, error: error.message };
     }
 }
@@ -178,8 +221,9 @@ async function sendContactNotificationToAdmin(submission) {
  * @returns {Promise<Object>} - Email send result
  */
 async function sendContactConfirmationToUser(submission) {
+    const transporter = getTransporter();
     if (!transporter) {
-        console.warn('[Email Service] Cannot send email: Transporter not configured');
+        logger.warn('Cannot send email: Transporter not configured');
         return { success: false, error: 'Email service not configured' };
     }
 
@@ -212,7 +256,7 @@ async function sendContactConfirmationToUser(submission) {
                         <h1 style="margin: 0; color: #333;">Thank You for Contacting Us!</h1>
                     </div>
                     <div class="content">
-                        <p>Dear ${submission.name},</p>
+                        <p>Dear ${esc(submission.name)},</p>
                         <p>Thank you for reaching out to Qualitick Collections. We have received your message and our team will get back to you as soon as possible.</p>
                         
                         <div class="info-box">
@@ -223,7 +267,7 @@ async function sendContactConfirmationToUser(submission) {
                         
                         <div class="message">
                             <strong>Your Message:</strong><br>
-                            ${submission.message.replace(/\n/g, '<br>')}
+                            ${esc(submission.message).replace(/\n/g, '<br>')}
                         </div>
                         
                         <p>We typically respond within 24-48 hours during business days (Monday-Friday, 9AM-6PM).</p>
@@ -253,10 +297,10 @@ async function sendContactConfirmationToUser(submission) {
         };
 
         const info = await transporter.sendMail(mailOptions);
-        console.log(`[Email Service] User confirmation sent: ${info.messageId}`);
+        logger.info({ messageId: info.messageId }, 'User confirmation sent');
         return { success: true, messageId: info.messageId };
     } catch (error) {
-        console.error('[Email Service] Error sending user confirmation:', error);
+        logger.error({ err: error }, 'Error sending user confirmation');
         return { success: false, error: error.message };
     }
 }
@@ -269,8 +313,9 @@ async function sendContactConfirmationToUser(submission) {
  * @returns {Promise<Object>} - Email send result
  */
 async function sendInvoiceEmail(order, pdfBuffer, options = {}) {
+    const transporter = getTransporter();
     if (!transporter) {
-        console.warn('[Email Service] Cannot send email: Transporter not configured');
+        logger.warn('Cannot send email: Transporter not configured');
         return { success: false, error: 'Email service not configured' };
     }
 
@@ -308,14 +353,14 @@ async function sendInvoiceEmail(order, pdfBuffer, options = {}) {
                         <h1 style="margin: 0; color: #333;">Your Order Invoice</h1>
                     </div>
                     <div class="content">
-                        <p>Dear ${order.customer.name},</p>
+                        <p>Dear ${esc(order.customer.name)},</p>
                         <p>Thank you for your order with Qualitick Collections! Please find your invoice attached to this email.</p>
-                        
+
                         <div class="order-info">
                             <h3 style="margin-top: 0; color: #333;">Order Details</h3>
                             <div class="info-row">
                                 <span class="info-label">Order Number:</span>
-                                <span class="info-value">${order.orderNumber}</span>
+                                <span class="info-value">${esc(order.orderNumber)}</span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">Order Date:</span>
@@ -339,7 +384,7 @@ async function sendInvoiceEmail(order, pdfBuffer, options = {}) {
                             <h3 style="margin-top: 0; color: #333;">Order Summary</h3>
                             ${order.items.map(item => `
                                 <div class="item-row">
-                                    <span>${item.name} x ${item.quantity}</span>
+                                    <span>${esc(item.name)} x ${item.quantity}</span>
                                     <span>K${formatCurrency(item.price * item.quantity)}</span>
                                 </div>
                             `).join('')}
@@ -364,12 +409,12 @@ async function sendInvoiceEmail(order, pdfBuffer, options = {}) {
                                 <span>K${formatCurrency(order.totals.total || 0)}</span>
                             </div>
                         </div>
-                        
+
                         ${order.shipping && !order.shipping.pickup ? `
                         <div class="order-info">
                             <h3 style="margin-top: 0; color: #333;">Shipping Address</h3>
-                            <p style="margin: 5px 0;">${order.shipping.address}</p>
-                            <p style="margin: 5px 0;">${order.shipping.city}, ${order.shipping.province}</p>
+                            <p style="margin: 5px 0;">${esc(order.shipping.address)}</p>
+                            <p style="margin: 5px 0;">${esc(order.shipping.city)}, ${esc(order.shipping.province)}</p>
                         </div>
                         ` : `
                         <div class="order-info">
@@ -377,7 +422,7 @@ async function sendInvoiceEmail(order, pdfBuffer, options = {}) {
                             <p style="margin: 5px 0;">Store Pickup</p>
                         </div>
                         `}
-                        
+
                         <p>Your invoice is attached as a PDF document. Please keep this for your records.</p>
                         
                         <p>If you have any questions about your order, please don't hesitate to contact us.</p>
@@ -415,10 +460,11 @@ async function sendInvoiceEmail(order, pdfBuffer, options = {}) {
         };
 
         const info = await transporter.sendMail(mailOptions);
-        console.log(`[Email Service] Invoice email sent to ${order.customer.email}: ${info.messageId}`);
+        // Do not log recipient email addresses (PII).
+        logger.info({ orderNumber: order.orderNumber, messageId: info.messageId }, 'Invoice email sent');
         return { success: true, messageId: info.messageId };
     } catch (error) {
-        console.error('[Email Service] Error sending invoice email:', error);
+        logger.error({ err: error }, 'Error sending invoice email');
         return { success: false, error: error.message };
     }
 }
@@ -456,8 +502,9 @@ function formatPaymentMethod(method) {
  * @returns {Promise<Object>} - Email send result
  */
 async function sendOrderNotificationToAdmin(order) {
+    const transporter = getTransporter();
     if (!transporter) {
-        console.warn('[Email Service] Cannot send email: Transporter not configured');
+        logger.warn('Cannot send email: Transporter not configured');
         return { success: false, error: 'Email service not configured' };
     }
 
@@ -465,11 +512,11 @@ async function sendOrderNotificationToAdmin(order) {
     try {
         const shouldSend = await settingsService.shouldSendNotification('newOrder');
         if (!shouldSend) {
-            console.log('[Email Service] New order notifications are disabled in settings');
+            logger.debug('New order notifications are disabled in settings');
             return { success: false, error: 'New order notifications are disabled' };
         }
     } catch (settingsError) {
-        console.warn('[Email Service] Error checking notification settings, proceeding with send:', settingsError.message);
+        logger.warn({ settingsErrorMessage: settingsError.message }, 'Error checking notification settings, proceeding with send');
         // Continue with send if settings check fails (fail open)
     }
 
@@ -515,7 +562,7 @@ async function sendOrderNotificationToAdmin(order) {
                             <h3 style="margin-top: 0; color: #333;">Order Details</h3>
                             <div class="info-row">
                                 <span class="info-label">Order Number:</span>
-                                <span class="info-value">${order.orderNumber}</span>
+                                <span class="info-value">${esc(order.orderNumber)}</span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">Order Date:</span>
@@ -523,15 +570,15 @@ async function sendOrderNotificationToAdmin(order) {
                             </div>
                             <div class="info-row">
                                 <span class="info-label">Customer:</span>
-                                <span class="info-value">${order.customer.name}</span>
+                                <span class="info-value">${esc(order.customer.name)}</span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">Customer Email:</span>
-                                <span class="info-value"><a href="mailto:${order.customer.email}">${order.customer.email}</a></span>
+                                <span class="info-value"><a href="mailto:${esc(order.customer.email)}">${esc(order.customer.email)}</a></span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">Customer Phone:</span>
-                                <span class="info-value">${order.customer.phone || 'N/A'}</span>
+                                <span class="info-value">${order.customer.phone ? esc(order.customer.phone) : 'N/A'}</span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">Payment Method:</span>
@@ -551,7 +598,7 @@ async function sendOrderNotificationToAdmin(order) {
                             <h3 style="margin-top: 0; color: #333;">Order Items</h3>
                             ${order.items.map(item => `
                                 <div class="item-row">
-                                    <strong>${item.name}</strong> x ${item.quantity} - K${formatCurrency(item.price * item.quantity)}
+                                    <strong>${esc(item.name)}</strong> x ${item.quantity} - K${formatCurrency(item.price * item.quantity)}
                                 </div>
                             `).join('')}
                             <div class="info-row">
@@ -579,8 +626,8 @@ async function sendOrderNotificationToAdmin(order) {
                         ${order.shipping && !order.shipping.pickup ? `
                         <div class="order-info">
                             <h3 style="margin-top: 0; color: #333;">Shipping Address</h3>
-                            <p style="margin: 5px 0;">${order.shipping.address}</p>
-                            <p style="margin: 5px 0;">${order.shipping.city}, ${order.shipping.province}</p>
+                            <p style="margin: 5px 0;">${esc(order.shipping.address)}</p>
+                            <p style="margin: 5px 0;">${esc(order.shipping.city)}, ${esc(order.shipping.province)}</p>
                         </div>
                         ` : `
                         <div class="order-info">
@@ -588,7 +635,7 @@ async function sendOrderNotificationToAdmin(order) {
                             <p style="margin: 5px 0;">Store Pickup</p>
                         </div>
                         `}
-                        
+
                         <div style="text-align: center;">
                             <a href="${process.env.SITE_URL || 'https://qualitick-collections.com'}/admin/orders" class="btn">View Order in Admin Panel</a>
                         </div>
@@ -611,10 +658,10 @@ async function sendOrderNotificationToAdmin(order) {
         };
 
         const info = await transporter.sendMail(mailOptions);
-        console.log(`[Email Service] New order notification sent to ${notificationEmail}: ${info.messageId}`);
+        logger.info({ messageId: info.messageId }, 'New order notification sent');
         return { success: true, messageId: info.messageId };
     } catch (error) {
-        console.error('[Email Service] Error sending new order notification:', error);
+        logger.error({ err: error }, 'Error sending new order notification');
         return { success: false, error: error.message };
     }
 }
@@ -625,8 +672,9 @@ async function sendOrderNotificationToAdmin(order) {
  * @returns {Promise<Object>} - Email send result
  */
 async function sendLowStockNotificationToAdmin(product) {
+    const transporter = getTransporter();
     if (!transporter) {
-        console.warn('[Email Service] Cannot send email: Transporter not configured');
+        logger.warn('Cannot send email: Transporter not configured');
         return { success: false, error: 'Email service not configured' };
     }
 
@@ -634,11 +682,11 @@ async function sendLowStockNotificationToAdmin(product) {
     try {
         const shouldSend = await settingsService.shouldSendNotification('lowStock');
         if (!shouldSend) {
-            console.log('[Email Service] Low stock notifications are disabled in settings');
+            logger.debug('Low stock notifications are disabled in settings');
             return { success: false, error: 'Low stock notifications are disabled' };
         }
     } catch (settingsError) {
-        console.warn('[Email Service] Error checking notification settings, proceeding with send:', settingsError.message);
+        logger.warn({ settingsErrorMessage: settingsError.message }, 'Error checking notification settings, proceeding with send');
         // Continue with send if settings check fails (fail open)
     }
 
@@ -679,11 +727,11 @@ async function sendLowStockNotificationToAdmin(product) {
                             <h3 style="margin-top: 0; color: #333;">Product Details</h3>
                             <div class="info-row">
                                 <span class="info-label">Product:</span>
-                                <span class="info-value"><strong>${product.brand} ${product.model}</strong></span>
+                                <span class="info-value"><strong>${esc(product.brand)} ${esc(product.model)}</strong></span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">SKU:</span>
-                                <span class="info-value">${product.sku}</span>
+                                <span class="info-value">${esc(product.sku)}</span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">Current Stock:</span>
@@ -725,10 +773,10 @@ async function sendLowStockNotificationToAdmin(product) {
         };
 
         const info = await transporter.sendMail(mailOptions);
-        console.log(`[Email Service] Low stock notification sent to ${notificationEmail}: ${info.messageId}`);
+        logger.info({ messageId: info.messageId }, 'Low stock notification sent');
         return { success: true, messageId: info.messageId };
     } catch (error) {
-        console.error('[Email Service] Error sending low stock notification:', error);
+        logger.error({ err: error }, 'Error sending low stock notification');
         return { success: false, error: error.message };
     }
 }
@@ -740,8 +788,9 @@ async function sendLowStockNotificationToAdmin(product) {
  * @returns {Promise<Object>} - Email send result
  */
 async function sendPaymentNotificationToAdmin(payment, order = null) {
+    const transporter = getTransporter();
     if (!transporter) {
-        console.warn('[Email Service] Cannot send email: Transporter not configured');
+        logger.warn('Cannot send email: Transporter not configured');
         return { success: false, error: 'Email service not configured' };
     }
 
@@ -749,11 +798,11 @@ async function sendPaymentNotificationToAdmin(payment, order = null) {
     try {
         const shouldSend = await settingsService.shouldSendNotification('payment');
         if (!shouldSend) {
-            console.log('[Email Service] Payment notifications are disabled in settings');
+            logger.debug('Payment notifications are disabled in settings');
             return { success: false, error: 'Payment notifications are disabled' };
         }
     } catch (settingsError) {
-        console.warn('[Email Service] Error checking notification settings, proceeding with send:', settingsError.message);
+        logger.warn({ settingsErrorMessage: settingsError.message }, 'Error checking notification settings, proceeding with send');
         // Continue with send if settings check fails (fail open)
     }
 
@@ -799,7 +848,7 @@ async function sendPaymentNotificationToAdmin(payment, order = null) {
                             <h3 style="margin-top: 0; color: #333;">Payment Details</h3>
                             <div class="info-row">
                                 <span class="info-label">Order Number:</span>
-                                <span class="info-value">${payment.orderNumber}</span>
+                                <span class="info-value">${esc(payment.orderNumber)}</span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">Payment Status:</span>
@@ -820,7 +869,7 @@ async function sendPaymentNotificationToAdmin(payment, order = null) {
                             ${payment.transactionId || payment.lencoTransactionId ? `
                             <div class="info-row">
                                 <span class="info-label">Transaction ID:</span>
-                                <span class="info-value">${payment.transactionId || payment.lencoTransactionId}</span>
+                                <span class="info-value">${esc(payment.transactionId || payment.lencoTransactionId)}</span>
                             </div>
                             ` : ''}
                             <div class="info-row">
@@ -830,11 +879,11 @@ async function sendPaymentNotificationToAdmin(payment, order = null) {
                             ${payment.customerInfo ? `
                             <div class="info-row">
                                 <span class="info-label">Customer:</span>
-                                <span class="info-value">${payment.customerInfo.name}</span>
+                                <span class="info-value">${esc(payment.customerInfo.name)}</span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">Customer Email:</span>
-                                <span class="info-value"><a href="mailto:${payment.customerInfo.email}">${payment.customerInfo.email}</a></span>
+                                <span class="info-value"><a href="mailto:${esc(payment.customerInfo.email)}">${esc(payment.customerInfo.email)}</a></span>
                             </div>
                             ` : ''}
                         </div>
@@ -861,10 +910,10 @@ async function sendPaymentNotificationToAdmin(payment, order = null) {
         };
 
         const info = await transporter.sendMail(mailOptions);
-        console.log(`[Email Service] Payment notification sent to ${notificationEmail}: ${info.messageId}`);
+        logger.info({ messageId: info.messageId }, 'Payment notification sent');
         return { success: true, messageId: info.messageId };
     } catch (error) {
-        console.error('[Email Service] Error sending payment notification:', error);
+        logger.error({ err: error }, 'Error sending payment notification');
         return { success: false, error: error.message };
     }
 }
@@ -876,6 +925,6 @@ module.exports = {
     sendOrderNotificationToAdmin,
     sendLowStockNotificationToAdmin,
     sendPaymentNotificationToAdmin,
-    createTransporter
+    verifyTransporter
 };
 

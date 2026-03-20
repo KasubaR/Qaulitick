@@ -1,6 +1,62 @@
 // Product Controller - Updated with Database Integration
+const { UniqueConstraintError } = require('sequelize');
 const productService = require('../services/product.service');
 const { calculateFinalPrice, calculateSavings } = require('../utils/price.utils');
+const { clearCache } = require('../middlewares/cache.middleware');
+
+/**
+ * Convert a Sequelize model instance to a plain object.
+ * Sequelize uses .get({ plain: true }) or .toJSON(); .toObject() is Mongoose-only and would throw.
+ */
+function toPlain(instance) {
+    if (instance == null) return instance;
+    if (typeof instance.get === 'function') return instance.get({ plain: true });
+    if (typeof instance.toJSON === 'function') return instance.toJSON();
+    return instance;
+}
+
+/**
+ * Normalize a product plain object so that JSON fields (images, colors, strapOptions, reviews)
+ * are always JavaScript arrays, not raw JSON strings.
+ * MySQL JSON columns are parsed by Sequelize but can occasionally come back as strings.
+ */
+function normalizeProduct(productObj) {
+    if (productObj.id != null && productObj._id == null) productObj._id = productObj.id;
+    const jsonArrayFields = ['images', 'colors', 'strapOptions', 'reviews'];
+    jsonArrayFields.forEach(field => {
+        if (typeof productObj[field] === 'string') {
+            try { productObj[field] = JSON.parse(productObj[field]); } catch (e) { productObj[field] = []; }
+        }
+        if (!Array.isArray(productObj[field])) productObj[field] = [];
+    });
+    return productObj;
+}
+
+/**
+ * Attach correct price fields to a normalised product plain object.
+ *   price         = current selling price (from DB)
+ *   originalPrice = pre-discount price    (from DB; equals price when no discount)
+ *   finalPrice    = same as price         (for template compatibility)
+ *   savings       = originalPrice - price
+ */
+function withPrices(productObj) {
+    const currentPrice   = Number(productObj.price) || 0;
+    const storedOriginal = Number(productObj.originalPrice) || 0;
+    const origPrice      = storedOriginal > currentPrice ? storedOriginal : currentPrice;
+    const discount       = productObj.discount || 0;
+    const savings        = origPrice > currentPrice
+        ? Math.round(origPrice - currentPrice)
+        : calculateSavings(origPrice, discount);
+    return { ...productObj, price: currentPrice, originalPrice: origPrice, finalPrice: currentPrice, savings };
+}
+
+/**
+ * Validate product ID (positive integer). Sequelize PKs are integers; !parseInt(id) wrongly rejects 0 and is loose for non-numeric strings.
+ */
+function isValidId(id) {
+    const n = Number(id);
+    return Number.isInteger(n) && n > 0;
+}
 
 /**
  * Get all products (API endpoint)
@@ -47,18 +103,9 @@ exports.getProductsAPI = async (req, res) => {
         const productsArray = Array.isArray(products) ? products : [];
         
         // Calculate prices for all products
-        const productsWithPrices = productsArray.map(product => {
-            const productObj = product.toObject ? product.toObject() : product;
-            const originalPrice = productObj.price || 0;
-            const discount = productObj.discount || 0;
-            
-            return {
-                ...productObj,
-                originalPrice: originalPrice,
-                finalPrice: calculateFinalPrice(originalPrice, discount),
-                savings: calculateSavings(originalPrice, discount)
-            };
-        });
+        const productsWithPrices = productsArray.map(product =>
+            withPrices(normalizeProduct(toPlain(product)))
+        );
         
         // Calculate pagination values
         const totalPages = Math.ceil(totalProducts / limit);
@@ -95,16 +142,14 @@ exports.getProductByIdAPI = async (req, res) => {
     try {
         const productId = req.params.id;
         
-        // Validate product ID format (MongoDB ObjectId)
-        if (!parseInt(productId)) {
+        if (!isValidId(productId)) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid product ID format'
+                message: 'Invalid product ID'
             });
         }
         
-        // Get product from database
-        const product = await productService.getProductById(productId);
+        const product = await productService.getProductById(Number(productId));
         
         if (!product) {
             return res.status(404).json({
@@ -113,18 +158,8 @@ exports.getProductByIdAPI = async (req, res) => {
             });
         }
         
-        // Calculate prices
-        const productObj = product.toObject();
-        const originalPrice = productObj.price || 0;
-        const discount = productObj.discount || 0;
-        
-        const productWithPrices = {
-            ...productObj,
-            originalPrice: originalPrice,
-            finalPrice: calculateFinalPrice(originalPrice, discount),
-            savings: calculateSavings(originalPrice, discount)
-        };
-        
+        const productWithPrices = withPrices(normalizeProduct(toPlain(product)));
+
         res.json({
             success: true,
             product: productWithPrices
@@ -154,11 +189,8 @@ exports.renderProductDetails = async (req, res) => {
             // Look up product by ID
             product = await productService.getProductById(parseInt(productSlug));
         } else {
-            // Try to convert slug to SKU (assuming slug format is based on SKU)
-        // Example: rolex-submariner-aaa -> ROLEX-SUB-001
-        const sku = productSlug.toUpperCase().replace(/-/g, '-');
-        
-        // Get product from database by SKU
+            // Slug format is the SKU lowercased (e.g. rolex-sub-001 → ROLEX-SUB-001)
+            const sku = productSlug.toUpperCase();
             product = await productService.getProductBySku(sku);
         }
         
@@ -170,12 +202,7 @@ exports.renderProductDetails = async (req, res) => {
             });
         }
         
-        const productObj = product.toObject();
-        
-        // Ensure reviews is always an array
-        if (!productObj.reviews || !Array.isArray(productObj.reviews)) {
-            productObj.reviews = [];
-        }
+        const productObj = normalizeProduct(toPlain(product));
         
         // SEO data
         const metaDescription = productObj.description 
@@ -189,14 +216,22 @@ exports.renderProductDetails = async (req, res) => {
             : 'https://qualitick-collections.com/images/default-watch.jpg';
         
         // Calculate prices
-        const originalPrice = productObj.price || 0;
+        // In the DB, productObj.price is the current selling price.
+        // If originalPrice exists and is greater than the current price, use it as the "original" crossed-out price.
+        const currentPrice = Number(productObj.price) || 0;
+        const storedOriginal = Number(productObj.originalPrice) || 0;
+        const originalPrice = storedOriginal > currentPrice ? storedOriginal : currentPrice;
         const discount = productObj.discount || 0;
-        const finalPrice = calculateFinalPrice(originalPrice, discount);
-        const savings = calculateSavings(originalPrice, discount);
+        // Final price is the current selling price from the DB
+        const finalPrice = currentPrice;
+        // Savings is the difference between original and final, or derived from discount if needed
+        const savings = originalPrice > finalPrice
+            ? Math.round(originalPrice - finalPrice)
+            : calculateSavings(originalPrice, discount);
         
         // Filter sensitive data from reviews (email, ipAddress)
         // Debug: Log review data
-        console.log(`[Product Controller] Product ${productObj._id} - Reviews in DB:`, productObj.reviews ? productObj.reviews.length : 0);
+        console.log(`[Product Controller] Product ${productObj.id} - Reviews in DB:`, productObj.reviews ? productObj.reviews.length : 0);
         if (productObj.reviews && productObj.reviews.length > 0) {
             console.log(`[Product Controller] Sample review:`, {
                 name: productObj.reviews[0].name,
@@ -239,10 +274,10 @@ exports.renderProductDetails = async (req, res) => {
         // Get related products (same brand)
         const relatedProductsRaw = await productService.getProductsByBrand(productObj.brand);
         const relatedProducts = relatedProductsRaw
-            .filter(p => p._id.toString() !== product._id.toString())
+            .filter(p => p.id !== product.id)
             .slice(0, 4)
             .map(p => {
-                const pObj = p.toObject();
+                const pObj = normalizeProduct(toPlain(p));
                 const pOriginalPrice = pObj.price || 0;
                 const pDiscount = pObj.discount || 0;
                 return {
@@ -253,6 +288,7 @@ exports.renderProductDetails = async (req, res) => {
                 };
             });
         
+        res.setHeader('Cache-Control', 'no-store');
         res.render('productdetails', {
             title: `${productObj.model} - ${productObj.brand} | Qualitick Collections`,
             page: 'product',
@@ -344,7 +380,8 @@ exports.createProduct = async (req, res) => {
         
         // Create product in database
         const product = await productService.createProduct(sanitizedData);
-        
+
+        clearCache('/api/products');
         res.status(201).json({
             success: true,
             message: 'Product created successfully',
@@ -353,9 +390,10 @@ exports.createProduct = async (req, res) => {
     } catch (error) {
         console.error('[Product Controller] Error creating product:', error);
         
-        // Handle duplicate SKU error
-        if (error.code === 11000) {
-            return res.status(400).json({
+        // Handle duplicate SKU error (Sequelize unique constraint)
+        if (error instanceof UniqueConstraintError ||
+            error.name === 'SequelizeUniqueConstraintError') {
+            return res.status(409).json({
                 success: false,
                 message: 'Product with this SKU already exists'
             });
@@ -378,19 +416,16 @@ exports.updateProduct = async (req, res) => {
         
         const productId = req.params.id;
         
-        // Validate product ID format
-        if (!parseInt(productId)) {
+        if (!isValidId(productId)) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid product ID format'
+                message: 'Invalid product ID'
             });
         }
         
-        // Sanitize input
         const sanitizedData = sanitizeObject(req.body);
-        
-        // Validate product data
-        const validation = validateProduct(sanitizedData);
+
+        const validation = validateProduct(sanitizedData, { partial: true });
         if (!validation.valid) {
             return res.status(400).json({
                 success: false,
@@ -398,17 +433,17 @@ exports.updateProduct = async (req, res) => {
                 errors: validation.errors
             });
         }
-        
-        // Update product in database
-        const product = await productService.updateProduct(productId, sanitizedData);
-        
+
+        const product = await productService.updateProduct(Number(productId), sanitizedData);
+
         if (!product) {
             return res.status(404).json({
                 success: false,
                 message: 'Product not found'
             });
         }
-        
+
+        clearCache('/api/products');
         res.json({
             success: true,
             message: 'Product updated successfully',
@@ -431,21 +466,20 @@ exports.deleteProduct = async (req, res) => {
     try {
         const productId = req.params.id;
         
-        // Validate product ID format
-        if (!parseInt(productId)) {
+        if (!isValidId(productId)) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid product ID format'
+                message: 'Invalid product ID'
             });
         }
         
-        // Delete product from database
-        const product = await productService.deleteProduct(productId);
+        const product = await productService.deleteProduct(Number(productId));
         
+        // If product does not exist, treat as already deleted (idempotent delete)
         if (!product) {
-            return res.status(404).json({
-                success: false,
-                message: 'Product not found'
+            return res.json({
+                success: true,
+                message: 'Product already deleted or not found'
             });
         }
         
@@ -461,6 +495,7 @@ exports.deleteProduct = async (req, res) => {
             console.error('[Product Controller] Error cleaning up featured products after deletion:', error);
         }
         
+        clearCache('/api/products');
         res.json({
             success: true,
             message: 'Product deleted successfully'
@@ -505,17 +540,9 @@ exports.renderShop = async (req, res) => {
         }
         
         // Calculate prices for all products
-        const productsWithPrices = products.map(product => {
-            const productObj = product.toObject ? product.toObject() : product;
-            const originalPrice = productObj.price || 0;
-            const discount = productObj.discount || 0;
-            return {
-                ...productObj,
-                originalPrice: originalPrice,
-                finalPrice: calculateFinalPrice(originalPrice, discount),
-                savings: calculateSavings(originalPrice, discount)
-            };
-        });
+        const productsWithPrices = products.map(product =>
+            withPrices(normalizeProduct(toPlain(product)))
+        );
         
         // SEO data
         const canonicalUrl = 'https://qualitick-collections.com/shop';
@@ -569,18 +596,9 @@ exports.searchProducts = async (req, res) => {
         });
         
         // Calculate prices
-        const productsWithPrices = products.map(product => {
-            const productObj = product.toObject();
-            const originalPrice = productObj.price || 0;
-            const discount = productObj.discount || 0;
-            
-            return {
-                ...productObj,
-                originalPrice: originalPrice,
-                finalPrice: calculateFinalPrice(originalPrice, discount),
-                savings: calculateSavings(originalPrice, discount)
-            };
-        });
+        const productsWithPrices = products.map(product =>
+            withPrices(normalizeProduct(toPlain(product)))
+        );
         
         // Calculate pagination values
         const totalPages = Math.ceil(totalProducts / limit);
@@ -677,11 +695,10 @@ exports.submitReview = async (req, res) => {
         const reviewService = require('../services/review.service');
         const { sanitizeObject } = require('../utils/validators');
 
-        // Validate product ID format
-        if (!parseInt(productId)) {
+        if (!isValidId(productId)) {
             return res.status(400).json({
                 success: false,
-                message: 'Please check your review details'
+                message: 'Invalid product ID'
             });
         }
 
@@ -707,8 +724,8 @@ exports.submitReview = async (req, res) => {
         // Sanitize review data
         const reviewData = reviewService.sanitizeReviewData(sanitizedData);
 
-        // Verify purchase
-        const purchaseVerification = await reviewService.verifyPurchase(productId, reviewData.email);
+        const numericId = Number(productId);
+        const purchaseVerification = await reviewService.verifyPurchase(numericId, reviewData.email);
         if (!purchaseVerification) {
             return res.status(403).json({
                 success: false,
@@ -718,8 +735,8 @@ exports.submitReview = async (req, res) => {
 
         // Check for duplicate review
         const duplicateCheck = await reviewService.checkDuplicateReview(
-            productId, 
-            reviewData.email, 
+            numericId,
+            reviewData.email,
             ipAddress
         );
         if (duplicateCheck.exists) {
@@ -737,15 +754,14 @@ exports.submitReview = async (req, res) => {
             ipAddress: ipAddress
         };
 
-        // Add review to product
-        const product = await productService.addReview(productId, finalReviewData);
+        const product = await productService.addReview(numericId, finalReviewData);
 
         // Get the newly added review (last one in array)
         const newReview = product.reviews[product.reviews.length - 1];
 
         // Prepare clean response (exclude sensitive data)
         const reviewResponse = {
-            _id: newReview._id,
+            id: newReview.id,
             name: newReview.name,
             title: newReview.title,
             comment: newReview.comment,
@@ -786,16 +802,16 @@ exports.bulkDeleteProducts = async (req, res) => {
             });
         }
 
-        const invalidIds = productIds.filter(id => !parseInt(id));
+        const invalidIds = productIds.filter(id => !isValidId(id));
         if (invalidIds.length > 0) {
             return res.status(400).json({
                 success: false,
-                message: `Invalid product ID format: ${invalidIds.join(', ')}`
+                message: `Invalid product ID: ${invalidIds.join(', ')}`
             });
         }
 
-        // Perform bulk delete
-        const result = await productService.bulkDeleteProducts(productIds);
+        const validIds = productIds.map(id => Number(id));
+        const result = await productService.bulkDeleteProducts(validIds);
         
         // Clean up featured products that reference deleted products
         try {
@@ -912,30 +928,33 @@ exports.exportProducts = async (req, res) => {
                     minPrice: minPrice || null,
                     maxPrice: maxPrice || null
                 },
-                products: products.map(product => ({
-                    _id: product._id,
-                    model: product.model,
-                    sku: product.sku,
-                    brand: product.brand,
-                    category: product.gender || product.category,
-                    description: product.description,
-                    price: product.price,
-                    originalPrice: product.originalPrice,
-                    discount: product.discount,
-                    stock: product.stock,
-                    lowStockThreshold: product.lowStockThreshold || 5,
-                    status: product.status,
-                    images: product.images || [],
-                    videoUrl: product.videoUrl,
-                    warranty: product.warranty,
-                    waterResistance: product.waterResistance,
-                    strapType: product.strapType,
-                    slug: product.slug,
-                    metaTitle: product.metaTitle,
-                    metaDescription: product.metaDescription,
-                    createdAt: product.createdAt,
-                    updatedAt: product.updatedAt
-                }))
+                products: products.map(product => {
+                    const plain = toPlain(product);
+                    return {
+                        _id: plain.id ?? plain._id,
+                        model: plain.model,
+                        sku: plain.sku,
+                        brand: plain.brand,
+                        category: plain.gender || plain.category,
+                        description: plain.description,
+                        price: plain.price,
+                        originalPrice: plain.originalPrice,
+                        discount: plain.discount,
+                        stock: plain.stock,
+                        lowStockThreshold: plain.lowStockThreshold || 5,
+                        status: plain.status,
+                        images: plain.images || [],
+                        videoUrl: plain.videoUrl,
+                        warranty: plain.warranty,
+                        waterResistance: plain.waterResistance,
+                        strapType: plain.strapType,
+                        slug: plain.slug,
+                        metaTitle: plain.metaTitle,
+                        metaDescription: plain.metaDescription,
+                        createdAt: plain.createdAt,
+                        updatedAt: plain.updatedAt
+                    };
+                })
             };
 
             res.setHeader('Content-Type', 'application/json');
@@ -1025,15 +1044,13 @@ exports.reorderProductImages = async (req, res) => {
         const productId = req.params.id;
         const { imageOrder } = req.body;
         
-        // Validate product ID format
-        if (!parseInt(productId)) {
+        if (!isValidId(productId)) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid product ID format'
+                message: 'Invalid product ID'
             });
         }
         
-        // Validate imageOrder
         if (!Array.isArray(imageOrder) || imageOrder.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -1041,8 +1058,7 @@ exports.reorderProductImages = async (req, res) => {
             });
         }
         
-        // Reorder images
-        const product = await productService.reorderProductImages(productId, imageOrder);
+        const product = await productService.reorderProductImages(Number(productId), imageOrder);
         
         if (!product) {
             return res.status(404).json({
@@ -1074,15 +1090,13 @@ exports.setPrimaryImage = async (req, res) => {
         const productId = req.params.id;
         const { imageUrl } = req.body;
         
-        // Validate product ID format
-        if (!parseInt(productId)) {
+        if (!isValidId(productId)) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid product ID format'
+                message: 'Invalid product ID'
             });
         }
         
-        // Validate imageUrl
         if (!imageUrl || typeof imageUrl !== 'string') {
             return res.status(400).json({
                 success: false,
@@ -1090,8 +1104,7 @@ exports.setPrimaryImage = async (req, res) => {
             });
         }
         
-        // Set primary image
-        const product = await productService.setPrimaryImage(productId, imageUrl);
+        const product = await productService.setPrimaryImage(Number(productId), imageUrl);
         
         if (!product) {
             return res.status(404).json({
@@ -1121,17 +1134,15 @@ exports.setPrimaryImage = async (req, res) => {
 exports.deleteProductImage = async (req, res) => {
     try {
         const productId = req.params.id;
-        const imageUrl = decodeURIComponent(req.params.imageId); // imageId is actually the image URL
+        const imageUrl = decodeURIComponent(req.params.imageId);
         
-        // Validate product ID format
-        if (!parseInt(productId)) {
+        if (!isValidId(productId)) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid product ID format'
+                message: 'Invalid product ID'
             });
         }
         
-        // Validate imageUrl
         if (!imageUrl || imageUrl.trim().length === 0) {
             return res.status(400).json({
                 success: false,
@@ -1139,8 +1150,7 @@ exports.deleteProductImage = async (req, res) => {
             });
         }
         
-        // Delete image
-        const product = await productService.deleteProductImage(productId, imageUrl);
+        const product = await productService.deleteProductImage(Number(productId), imageUrl);
         
         if (!product) {
             return res.status(404).json({

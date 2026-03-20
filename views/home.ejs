@@ -63,22 +63,44 @@
         <div class="products-slider">
             <div class="slider-container" id="featuredSlider"></div>
         </div>
+        <div class="featured-view-all is-hidden" id="featuredViewAllWrapper">
+            <a href="/shop" class="btn-view-all">
+                View All Products
+                <img src="/images/icons/arrow-Icon-2.svg" alt="">
+            </a>
+        </div>
     </section>
 
     <!-- FLASH SALES -->
     <section id="flashSalesSection" class="flash-sales-section">
-        <div class="flash-sales">
-            <div class="flash-header">
-                <div class="flash-title">
-                    <span class="flash-icon">⚡</span> FLASH SALE
+        <div class="fs-container">
+
+            <!-- Top band: eyebrow + countdown -->
+            <div class="fs-band">
+                <div class="fs-band-left">
+                    <span class="fs-eyebrow">
+                        <span class="flash-icon">⚡</span>
+                        Limited Time Offer
+                    </span>
+                    <h2 class="fs-title">Flash Sale</h2>
                 </div>
-                <div class="timer gradient-text" id="flashTimer">02:15:33</div>
+                <div class="fs-countdown">
+                    <span class="fs-countdown-label">Ends in</span>
+                    <span class="fs-timer" id="flashTimer">00:00:00</span>
+                </div>
             </div>
-            <div class="progress-bar">
-                <div class="progress gradient-flow"></div>
+
+            <!-- Urgency bar -->
+            <div class="fs-urgency">
+                <div class="fs-progress-track">
+                    <div class="progress fs-progress-fill gradient-flow"></div>
+                </div>
+                <p class="fs-urgency-text" id="flashBannerText">Limited stock available! 60% of items already sold.</p>
             </div>
-            <p id="flashBannerText">Limited stock available! 60% of items already sold.</p>
-            <div class="products" id="flashProducts"></div>
+
+            <!-- Product cards -->
+            <div class="fs-products" id="flashProducts"></div>
+
         </div>
     </section>
 

@@ -116,22 +116,5 @@ Payment.findExpiredPayments = function() {
     });
 };
 
-Payment.findOneAndUpdate = async function(filter, update, options = {}) {
-    const where = { ...filter };
-    if (where._id !== undefined) { where.id = where._id; delete where._id; }
-    if (where.$or) {
-        where[Op.or] = where.$or.map(clause => {
-            const c = { ...clause };
-            if (c.status && c.status.$nin) { c.status = { [Op.notIn]: c.status.$nin }; }
-            return c;
-        });
-        delete where.$or;
-    }
-    const doc = await this.findOne({ where });
-    if (!doc) return null;
-    const updatePayload = update.$set || update;
-    await doc.update(updatePayload, options);
-    return options.new !== false ? this.findByPk(doc.id) : doc;
-};
 
 module.exports = Payment;

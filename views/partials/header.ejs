@@ -151,8 +151,8 @@
         <link rel="stylesheet" href="/css/home.css">
     <% } %>
 
-    <% if (typeof page !=='undefined' && page==='shop' ) { %>
-        <!-- Shop Stylesheet -->
+    <% if (typeof page !=='undefined' && (page==='shop' || page==='home') ) { %>
+        <!-- Shop Stylesheet (also used by featured cards on home) -->
         <link rel="stylesheet" href="/css/shop.css">
     <% } %>
     

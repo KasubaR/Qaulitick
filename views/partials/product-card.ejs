@@ -1,0 +1,68 @@
+<%
+    // Normalize images: product.images can be a stringified JSON (DB) or an array
+    let _imgs = product.images;
+    if (typeof _imgs === 'string') {
+        try { _imgs = JSON.parse(_imgs); } catch (e) { _imgs = []; }
+    }
+    if (!Array.isArray(_imgs)) _imgs = [];
+    const _firstImage = _imgs[0] || '/images/placeholder.jpg';
+
+    const _discount = Number(product.discount) || 0;
+    const _productId = product._id || product.id;
+%>
+
+<div class="shop-product-card">
+    <a href="/product/<%= _productId %>" class="product-link">
+        <div class="product-image-wrapper">
+            <% if (_discount > 0) { %>
+                <span class="discount-badge">-<%= _discount %>%</span>
+            <% } %>
+            <% if (product.stock === 0) { %>
+                <div class="out-of-stock-overlay">Out of Stock</div>
+            <% } %>
+            <img
+                src="<%= _firstImage %>"
+                alt="<%= product.model %>"
+                class="product-image"
+                loading="lazy"
+                decoding="async"
+                width="400"
+                height="400"
+            >
+        </div>
+
+        <div class="product-info">
+            <div class="product-brand"><%= product.brand || 'Brand' %></div>
+            <h3 class="product-name"><%= product.model %></h3>
+            <div class="product-rating">
+                <% for(let i = 1; i <= 5; i++) { %>
+                    <% if (i <= Math.floor(product.rating || 0)) { %>
+                        <i class="fas fa-star"></i>
+                    <% } else if (i === Math.ceil(product.rating || 0) && (product.rating || 0) % 1 !== 0) { %>
+                        <i class="fas fa-star-half-alt"></i>
+                    <% } else { %>
+                        <i class="far fa-star"></i>
+                    <% } %>
+                <% } %>
+                <span class="rating-value">(<%= product.rating || 0 %>)</span>
+            </div>
+
+            <div class="product-price">
+                <% if (_discount > 0) { %>
+                    <span class="original-price">K<%= (product.originalPrice || product.price || 0).toLocaleString() %></span>
+                    <span class="current-price" data-final-price="<%= product.finalPrice || product.price || 0 %>">K<%= (product.finalPrice || product.price || 0).toLocaleString() %></span>
+                <% } else { %>
+                    <span class="current-price" data-final-price="<%= product.finalPrice || product.price || 0 %>">K<%= (product.finalPrice || product.price || 0).toLocaleString() %></span>
+                <% } %>
+            </div>
+
+            <div class="product-meta">
+                <span class="product-strap">
+                    <i class="fas fa-link"></i>
+                    <%= product.strapType || 'N/A' %>
+                </span>
+            </div>
+        </div>
+    </a>
+</div>
+

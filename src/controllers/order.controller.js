@@ -1,17 +1,31 @@
 // Order Controller
+const crypto = require('crypto');
+const { Op } = require('sequelize');
+const { sequelize } = require('../config/mysql');
 const Order = require('../models/Order.model');
 const Payment = require('../models/Payment.model');
+const Product = require('../models/Product.model');
 const orderService = require('../services/order.service');
+const logger = require('../utils/logger').child({ module: 'OrderController' });
 
-// Order counter for generating unique order numbers
-let orderCounter = 1000;
+// Delivery fee in ZMW. Configurable via env; set to 0 for free shipping.
+const DELIVERY_FEE_ZMW = parseFloat(process.env.DELIVERY_FEE_ZMW ?? '0') || 0;
+
+/**
+ * Calculate delivery fee server-side.
+ * Never trust the client-supplied totals.delivery value.
+ */
+function calculateDeliveryFee(shipping) {
+    if (shipping && (shipping.pickup === true || shipping.pickup === 'true')) return 0;
+    return DELIVERY_FEE_ZMW;
+}
 
 /**
  * Helper function to enrich order with payment status from Payment model
  * This ensures orders.ejs uses the same payment status source as payments.ejs
  */
 async function enrichOrderWithPaymentStatus(order) {
-    const orderObj = order.toObject ? order.toObject() : order;
+    const orderObj = order.toJSON();
     
     // Find payment for this order (Payment model is source of truth)
     const payment = await Payment.findByOrderNumber(orderObj.orderNumber);
@@ -33,9 +47,9 @@ exports.createOrder = async (req, res) => {
     try {
         const { validateOrder, sanitizeObject } = require('../utils/validators');
         
-        // Debug: Log incoming request body structure
-        console.log('[Order Controller] Incoming request body keys:', Object.keys(req.body || {}));
-        console.log('[Order Controller] Items in request:', req.body?.items ? `Array with ${req.body.items.length} items` : 'undefined or not array');
+        // Debug-level request metadata (never log raw req.body to avoid PII leakage)
+        const incomingItemCount = Array.isArray(req.body?.items) ? req.body.items.length : 0;
+        logger.debug({ incomingItemCount }, 'Incoming order request');
         
         // Sanitize input
         const sanitizedBody = sanitizeObject(req.body);
@@ -48,8 +62,8 @@ exports.createOrder = async (req, res) => {
             coupon
         } = sanitizedBody;
         
-        // Debug: Log after sanitization
-        console.log('[Order Controller] Items after sanitization:', items ? `Array with ${items.length} items` : 'undefined or not array');
+        // Debug-level log (no request body / no customer PII)
+        logger.debug({ sanitizedItemCount: Array.isArray(items) ? items.length : 0 }, 'Order items after sanitization');
 
         // Validate order data using validator
         const validation = validateOrder(sanitizedBody);
@@ -70,170 +84,170 @@ exports.createOrder = async (req, res) => {
             });
         }
 
-        // CRITICAL: Validate and recalculate prices server-side to prevent manipulation
-        const productService = require('../services/product.service');
         const { calculateFinalPrice, calculateSubtotal, calculateTotal } = require('../utils/price.utils');
-        
-        // Track stock validation errors
-        const stockErrors = [];
-        
-        // Recalculate prices from database and validate stock
-        const validatedItems = await Promise.all(items.map(async (item) => {
-            // Find product in database using product service
-            const productId = item.id || item.productId;
-            if (!productId) {
-                throw new Error('Product ID is required for item');
-            }
-            
-            const product = await productService.getProductById(productId);
-            
-            if (!product) {
-                throw new Error(`Product ${productId} not found`);
-            }
-            
-            // Convert Mongoose document to plain object if needed
-            const productObj = product.toObject ? product.toObject() : product;
-            
-            // CRITICAL: Validate stock availability
-            const requestedQuantity = Math.max(1, parseInt(item.quantity) || 1);
-            
-            if (productObj.stock < requestedQuantity) {
-                stockErrors.push({
-                    productId: productObj._id,
-                    productName: productObj.model,
-                    requestedQuantity: requestedQuantity,
-                    availableStock: productObj.stock,
-                    message: `Only ${productObj.stock} item${productObj.stock !== 1 ? 's' : ''} available for "${productObj.model}"`
-                });
-                
-                // Reject order if stock insufficient
-                throw new Error(`Insufficient stock for "${productObj.model}". Available: ${productObj.stock}, Requested: ${requestedQuantity}`);
-            }
-            
-            // Calculate server-side price (ignore client-provided price)
-            const originalPrice = productObj.price || 0;
-            const discount = productObj.discount || 0;
-            const serverPrice = calculateFinalPrice(originalPrice, discount);
-            
-            // Warn if client price doesn't match server price
-            const clientPrice = parseFloat(item.price) || 0;
-            if (Math.abs(clientPrice - serverPrice) > 0.01) {
-                console.warn(`[Order Controller] Price mismatch for product ${productId}: client=${clientPrice}, server=${serverPrice}`);
-            }
-            
-            return {
-                id: item.id || productObj._id.toString(),
-                name: item.name || productObj.model,
-                price: serverPrice, // Use server-calculated price
-                originalPrice: originalPrice,
-                discount: discount,
-                quantity: requestedQuantity,
-                image: item.image || (productObj.images && productObj.images[0]) || null,
-                productId: productObj._id.toString(),
-                sku: productObj.sku || null,
-                stock: productObj.stock // Include for reference
-            };
-        }));
-        
-        // If any stock errors occurred, return error response
-        if (stockErrors.length > 0) {
+
+        // Coupon codes are not yet implemented — reject loudly so the client knows.
+        if (coupon && coupon.code) {
             return res.status(400).json({
                 success: false,
-                message: 'Some items are out of stock',
-                errors: stockErrors
+                message: 'Coupon codes are not supported yet.'
             });
         }
-        
-        // Recalculate totals server-side using utility functions
-        const subtotal = calculateSubtotal(validatedItems);
-        const deliveryFee = totals.delivery || 0;
-        const couponDiscount = totals.discount || 0;
-        const total = calculateTotal(subtotal, couponDiscount, deliveryFee);
-        
-        // Generate order number
-        const orderNumber = `ORD-${Date.now()}-${orderCounter++}`;
 
-        // Create order object with server-validated prices
-        const orderData = {
-            orderNumber,
-            customer: {
-                name: customer.name,
-                phone: customer.phone,
-                email: customer.email,
-                createAccount: customer.createAccount || false
-            },
-            shipping: {
-                address: shipping.address,
-                city: shipping.city,
-                province: shipping.province,
-                instructions: shipping.instructions || '',
-                pickup: shipping.pickup || false
-            },
-            paymentMethod,
-            items: validatedItems, // Use server-validated items
-            totals: {
-                subtotal: subtotal, // Server-calculated
-                discount: couponDiscount,
-                delivery: deliveryFee,
-                total: total // Server-calculated
-            },
-            coupon: coupon || null,
-            status: 'pending',
-            paymentStatus: 'pending', // Initialize payment status
-            history: [{
+        // Wrap ALL DB operations — reads, stock decrements, and order creation — in a
+        // single transaction so any failure rolls back every write atomically.
+        const order = await sequelize.transaction(async (t) => {
+            // Read product rows inside the transaction for a consistent snapshot.
+            // Using Product.findByPk directly so we can pass { transaction: t }.
+            const validatedItems = await Promise.all(items.map(async (item) => {
+                const productId = item.id || item.productId;
+                if (!productId) {
+                    throw new Error('Product ID is required for item');
+                }
+
+                const product = await Product.findByPk(parseInt(productId, 10), { transaction: t });
+                if (!product) {
+                    throw new Error(`Product ${productId} not found`);
+                }
+
+                const productObj = product.toJSON();
+                const requestedQuantity = Math.max(1, parseInt(item.quantity) || 1);
+
+                if (productObj.stock < requestedQuantity) {
+                    const err = new Error(`Insufficient stock for "${productObj.model}". Available: ${productObj.stock}, Requested: ${requestedQuantity}`);
+                    err.statusCode = 409;
+                    throw err;
+                }
+
+                // Server-side price — ignore whatever the client sent.
+                const originalPrice = productObj.price || 0;
+                const discount = productObj.discount || 0;
+                const serverPrice = calculateFinalPrice(originalPrice, discount);
+
+                const clientPrice = parseFloat(item.price) || 0;
+                if (Math.abs(clientPrice - serverPrice) > 0.01) {
+                    logger.warn(
+                        { productId, clientPrice, serverPrice },
+                        'Price mismatch for order item'
+                    );
+                }
+
+                return {
+                    id: item.id || String(productObj.id),
+                    name: item.name || productObj.model,
+                    price: serverPrice,
+                    originalPrice: originalPrice,
+                    discount: discount,
+                    quantity: requestedQuantity,
+                    image: item.image || (productObj.images && productObj.images[0]) || null,
+                    productId: String(productObj.id),
+                    sku: productObj.sku || null,
+                    stock: productObj.stock
+                };
+            }));
+
+            // Recalculate totals server-side — never trust financial values from the client.
+            const subtotal = calculateSubtotal(validatedItems);
+            const deliveryFee = calculateDeliveryFee(shipping);
+            const couponDiscount = 0;
+            const total = calculateTotal(subtotal, couponDiscount, deliveryFee);
+
+            const orderData = {
+                orderNumber: `TEMP-${crypto.randomUUID()}`, // replaced immediately below
+                customer: {
+                    name: customer.name,
+                    phone: customer.phone,
+                    email: customer.email,
+                    createAccount: customer.createAccount || false
+                },
+                shipping: {
+                    address: shipping.address,
+                    city: shipping.city,
+                    province: shipping.province,
+                    instructions: shipping.instructions || '',
+                    pickup: shipping.pickup || false
+                },
+                paymentMethod,
+                items: validatedItems,
+                totals: {
+                    subtotal: subtotal,
+                    discount: couponDiscount,
+                    delivery: deliveryFee,
+                    total: total
+                },
+                coupon: coupon || null,
                 status: 'pending',
                 paymentStatus: 'pending',
-                notes: 'Order created',
-                updatedBy: 'system',
-                updatedAt: new Date().toISOString(),
-                source: 'order_creation'
-            }],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        };
+                history: [{
+                    status: 'pending',
+                    paymentStatus: 'pending',
+                    notes: 'Order created',
+                    updatedBy: 'system',
+                    updatedAt: new Date().toISOString(),
+                    source: 'order_creation'
+                }],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
 
-        // Save order to database using Order model
-        const order = await Order.create(orderData);
-        
-        // TODO: In production, use optimistic locking to reserve stock:
-        // const updated = await Product.findOneAndUpdate(
-        //     { _id: productId, stock: { $gte: quantity } },
-        //     { $inc: { stock: -quantity, reserved: quantity } },
-        //     { new: true }
-        // );
-        // if (!updated) {
-        //     return res.status(409).json({
-        //         success: false,
-        //         message: 'Stock no longer available'
-        //     });
-        // }
+            // Atomic stock decrement: WHERE stock >= quantity prevents overselling
+            // even under concurrent requests. rowsAffected === 0 means another request
+            // already consumed the last unit between our read and this update.
+            for (const item of validatedItems) {
+                const [rowsAffected] = await Product.update(
+                    { stock: sequelize.literal(`stock - ${item.quantity}`) },
+                    {
+                        where: {
+                            id: parseInt(item.productId, 10),
+                            stock: { [Op.gte]: item.quantity }
+                        },
+                        transaction: t
+                    }
+                );
+                if (rowsAffected === 0) {
+                    const err = new Error(`Stock no longer available for "${item.name}"`);
+                    err.statusCode = 409;
+                    throw err;
+                }
+            }
 
-        console.log(`[Order Controller] Order created: ${orderNumber}`);
-        console.log(`[Order Controller] Stock validation passed for all items`);
+            const created = await Order.create(orderData, { transaction: t });
+            const orderNumber = `ORD-${String(created.id).padStart(6, '0')}`;
+            await created.update({ orderNumber }, { transaction: t });
+            return created;
+        });
+
+        const orderNumber = order.orderNumber;
+        logger.info({ orderNumber }, 'Order created');
+        logger.debug({ orderNumber }, 'Stock validation passed for all items');
 
         // Send new order notification to admin (if enabled)
         try {
             const emailService = require('../services/email.service');
-            const orderObj = order.toObject ? order.toObject() : order;
+            const orderObj = order.toJSON();
             await emailService.sendOrderNotificationToAdmin(orderObj);
         } catch (emailError) {
-            console.error('[Order Controller] Error sending new order notification:', emailError);
+            logger.error({ err: emailError }, 'Error sending new order notification');
             // Continue even if email fails - don't block order creation
         }
 
         res.json({
             success: true,
             orderNumber: order.orderNumber,
-            order: order.toObject ? order.toObject() : order,
+            order: order.toJSON(),
             message: 'Order created successfully'
         });
     } catch (error) {
-        console.error('[Order Controller] Error creating order:', error);
-        console.error('[Order Controller] Error stack:', error.stack);
-        
-        // Return more detailed error message for debugging
+        logger.error({ err: error }, 'Error creating order');
+
+        if (error.statusCode === 409) {
+            return res.status(409).json({
+                success: false,
+                message: error.message
+            });
+        }
+
         const errorMessage = error.message || 'Failed to create order. Please try again.';
-        
         res.status(500).json({
             success: false,
             message: errorMessage,
@@ -266,7 +280,7 @@ exports.getOrderByNumber = async (req, res) => {
             order: enrichedOrder
         });
     } catch (error) {
-        console.error('[Order Controller] Error fetching order:', error);
+        logger.error({ err: error }, 'Error fetching order');
         res.status(500).json({
             success: false,
             message: 'Failed to fetch order'
@@ -274,31 +288,121 @@ exports.getOrderByNumber = async (req, res) => {
     }
 };
 
-// Get all orders
+// Get all orders (paginated, filtered)
 exports.getAllOrders = async (req, res) => {
     try {
-        const { email, status, paymentStatus, paymentMethod, startDate, endDate, sort, search, updatedSince } = req.query;
-        
-        // NOTE: Original implementation used Mongo-style queries. This is a simplified
-        // Sequelize-compatible version that returns all orders with basic sorting.
-        const orderDirection = sort === 'oldest' ? 'ASC' : 'DESC';
-        const filteredOrders = await Order.findAll({
-            order: [['createdAt', orderDirection]]
+        const {
+            email, status, paymentStatus, paymentMethod,
+            startDate, endDate, sort, search, updatedSince,
+            page = 1, limit: rawLimit = 50
+        } = req.query;
+
+        const pageNum  = Math.max(1, parseInt(page, 10)  || 1);
+        const pageSize = Math.min(200, Math.max(1, parseInt(rawLimit, 10) || 50));
+        const offset   = (pageNum - 1) * pageSize;
+        let orderClause;
+        if (sort === 'oldest') {
+            orderClause = [['createdAt', 'ASC']];
+        } else if (sort === 'highest_value') {
+            orderClause = [[sequelize.fn('JSON_EXTRACT', sequelize.col('totals'), '$.total'), 'DESC']];
+        } else if (sort === 'lowest_value') {
+            orderClause = [[sequelize.fn('JSON_EXTRACT', sequelize.col('totals'), '$.total'), 'ASC']];
+        } else {
+            orderClause = [['createdAt', 'DESC']]; // default: newest
+        }
+
+        // Build WHERE clause from query params
+        const where = {};
+
+        if (status)        where.status        = status;
+        if (paymentStatus) where.paymentStatus = paymentStatus;
+        if (paymentMethod) where.paymentMethod = paymentMethod;
+
+        if (updatedSince) {
+            const since = new Date(updatedSince);
+            if (!isNaN(since)) where.updatedAt = { [Op.gte]: since };
+        }
+
+        if (startDate || endDate) {
+            where.createdAt = {};
+            if (startDate) {
+                const d = new Date(startDate);
+                if (!isNaN(d)) where.createdAt[Op.gte] = d;
+            }
+            if (endDate) {
+                const d = new Date(endDate);
+                if (!isNaN(d)) where.createdAt[Op.lte] = d;
+            }
+        }
+
+        // Text search: orderNumber prefix or customer email/name (JSON column)
+        const searchClauses = [];
+        if (search) {
+            searchClauses.push({ orderNumber: { [Op.like]: `%${search}%` } });
+            searchClauses.push(
+                sequelize.where(
+                    sequelize.fn('JSON_EXTRACT', sequelize.col('customer'), '$.email'),
+                    { [Op.like]: `%${search}%` }
+                )
+            );
+            searchClauses.push(
+                sequelize.where(
+                    sequelize.fn('JSON_EXTRACT', sequelize.col('customer'), '$.name'),
+                    { [Op.like]: `%${search}%` }
+                )
+            );
+        }
+        if (email) {
+            searchClauses.push(
+                sequelize.where(
+                    sequelize.fn('JSON_EXTRACT', sequelize.col('customer'), '$.email'),
+                    { [Op.like]: `%${email}%` }
+                )
+            );
+        }
+        if (searchClauses.length) {
+            where[Op.or] = searchClauses;
+        }
+
+        // Single paginated query + total count (two queries, both use the same WHERE)
+        const { count: total, rows: orders } = await Order.findAndCountAll({
+            where,
+            order: orderClause,
+            limit: pageSize,
+            offset
         });
 
-        // Fetch payment status from Payment model for each order (source of truth)
-        // This ensures orders.ejs shows the same payment status as payments.ejs
-        const ordersWithPaymentStatus = await Promise.all(
-            filteredOrders.map(order => enrichOrderWithPaymentStatus(order))
-        );
+        // Batch-load payments for this page in one query — avoids N+1
+        const orderNumbers = orders.map(o => o.orderNumber);
+        const payments = orderNumbers.length
+            ? await Payment.findAll({ where: { orderNumber: { [Op.in]: orderNumbers } } })
+            : [];
+        const paymentByOrder = new Map(payments.map(p => [p.orderNumber, p]));
+
+        // Merge payment data onto each order (same enrichment as enrichOrderWithPaymentStatus)
+        const enriched = orders.map(order => {
+            const orderObj = order.toJSON();
+            const payment  = paymentByOrder.get(orderObj.orderNumber);
+            if (payment) {
+                orderObj.paymentStatus        = payment.status;
+                orderObj.paymentTransactionId = payment.transactionId || payment.lencoTransactionId;
+                orderObj.paymentLencoStatus   = payment.lencoStatus;
+                orderObj.paymentCompletedAt   = payment.completedAt;
+                orderObj.paymentFailedAt      = payment.failedAt;
+            }
+            return orderObj;
+        });
 
         res.json({
             success: true,
-            orders: ordersWithPaymentStatus,
-            count: ordersWithPaymentStatus.length
+            orders: enriched,
+            count: enriched.length,
+            total,
+            page: pageNum,
+            pages: Math.ceil(total / pageSize)
         });
     } catch (error) {
-        console.error('[Order Controller] Error fetching orders:', error);
+        logger.error({ err: error }, 'Error fetching orders');
         res.status(500).json({
             success: false,
             message: 'Failed to fetch orders'
@@ -330,15 +434,15 @@ exports.updateOrderStatus = async (req, res) => {
             });
         }
 
-        console.log(`[Order Controller] Order ${orderNumber} status updated to: ${status}`);
+        logger.info({ orderNumber, status }, 'Order status updated');
 
         res.json({
             success: true,
-            order: order.toObject ? order.toObject() : order,
+            order: order.toJSON(),
             message: 'Order status updated'
         });
     } catch (error) {
-        console.error('[Order Controller] Error updating order status:', error);
+        logger.error({ err: error }, 'Error updating order status');
         res.status(500).json({
             success: false,
             message: 'Failed to update order status'
@@ -365,11 +469,11 @@ exports.updateTracking = async (req, res) => {
         
         res.json({
             success: true,
-            order: order.toObject ? order.toObject() : order,
+            order: order.toJSON(),
             message: 'Tracking information updated'
         });
     } catch (error) {
-        console.error('[Order Controller] Error updating tracking:', error);
+        logger.error({ err: error }, 'Error updating tracking');
         res.status(500).json({
             success: false,
             message: 'Failed to update tracking information'
@@ -396,11 +500,11 @@ exports.addOrderNote = async (req, res) => {
         
         res.json({
             success: true,
-            order: order.toObject ? order.toObject() : order,
+            order: order.toJSON(),
             message: 'Note added successfully'
         });
     } catch (error) {
-        console.error('[Order Controller] Error adding note:', error);
+        logger.error({ err: error }, 'Error adding order note');
         res.status(500).json({
             success: false,
             message: 'Failed to add note'
@@ -500,10 +604,17 @@ exports.verifyOrderPayment = async (req, res) => {
                 await payment.save();
                 verified = true;
                 
-                console.log(`[Order Controller] Payment ${payment.transactionId || payment.lencoTransactionId} verified for order ${orderNumber}. Status: ${previousPaymentStatus} → ${payment.status}`);
+                logger.info(
+                    {
+                        orderNumber,
+                        previousPaymentStatus,
+                        paymentStatus: payment.status
+                    },
+                    'Payment verified'
+                );
                 
             } catch (error) {
-                console.error('[Order Controller] Error verifying payment with Lenco:', error);
+                logger.error({ err: error }, 'Error verifying payment with Lenco');
                 verificationError = error.message;
                 // Continue with database status if verification fails
             }
@@ -524,7 +635,7 @@ exports.verifyOrderPayment = async (req, res) => {
         );
 
         if (!updatedOrder) {
-            console.warn(`[Order Controller] Failed to update order status for ${orderNumber}`);
+            logger.warn({ orderNumber }, 'Failed to update order status for payment verification');
         }
 
         // Return verification result
@@ -553,7 +664,7 @@ exports.verifyOrderPayment = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('[Order Controller] Error verifying order payment:', error);
+        logger.error({ err: error }, 'Error verifying order payment');
         res.status(500).json({
             success: false,
             message: error.message || 'Failed to verify order payment'
@@ -598,9 +709,9 @@ exports.generateInvoice = async (req, res) => {
         // Send PDF
         res.send(pdfBuffer);
 
-        console.log(`[Order Controller] Invoice generated for order ${orderNumber}`);
+        logger.info({ orderNumber }, 'Invoice generated');
     } catch (error) {
-        console.error('[Order Controller] Error generating invoice:', error);
+        logger.error({ err: error }, 'Error generating invoice');
         res.status(500).json({
             success: false,
             message: error.message || 'Failed to generate invoice'
@@ -637,15 +748,15 @@ exports.deleteOrder = async (req, res) => {
             });
         }
         
-        console.log(`[Order Controller] Order ${orderNumber} deleted (soft delete)`);
+        logger.info({ orderNumber }, 'Order deleted (soft delete)');
         
         res.json({
             success: true,
             message: 'Order deleted successfully',
-            order: order.toObject ? order.toObject() : order
+            order: order.toJSON()
         });
     } catch (error) {
-        console.error('[Order Controller] Error deleting order:', error);
+        logger.error({ err: error }, 'Error deleting order');
         res.status(500).json({
             success: false,
             message: 'Failed to delete order',
@@ -685,12 +796,19 @@ exports.deleteOrders = async (req, res) => {
                     results.notFound.push(orderNumber);
                 }
             } catch (error) {
-                console.error(`[Order Controller] Error deleting order ${orderNumber}:`, error);
+                logger.error({ err: error, orderNumber }, 'Error deleting order in bulk delete');
                 results.errors.push({ orderNumber, error: error.message });
             }
         }
         
-        console.log(`[Order Controller] Bulk delete completed: ${results.deleted.length} deleted, ${results.notFound.length} not found, ${results.errors.length} errors`);
+        logger.info(
+            {
+                deletedCount: results.deleted.length,
+                notFoundCount: results.notFound.length,
+                errorCount: results.errors.length
+            },
+            'Bulk delete completed'
+        );
         
         res.json({
             success: true,
@@ -698,7 +816,7 @@ exports.deleteOrders = async (req, res) => {
             results: results
         });
     } catch (error) {
-        console.error('[Order Controller] Error in bulk delete:', error);
+        logger.error({ err: error }, 'Error in bulk delete');
         res.status(500).json({
             success: false,
             message: 'Failed to delete orders',
@@ -752,7 +870,8 @@ exports.sendInvoiceEmail = async (req, res) => {
             });
         }
 
-        console.log(`[Order Controller] Invoice email sent for order ${orderNumber} to ${order.customer.email}`);
+        // Do not log customer email addresses in production logs (PII).
+        logger.info({ orderNumber, messageId: emailResult.messageId }, 'Invoice email sent');
 
         res.json({
             success: true,
@@ -761,7 +880,7 @@ exports.sendInvoiceEmail = async (req, res) => {
             messageId: emailResult.messageId
         });
     } catch (error) {
-        console.error('[Order Controller] Error sending invoice email:', error);
+        logger.error({ err: error }, 'Error sending invoice email');
         res.status(500).json({
             success: false,
             message: error.message || 'Failed to send invoice email'
@@ -988,11 +1107,33 @@ exports.exportOrders = async (req, res) => {
             res.send(csvContent);
         }
     } catch (error) {
-        console.error('[Order Controller] Error exporting orders:', error);
+        logger.error({ err: error }, 'Error exporting orders');
         res.status(500).json({
             success: false,
             message: 'Failed to export orders data'
         });
+    }
+};
+
+/**
+ * GET /api/admin/orders/unread-count?since=<ISO timestamp>
+ * Returns the count of orders created after `since`.
+ * Returns only a number — no order data, no PII.
+ */
+exports.getUnreadOrderCount = async (req, res) => {
+    try {
+        const since = req.query.since ? new Date(req.query.since) : null;
+        if (!since || isNaN(since.getTime())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid or missing "since" parameter (ISO 8601 timestamp required)'
+            });
+        }
+        const count = await Order.count({ where: { createdAt: { [Op.gt]: since } } });
+        res.json({ success: true, count });
+    } catch (error) {
+        logger.error({ err: error }, 'Error getting unread order count');
+        res.status(500).json({ success: false, message: 'Failed to get unread order count' });
     }
 };
 

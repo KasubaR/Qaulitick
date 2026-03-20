@@ -19,18 +19,14 @@ class FlashSaleService {
      */
     async getAllFlashSales(filters = {}, options = {}) {
         try {
-            const {
-                sort = { createdAt: -1 },
-                limit = 0,
-                skip = 0
-            } = options;
-
-            const query = FlashSale.find(filters);
-            if (sort) query.sort(sort);
-            if (skip) query.skip(skip);
-            if (limit) query.limit(limit);
-            const flashSales = await query.exec();
-            return flashSales;
+            const { limit, skip = 0 } = options;
+            const findOptions = {
+                where: filters,
+                order: [['createdAt', 'DESC']],
+                offset: skip
+            };
+            if (limit) findOptions.limit = limit;
+            return await FlashSale.findAll(findOptions);
         } catch (error) {
             console.error('[Flash Sale Service] Error getting all flash sales:', error);
             throw error;
@@ -68,8 +64,7 @@ class FlashSaleService {
      */
     async getFlashSaleById(id) {
         try {
-            const flashSale = await FlashSale.findById(id);
-            return flashSale;
+            return await FlashSale.findByPk(toId(id));
         } catch (error) {
             console.error('[Flash Sale Service] Error getting flash sale by ID:', error);
             throw error;
@@ -106,8 +101,9 @@ class FlashSaleService {
             if (updateData.productIds && Array.isArray(updateData.productIds)) {
                 updateData.productIds = updateData.productIds.map(pid => toId(pid));
             }
-            const flashSale = await FlashSale.findByIdAndUpdate(id, updateData, { new: true });
-            
+            const flashSale = await FlashSale.findByPk(toId(id));
+            if (!flashSale) return null;
+            await flashSale.update(updateData);
             return flashSale;
         } catch (error) {
             console.error('[Flash Sale Service] Error updating flash sale:', error);
@@ -122,7 +118,9 @@ class FlashSaleService {
      */
     async deleteFlashSale(id) {
         try {
-            const flashSale = await FlashSale.findByIdAndDelete(id);
+            const flashSale = await FlashSale.findByPk(toId(id));
+            if (!flashSale) return null;
+            await flashSale.destroy();
             return flashSale;
         } catch (error) {
             console.error('[Flash Sale Service] Error deleting flash sale:', error);

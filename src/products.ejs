@@ -332,47 +332,22 @@
 
                     <!-- SEO Tab -->
                     <div class="tab-pane" id="seoTab">
-
-                        <div class="seo-tip-box">
-                            <i class="fas fa-lightbulb"></i>
-                            <span>Good SEO titles and descriptions help customers find your products on Google. Leave blank to auto-generate from brand &amp; model.</span>
+                        <div class="form-group">
+                            <label>Meta Title</label>
+                            <input type="text" id="metaTitle" name="metaTitle" class="form-input" maxlength="60">
+                            <small class="form-hint">Recommended: 50-60 characters</small>
                         </div>
 
                         <div class="form-group">
-                            <label>Meta Title <span class="field-optional">(optional)</span></label>
-                            <input type="text" id="metaTitle" name="metaTitle" class="form-input"
-                                maxlength="60"
-                                placeholder="e.g. Rolex Submariner AAA — Qualitick Collections">
-                            <div class="form-hint-row">
-                                <small class="form-hint">Include brand, model and 1–2 keywords. Keep it under 60 characters so Google doesn't cut it off.</small>
-                                <small class="char-counter" id="metaTitleCounter">0 / 60</small>
-                            </div>
-                            <small class="form-hint-example"><i class="fas fa-check-circle"></i> Good: <em>Rolex Submariner AAA Luxury Watch — Qualitick</em></small>
+                            <label>Meta Description</label>
+                            <textarea id="metaDescription" name="metaDescription" class="form-input" rows="3" maxlength="160"></textarea>
+                            <small class="form-hint">Recommended: 150-160 characters</small>
                         </div>
 
                         <div class="form-group">
-                            <label>Meta Description <span class="field-optional">(optional)</span></label>
-                            <textarea id="metaDescription" name="metaDescription" class="form-input" rows="3"
-                                maxlength="160"
-                                placeholder="e.g. Shop the Rolex Submariner AAA replica at Qualitick Collections. Premium build, sapphire glass, automatic movement. Fast delivery across Zambia."></textarea>
-                            <div class="form-hint-row">
-                                <small class="form-hint">Write a natural sentence describing the product. Aim for 140–160 characters. Include key features and a call to action.</small>
-                                <small class="char-counter" id="metaDescCounter">0 / 160</small>
-                            </div>
-                            <small class="form-hint-example"><i class="fas fa-check-circle"></i> Tip: mention movement type, material, warranty, or delivery to stand out in search results.</small>
-                        </div>
-
-                        <div class="form-group">
-                            <label>URL Slug <span class="field-optional">(optional)</span></label>
-                            <div class="slug-input-wrapper">
-                                <span class="slug-prefix">/product/</span>
-                                <input type="text" id="slug" name="slug" class="form-input slug-field"
-                                    placeholder="rolex-submariner-aaa">
-                            </div>
-                            <div class="form-hint-row">
-                                <small class="form-hint">Auto-generated from brand &amp; model if left blank. Use lowercase letters and hyphens only — no spaces or special characters.</small>
-                            </div>
-                            <small class="form-hint-example"><i class="fas fa-check-circle"></i> Good: <em>rolex-submariner-aaa</em> &nbsp;|&nbsp; <i class="fas fa-times-circle" style="color:#e74c3c"></i> Avoid: <em>Rolex Submariner AAA!</em></small>
+                            <label>Slug</label>
+                            <input type="text" id="slug" name="slug" class="form-input" placeholder="auto-generated-from-title">
+                            <small class="form-hint">URL-friendly version of the product name</small>
                         </div>
 
                         <div class="form-group">
@@ -418,36 +393,10 @@
     <!-- Pass products data to JavaScript -->
     <% if (typeof products !== 'undefined' && products) { %>
     <script>
-        // JSON is HTML-encoded to prevent </script> injection (stored XSS).
-        // The three replacements cover every character that can break out of a
-        // script block; JSON.parse on the client reverses the encoding safely.
-        window.initialProducts = JSON.parse(<%= JSON.stringify(JSON.stringify(products))
-            .replace(/&/g, '\\u0026')
-            .replace(/</g, '\\u003c')
-            .replace(/>/g, '\\u003e') %>);
+        // Make products available to JavaScript
+        window.initialProducts = <%- JSON.stringify(products) %>;
     </script>
     <% } %>
-    <script>
-    // Live character counters for SEO fields
-    (function () {
-        function bindCounter(inputId, counterId, max) {
-            const el = document.getElementById(inputId);
-            const counter = document.getElementById(counterId);
-            if (!el || !counter) return;
-            function update() {
-                const len = el.value.length;
-                counter.textContent = len + ' / ' + max;
-                counter.style.color = len > max * 0.9 ? (len >= max ? '#e74c3c' : '#f39c12') : '#888';
-            }
-            el.addEventListener('input', update);
-            update();
-        }
-        document.addEventListener('DOMContentLoaded', function () {
-            bindCounter('metaTitle', 'metaTitleCounter', 60);
-            bindCounter('metaDescription', 'metaDescCounter', 160);
-        });
-    })();
-    </script>
     <script src="/js/admin/auth-utils.js"></script>
     <script src="/js/admin/admin-products.api.js"></script>
     <script src="/js/admin/admin-products.images.js"></script>

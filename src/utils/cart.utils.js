@@ -92,14 +92,14 @@ async function parseAndValidateCartCookie(req) {
                     continue;
                 }
                 
-                const productObj = product.toObject ? product.toObject() : product;
+                const productObj = product.toJSON();
                 let requestedQuantity = Math.max(1, parseInt(item.quantity) || 1);
                 
                 // Validate stock
                 if (productObj.stock < requestedQuantity) {
                     warnings.push({
                         itemId: item.id,
-                        productId: productObj._id.toString(),
+                        productId: String(productObj.id),
                         message: `Only ${productObj.stock} item${productObj.stock !== 1 ? 's' : ''} available for "${productObj.model}"`,
                         availableStock: productObj.stock,
                         requestedQuantity: requestedQuantity
@@ -119,7 +119,7 @@ async function parseAndValidateCartCookie(req) {
                     console.warn(`[Cart Utils] Price mismatch for product ${productId}: client=${clientPrice}, server=${authoritativePrice}`);
                     warnings.push({
                         itemId: item.id,
-                        productId: productObj._id.toString(),
+                        productId: String(productObj.id),
                         message: `Price updated for "${productObj.model}"`,
                         oldPrice: clientPrice,
                         newPrice: authoritativePrice
@@ -138,8 +138,8 @@ async function parseAndValidateCartCookie(req) {
                 
                 // Build validated item with authoritative data
                 validatedItems.push({
-                    id: item.id || productObj._id.toString(),
-                    productId: productObj._id.toString(),
+                    id: item.id || String(productObj.id),
+                    productId: String(productObj.id),
                     name: productObj.model || item.name,
                     brand: productObj.brand,
                     price: authoritativePrice, // Server-calculated price

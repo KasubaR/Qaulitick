@@ -29,6 +29,17 @@ class ProductService {
         }
     }
 
+    async getProductsByIds(ids) {
+        try {
+            const numericIds = ids.map(id => parseInt(id, 10)).filter(n => !isNaN(n));
+            if (numericIds.length === 0) return [];
+            return await Product.findAll({ where: { id: { [Op.in]: numericIds } } });
+        } catch (error) {
+            console.error('Error getting products by IDs:', error);
+            throw error;
+        }
+    }
+
     async getProductBySku(sku) {
         try {
             return await Product.findOne({ where: { sku: sku.toUpperCase() } });

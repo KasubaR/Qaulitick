@@ -16,7 +16,15 @@ async function startServer() {
         console.log(`📍 Environment: ${NODE_ENV}`);
         
         await databaseService.connect();
-        
+
+        // Verify email transporter early so auth failures surface at startup rather
+        // than silently on the first real email. Skipped when credentials are absent
+        // (e.g. local dev without Gmail configured).
+        if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+            const emailService = require('./src/services/email.service');
+            await emailService.verifyTransporter();
+        }
+
         // Start scheduled tasks
         const schedulerService = require('./src/services/scheduler.service');
         schedulerService.start();

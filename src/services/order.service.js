@@ -37,7 +37,7 @@ async function getOrdersForExport(filters = {}) {
         // Enrich orders with payment status
         const ordersWithPayment = await Promise.all(
             orders.map(async (order) => {
-                const orderObj = order.toObject ? order.toObject() : order;
+                const orderObj = order.toJSON();
                 
                 // Get payment status from Payment model
                 const payment = await Payment.findByOrderNumber(orderObj.orderNumber);

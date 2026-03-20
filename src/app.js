@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const cors = require('cors');
 const compression = require('compression');
 const ipaddr = require('ipaddr.js');
 const cookieParser = require('cookie-parser');
@@ -72,7 +73,15 @@ app.use(sqlInjectionProtection);
 app.use(cookieParser());
 
 // Body parser middleware (with size limits)
-app.use(express.json({ limit: '10mb' }));
+// verify callback captures raw bytes for webhook signature verification before JSON.parse runs
+app.use(express.json({
+    limit: '10mb',
+    verify: (req, _res, buf) => {
+        if (req.path === '/api/payments/lenco/webhook') {
+            req.rawBody = buf; // original bytes — used by validateWebhookSignature
+        }
+    }
+}));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Input Sanitization (after body parser)
@@ -89,22 +98,35 @@ if (!process.env.SESSION_SECRET && process.env.NODE_ENV === 'production') {
     throw new Error('SESSION_SECRET must be set in production. Please set the SESSION_SECRET environment variable.');
 }
 
+// Validate LENCO_WEBHOOK_SECRET in production — placeholder or missing secret allows unauthenticated webhook calls
+if (process.env.NODE_ENV === 'production') {
+    const webhookSecret = process.env.LENCO_WEBHOOK_SECRET;
+    if (!webhookSecret || webhookSecret === 'xxxxxxxxxxxxxxxxxxxxxxx') {
+        throw new Error('LENCO_WEBHOOK_SECRET must be set to a real value in production.');
+    }
+}
+
+// Session store — MemoryStore (dev/single-process). Replace with a persistent store
+// (e.g. connect-session-sequelize) if multi-process or session persistence is needed.
+if (process.env.NODE_ENV === 'production') {
+    console.warn('[Session] Using in-memory MemoryStore. Sessions will not persist across restarts.');
+}
+const sessionStore = undefined; // express-session defaults to MemoryStore
+
 // Session configuration
-// Note: In production, SESSION_SECRET is required (validated above)
-// In development, a default is used for convenience
 const sessionConfig = {
-    // Using default in-memory store (no Redis)
+    store: sessionStore,
     secret: process.env.SESSION_SECRET || 'dev-secret-not-for-production-use',
     resave: false,
     saveUninitialized: false,
-    name: 'admin.sid', // Custom session name
+    name: 'admin.sid',
     cookie: {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // Only send over HTTPS in production
-        sameSite: 'strict', // CSRF protection
-        maxAge: parseInt(process.env.SESSION_MAX_AGE || '28800000', 10) // Default: 8 hours (in milliseconds)
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: parseInt(process.env.SESSION_MAX_AGE || '28800000', 10) // Default: 8 hours
     },
-    rolling: true // Reset expiration on each request
+    rolling: true
 };
 
 app.use(session(sessionConfig));
@@ -117,22 +139,26 @@ app.use(csrfTokenGenerator);
 // Disable directory listing: return 403 for folder requests (no index file)
 // Skip for root path so the app's routes can serve the homepage
 const publicDir = path.join(__dirname, '..', 'public');
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
     const p = path.normalize(req.path).replace(/^(\.\.(\/|\\|$))+/, '');
     if (p === '' || p === '/' || p === '\\') return next();
     const requestedPath = path.join(publicDir, p);
     const resolved = path.resolve(requestedPath);
     if (!resolved.startsWith(path.resolve(publicDir))) return next();
     try {
-        const stat = fs.statSync(resolved);
+        const stat = await fs.promises.stat(resolved);
         if (stat.isDirectory()) {
-            const hasIndex = ['index.html', 'index.htm'].some(name => fs.existsSync(path.join(resolved, name)));
-            if (!hasIndex) {
-                res.status(403).send('Forbidden');
-                return;
+            let hasIndex = false;
+            for (const name of ['index.html', 'index.htm']) {
+                try {
+                    await fs.promises.access(path.join(resolved, name));
+                    hasIndex = true;
+                    break;
+                } catch (_) { /* not found */ }
             }
+            if (!hasIndex) return res.status(403).send('Forbidden');
         }
-    } catch (_) { /* not found, let static or 404 handle it */ }
+    } catch (_) { /* path not found — let static or 404 handler deal with it */ }
     next();
 });
 
@@ -147,7 +173,7 @@ app.use(express.static(publicDir, {
             res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year for images
             res.setHeader('X-Content-Type-Options', 'nosniff');
         } else if (filePath.endsWith('.css') || filePath.endsWith('.js')) {
-            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year for assets
+            res.setHeader('Cache-Control', 'no-cache'); // Always revalidate CSS/JS
         } else {
             res.setHeader('Cache-Control', 'public, max-age=86400'); // 1 day for other files
         }
@@ -158,21 +184,27 @@ app.use(express.static(publicDir, {
     }
 }));
 
-// CDN support middleware for API responses
-app.use('/api', (req, res, next) => {
-    // Set CDN-friendly headers for API responses
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Vary', 'Accept-Encoding, Accept');
-    
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-    
-    next();
-});
+// CORS configuration
+// Admin routes: same-origin only — no cross-origin access permitted
+app.use('/api/admin', cors({ origin: false }));
+
+// Public API routes: explicit allowlist from ALLOWED_ORIGINS env var
+// e.g. ALLOWED_ORIGINS=https://qualitick.com,https://www.qualitick.com
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
+    : [];
+
+app.use('/api', cors({
+    origin(origin, callback) {
+        // Same-origin requests have no Origin header — always allow
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        callback(Object.assign(new Error(`CORS policy does not allow origin: ${origin}`), { status: 403 }));
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+    credentials: true
+}));
 
 // Serve favicon.ico to prevent 404 errors (browsers auto-request this)
 app.get('/favicon.ico', (req, res) => {
@@ -220,36 +252,18 @@ app.get('/api/products/search',
     productController.searchProducts
 );
 
-// Product CRUD API endpoints (Admin) - Protected
-// GET /api/products/:id - Get single product (for editing)
-app.get('/api/products/:id',
+// GET /api/products/brands - List product brands
+app.get('/api/products/brands',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
-    authenticateAdmin,
-    productController.getProductByIdAPI
+    cacheMiddleware(5 * 60 * 1000),
+    productController.getBrands
 );
 
-// POST /api/products - Create product
-app.post('/api/products',
-    rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }),
+// GET /api/products/export - Export products to CSV/JSON (Admin)
+app.get('/api/products/export',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }),
     authenticateAdmin,
-    csrfTokenValidator(),
-    productController.createProduct
-);
-
-// PUT /api/products/:id - Update product
-app.put('/api/products/:id',
-    rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }),
-    authenticateAdmin,
-    csrfTokenValidator(),
-    productController.updateProduct
-);
-
-// DELETE /api/products/:id - Delete product
-app.delete('/api/products/:id',
-    rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }),
-    authenticateAdmin,
-    csrfTokenValidator(),
-    productController.deleteProduct
+    productController.exportProducts
 );
 
 // POST /api/products/generate-sku - Generate SKU (Admin)
@@ -258,6 +272,14 @@ app.post('/api/products/generate-sku',
     authenticateAdmin,
     csrfTokenValidator(),
     productController.generateSKU
+);
+
+// POST /api/products - Create product
+app.post('/api/products',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }),
+    authenticateAdmin,
+    csrfTokenValidator(),
+    productController.createProduct
 );
 
 // POST /api/products/:id/reviews - Submit product review
@@ -387,11 +409,28 @@ app.delete('/api/products/bulk',
     productController.bulkDeleteProducts
 );
 
-// GET /api/products/export - Export products to CSV/JSON
-app.get('/api/products/export',
-    rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }),
+// Product routes with :id - must be registered AFTER static segments (search, brands, export, generate-sku, upload-images, bulk)
+// GET /api/products/:id - Get single product (for editing)
+app.get('/api/products/:id',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
     authenticateAdmin,
-    productController.exportProducts
+    productController.getProductByIdAPI
+);
+
+// PUT /api/products/:id - Update product
+app.put('/api/products/:id',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }),
+    authenticateAdmin,
+    csrfTokenValidator(),
+    productController.updateProduct
+);
+
+// DELETE /api/products/:id - Delete product
+app.delete('/api/products/:id',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }),
+    authenticateAdmin,
+    csrfTokenValidator(),
+    productController.deleteProduct
 );
 
 // PUT /api/products/:id/images/reorder - Reorder product images
@@ -870,7 +909,7 @@ app.get('/admin/products', requireAdminAuth, async (req, res) => {
         
         // Convert to plain objects for EJS
         const productsData = products.map(product => {
-            const productObj = product.toObject ? product.toObject() : product;
+            const productObj = product.toJSON();
             return productObj;
         });
         

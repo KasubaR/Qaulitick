@@ -9,16 +9,37 @@ const Product = sequelize.define('Product', {
     },
     model: { type: DataTypes.STRING(200), allowNull: false },
     brand: { type: DataTypes.STRING(100), allowNull: false },
-    sku: { type: DataTypes.STRING(100), allowNull: false, unique: true },
+    sku: { type: DataTypes.STRING(100), allowNull: false },
     price: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
     originalPrice: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
     discount: { type: DataTypes.INTEGER, defaultValue: 0 },
     stock: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
     lowStockThreshold: { type: DataTypes.INTEGER, defaultValue: 5 },
     description: { type: DataTypes.TEXT, allowNull: true },
-    images: { type: DataTypes.JSON, allowNull: true, defaultValue: [] },
-    colors: { type: DataTypes.JSON, allowNull: true, defaultValue: [] },
-    strapOptions: { type: DataTypes.JSON, allowNull: true, defaultValue: [] },
+    images: {
+        type: DataTypes.JSON, allowNull: true, defaultValue: [],
+        get() {
+            const v = this.getDataValue('images');
+            if (typeof v === 'string') { try { return JSON.parse(v); } catch { return []; } }
+            return Array.isArray(v) ? v : [];
+        }
+    },
+    colors: {
+        type: DataTypes.JSON, allowNull: true, defaultValue: [],
+        get() {
+            const v = this.getDataValue('colors');
+            if (typeof v === 'string') { try { return JSON.parse(v); } catch { return []; } }
+            return Array.isArray(v) ? v : [];
+        }
+    },
+    strapOptions: {
+        type: DataTypes.JSON, allowNull: true, defaultValue: [],
+        get() {
+            const v = this.getDataValue('strapOptions');
+            if (typeof v === 'string') { try { return JSON.parse(v); } catch { return []; } }
+            return Array.isArray(v) ? v : [];
+        }
+    },
     movement: { type: DataTypes.STRING(50), allowNull: true },
     caseMaterial: { type: DataTypes.STRING(100), allowNull: true },
     strapType: { type: DataTypes.STRING(100), allowNull: true },
@@ -27,7 +48,14 @@ const Product = sequelize.define('Product', {
     glassType: { type: DataTypes.STRING(50), allowNull: true },
     gender: { type: DataTypes.ENUM('Men', 'Women', 'Unisex', 'Accessories', 'Gift Picks', ''), defaultValue: '' },
     rating: { type: DataTypes.DECIMAL(3, 2), defaultValue: 0 },
-    reviews: { type: DataTypes.JSON, allowNull: true, defaultValue: [] },
+    reviews: {
+        type: DataTypes.JSON, allowNull: true, defaultValue: [],
+        get() {
+            const v = this.getDataValue('reviews');
+            if (typeof v === 'string') { try { return JSON.parse(v); } catch { return []; } }
+            return Array.isArray(v) ? v : [];
+        }
+    },
     warranty: { type: DataTypes.STRING(200), allowNull: true },
     status: {
         type: DataTypes.ENUM('active', 'inactive', 'discontinued', 'out_of_stock'),
@@ -36,10 +64,18 @@ const Product = sequelize.define('Product', {
 }, {
     tableName: 'products',
     timestamps: true,
+    indexes: [
+        // Declared here instead of unique:true on the column so that
+        // sequelize.sync({ alter:true }) deduplicates the index correctly
+        // and does not issue a new ALTER TABLE on every boot.
+        { unique: true, fields: ['sku'], name: 'products_sku_unique' }
+    ],
     hooks: {
         beforeSave: (product) => {
             if (product.originalPrice && product.originalPrice > product.price) {
-                product.discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
+                product.discount = Math.max(0, Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100));
+            } else {
+                product.discount = 0;
             }
             if (product.stock === 0 && product.status !== 'discontinued') product.status = 'out_of_stock';
             else if (product.stock > 0 && product.status === 'out_of_stock') product.status = 'active';

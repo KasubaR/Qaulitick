@@ -149,20 +149,32 @@ async function generateInvoicePDF(order, options = {}) {
 
             // Items Table Header
             const tableStartY = customerY + 90;
-            doc.fontSize(10)
-               .fillColor('#ffffff')
-               .rect(50, tableStartY, 500, 25)
-               .fill('#1a1a1a');
 
-            doc.text('Item', 60, tableStartY + 8)
-               .text('Quantity', 250, tableStartY + 8)
-               .text('Unit Price', 350, tableStartY + 8)
-               .text('Total', 480, tableStartY + 8, { align: 'right' });
+            // Renders the item table header at y and returns the new currentY
+            const renderTableHeader = (y) => {
+                doc.fontSize(10)
+                   .fillColor('#ffffff')
+                   .rect(50, y, 500, 25)
+                   .fill('#1a1a1a');
+                doc.text('Item', 60, y + 8)
+                   .text('Quantity', 250, y + 8)
+                   .text('Unit Price', 350, y + 8)
+                   .text('Total', 480, y + 8, { align: 'right' });
+                return y + 35;
+            };
+
+            renderTableHeader(tableStartY);
 
             // Items
             let currentY = tableStartY + 35;
             order.items.forEach((item, index) => {
                 try {
+                    // Page break before this row if it would overflow the printable area
+                    if (currentY > 700) {
+                        doc.addPage();
+                        currentY = renderTableHeader(50);
+                    }
+
                     // Alternate row colors
                     if (index % 2 === 0) {
                         doc.rect(50, currentY - 5, 500, 30)
@@ -190,6 +202,12 @@ async function generateInvoicePDF(order, options = {}) {
                     currentY += 35;
                 }
             });
+
+            // If totals + payment info + footer (~250pt) won't fit on the current page, start a new one
+            if (currentY + 250 > doc.page.height - 50) {
+                doc.addPage();
+                currentY = 50;
+            }
 
             // Totals Section
             const totalsStartY = currentY + 20;
@@ -244,12 +262,12 @@ async function generateInvoicePDF(order, options = {}) {
                 safeText(doc, sanitizeTextField(order.transactionId, 100), 50, paymentY + 85);
             }
 
-            // Footer
-            const footerY = 750;
+            // Footer — anchored to the bottom of the last (current) page
+            const footerY = doc.page.height - 80;
             doc.fontSize(8)
                .fillColor('#999999')
-               .text('Thank you for your business!', 50, footerY, { align: 'center' })
-               .text('This is a computer-generated invoice.', 50, footerY + 15, { align: 'center' });
+               .text('Thank you for your business!', 50, footerY, { align: 'center', width: 500 })
+               .text('This is a computer-generated invoice.', 50, footerY + 15, { align: 'center', width: 500 });
 
             // Finalize PDF
             doc.end();

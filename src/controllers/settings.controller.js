@@ -16,7 +16,7 @@ exports.getSettings = async (req, res) => {
         const settings = await settingsService.getSettings();
         
         // Convert to plain object and structure response
-        const settingsObj = settings.toObject ? settings.toObject() : settings;
+        const settingsObj = settings.toJSON();
         
         res.json({
             success: true,
@@ -91,7 +91,7 @@ exports.updateSettings = async (req, res) => {
         const updatedSettings = await settingsService.updateSettings(category, data);
         
         // Get the updated category data
-        const settingsObj = updatedSettings.toObject ? updatedSettings.toObject() : updatedSettings;
+        const settingsObj = updatedSettings.toJSON();
         const categoryData = settingsObj[category] || {};
         
         res.json({
@@ -230,7 +230,7 @@ exports.testEmail = async (req, res) => {
 exports.testPayment = async (req, res) => {
     try {
         const settings = await settingsService.getSettings();
-        const settingsObj = settings.toObject ? settings.toObject() : settings;
+        const settingsObj = settings.toJSON();
         const paymentSettings = settingsObj.payment || {};
         
         // Check if payment settings are configured

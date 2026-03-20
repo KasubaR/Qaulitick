@@ -41,7 +41,7 @@ class AdminService {
             await admin.save();
 
             // Return admin without password
-            const adminObj = admin.toObject();
+            const adminObj = admin.toJSON();
             delete adminObj.password;
             return adminObj;
         } catch (error) {
@@ -95,7 +95,7 @@ class AdminService {
             }
 
             // Credentials are valid, return admin (password excluded)
-            const adminObj = admin.toObject();
+            const adminObj = admin.toJSON();
             delete adminObj.password;
             return adminObj;
         } catch (error) {
@@ -135,7 +135,7 @@ class AdminService {
             }
             
             // Return admin without password
-            const adminObj = admin.toObject();
+            const adminObj = admin.toJSON();
             delete adminObj.password;
             return adminObj;
         } catch (error) {

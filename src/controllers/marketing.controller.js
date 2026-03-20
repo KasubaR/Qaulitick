@@ -1,8 +1,20 @@
 // Marketing Controller
-const productController = require('./product.controller');
 const flashSaleService = require('../services/flashSale.service');
 const productService = require('../services/product.service');
 const featuredProductService = require('../services/featuredProduct.service');
+const { calculateFinalPrice, calculateSavings } = require('../utils/price.utils');
+
+// Attach correct price fields to a normalised product plain object.
+function withPrices(productObj) {
+    const currentPrice   = Number(productObj.price) || 0;
+    const storedOriginal = Number(productObj.originalPrice) || 0;
+    const origPrice      = storedOriginal > currentPrice ? storedOriginal : currentPrice;
+    const discount       = productObj.discount || 0;
+    const savings        = origPrice > currentPrice
+        ? Math.round(origPrice - currentPrice)
+        : calculateSavings(origPrice, discount);
+    return { ...productObj, price: currentPrice, originalPrice: origPrice, finalPrice: currentPrice, savings };
+}
 
 // Get Featured Products for Home Page
 exports.getFeaturedProducts = async (req, res) => {
@@ -17,19 +29,10 @@ exports.getFeaturedProducts = async (req, res) => {
                     const product = await productService.getProductById(featuredDoc.productId);
 
                     if (product) {
-                        const productObj = product.toObject ? product.toObject() : product;
-
-                        // Calculate prices
-                        const originalPrice = productObj.price || 0;
-                        const discount = productObj.discount || 0;
-                        const { calculateFinalPrice, calculateSavings } = require('../utils/price.utils');
-
+                        const productObj = product.toJSON();
                         return {
-                            ...productObj,
-                            featuredOrder: featuredDoc.order,
-                            originalPrice: originalPrice,
-                            finalPrice: calculateFinalPrice(originalPrice, discount),
-                            savings: calculateSavings(originalPrice, discount)
+                            ...withPrices(productObj),
+                            featuredOrder: featuredDoc.order
                         };
                     }
 
@@ -69,22 +72,30 @@ exports.getActiveFlashSales = async (req, res) => {
         // Get full product details for flash sale products
         const flashSalesWithProducts = await Promise.all(
             activeSales.map(async (sale) => {
+                const saleObj  = sale.toJSON();
+                const saleDiscount = Number(saleObj.discount) || 0;
+
+                // Safely parse productIds — JSON columns can arrive as a string on some MySQL drivers
+                const rawIds = saleObj.productIds;
+                const productIds = Array.isArray(rawIds)
+                    ? rawIds
+                    : (typeof rawIds === 'string' ? (() => { try { return JSON.parse(rawIds); } catch { return []; } })() : []);
+
                 const products = await Promise.all(
-                    sale.productIds.map(async (productId) => {
+                    productIds.map(async (productId) => {
                         try {
                             const product = await productService.getProductById(productId);
                             if (product) {
-                                const productObj = product.toObject ? product.toObject() : product;
-                                // Calculate prices
-                                const originalPrice = productObj.price || 0;
-                                const discount = productObj.discount || 0;
-                                const { calculateFinalPrice, calculateSavings } = require('../utils/price.utils');
-
+                                const productObj  = product.toJSON();
+                                const currentPrice = Number(productObj.price) || 0;
                                 return {
                                     ...productObj,
-                                    originalPrice: originalPrice,
-                                    finalPrice: calculateFinalPrice(originalPrice, discount),
-                                    savings: calculateSavings(originalPrice, discount)
+                                    // originalPrice = normal selling price (shown crossed-out)
+                                    originalPrice:     currentPrice,
+                                    flashSaleDiscount: saleDiscount,
+                                    finalPrice:        calculateFinalPrice(currentPrice, saleDiscount),
+                                    savings:           calculateSavings(currentPrice, saleDiscount),
+                                    saleId:            saleObj.id
                                 };
                             }
                             return null;
@@ -95,7 +106,6 @@ exports.getActiveFlashSales = async (req, res) => {
                     })
                 );
 
-                const saleObj = sale.toObject ? sale.toObject() : sale;
                 return {
                     ...saleObj,
                     products: products.filter(p => p !== null)
@@ -120,7 +130,7 @@ exports.getActiveFlashSales = async (req, res) => {
 exports.getAllFlashSales = async (req, res) => {
     try {
         const sales = await flashSaleService.getAllFlashSales();
-        const salesData = sales.map(sale => sale.toObject ? sale.toObject() : sale);
+        const salesData = sales.map(sale => sale.toJSON());
 
         res.json({
             success: true,
@@ -140,7 +150,7 @@ exports.createFlashSale = async (req, res) => {
     try {
         const saleData = req.body;
         const newSale = await flashSaleService.createFlashSale(saleData);
-        const saleDataObj = newSale.toObject ? newSale.toObject() : newSale;
+        const saleDataObj = newSale.toJSON();
 
         res.json({
             success: true,
@@ -164,7 +174,7 @@ exports.updateFlashSale = async (req, res) => {
         const updatedSale = await flashSaleService.updateFlashSale(id, saleData);
 
         if (updatedSale) {
-            const saleDataObj = updatedSale.toObject ? updatedSale.toObject() : updatedSale;
+            const saleDataObj = updatedSale.toJSON();
             res.json({
                 success: true,
                 flashSale: saleDataObj,
@@ -233,14 +243,17 @@ exports.updateFeaturedProducts = async (req, res) => {
             });
         }
 
-        // Validate all productIds exist before saving
+        // Fetch all candidate products in one query instead of one per item
+        const candidateIds = products.map(p => parseInt(String(p.productId), 10));
+        const fetched = await productService.getProductsByIds(candidateIds);
+        const productMap = Object.fromEntries(fetched.map(p => [p.id, p]));
+
         const validationErrors = [];
         const validatedProducts = [];
 
         for (let i = 0; i < products.length; i++) {
             const product = products[i];
 
-            // Validate structure
             if (!product.productId) {
                 validationErrors.push(`Product at index ${i} is missing productId`);
                 continue;
@@ -257,20 +270,17 @@ exports.updateFeaturedProducts = async (req, res) => {
                 continue;
             }
 
-            // Check if product exists and get full product details
-            const productDetails = await productService.getProductById(product.productId);
+            const productDetails = productMap[productIdNum];
             if (!productDetails) {
                 validationErrors.push(`Product at index ${i} (ID: ${product.productId}) does not exist in the database`);
                 continue;
             }
 
-            // Validate product status (must be active)
             if (productDetails.status !== 'active') {
                 validationErrors.push(`Product at index ${i} (ID: ${product.productId}) is not active (status: ${productDetails.status}). Only active products can be featured.`);
                 continue;
             }
 
-            // Validate product has stock
             if (!productDetails.stock || productDetails.stock <= 0) {
                 validationErrors.push(`Product at index ${i} (ID: ${product.productId}) has no stock (stock: ${productDetails.stock}). Only products with stock can be featured.`);
                 continue;

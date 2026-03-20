@@ -228,7 +228,7 @@ exports.updateStock = async (req, res) => {
         if ((isLowStock && !wasLowStock) || (isOutOfStock && !wasOutOfStock)) {
             try {
                 const emailService = require('../services/email.service');
-                const productObj = product.toObject ? product.toObject() : product;
+                const productObj = product.toJSON();
                 await emailService.sendLowStockNotificationToAdmin(productObj);
             } catch (emailError) {
                 console.error('[Inventory Controller] Error sending low stock notification:', emailError);

@@ -14,6 +14,11 @@
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
     <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
+
+    <!-- CSRF Token -->
+    <% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
+        <meta name="csrf-token" content="<%= csrfToken %>">
+    <% } %>
     
     <!-- Professional Admin Styles -->
     <link rel="stylesheet" href="/css/admin/admin-professional.css">

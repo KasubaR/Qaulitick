@@ -16,7 +16,14 @@ const FlashSale = sequelize.define('FlashSale', {
         autoIncrement: true
     },
     name: { type: DataTypes.STRING(200), allowNull: false },
-    productIds: { type: DataTypes.JSON, allowNull: true, defaultValue: [] },
+    productIds: {
+        type: DataTypes.JSON, allowNull: true, defaultValue: [],
+        get() {
+            const v = this.getDataValue('productIds');
+            if (typeof v === 'string') { try { return JSON.parse(v); } catch { return []; } }
+            return Array.isArray(v) ? v : [];
+        }
+    },
     discount: { type: DataTypes.INTEGER, allowNull: false },
     startDate: { type: DataTypes.DATE, allowNull: false },
     endDate: { type: DataTypes.DATE, allowNull: false },
@@ -62,15 +69,15 @@ FlashSale.findActive = function() {
 };
 
 FlashSale.findScheduled = function() {
-    const now = new Date();
     return this.findAll({
-        where: { status: 'active', startDate: { [Op.gt]: now } }
+        where: { status: 'scheduled' }
     });
 };
 
 FlashSale.findEnded = function() {
-    const now = new Date();
-    return this.findAll({ where: { endDate: { [Op.lt]: now } } });
+    return this.findAll({
+        where: { status: 'ended' }
+    });
 };
 
 module.exports = FlashSale;

@@ -43,7 +43,7 @@ exports.addToCart = async (req, res) => {
             });
         }
         
-        const productObj = product.toObject ? product.toObject() : product;
+        const productObj = product.toJSON();
         
         const requestedQuantity = Math.max(1, parseInt(quantity) || 1);
         
@@ -67,8 +67,8 @@ exports.addToCart = async (req, res) => {
         res.json({
             success: true,
             cartItem: {
-                id: productObj._id.toString(),
-                productId: productObj._id.toString(),
+                id: String(productObj.id),
+                productId: String(productObj.id),
                 name: productObj.model,
                 brand: productObj.brand,
                 price: finalPrice,
@@ -116,7 +116,7 @@ exports.updateCartItem = async (req, res) => {
             });
         }
         
-        const productObj = product.toObject ? product.toObject() : product;
+        const productObj = product.toJSON();
         
         // Validate stock availability
         if (productObj.stock < requestedQuantity) {
@@ -210,14 +210,14 @@ exports.validateCart = async (req, res) => {
                     continue;
                 }
                 
-                const productObj = product.toObject ? product.toObject() : product;
+                const productObj = product.toJSON();
                 let requestedQuantity = Math.max(1, parseInt(item.quantity) || 1);
                 
                 // Validate stock
                 if (productObj.stock < requestedQuantity) {
                     warnings.push({
                         itemId: item.id,
-                        productId: productObj._id.toString(),
+                        productId: String(productObj.id),
                         message: `Only ${productObj.stock} item${productObj.stock !== 1 ? 's' : ''} available for "${productObj.model}"`,
                         availableStock: productObj.stock,
                         requestedQuantity: requestedQuantity
@@ -237,7 +237,7 @@ exports.validateCart = async (req, res) => {
                     console.warn(`[Cart Controller] Price mismatch for product ${productId}: client=${clientPrice}, server=${authoritativePrice}`);
                     warnings.push({
                         itemId: item.id,
-                        productId: productObj._id.toString(),
+                        productId: String(productObj.id),
                         message: `Price updated for "${productObj.model}"`,
                         oldPrice: clientPrice,
                         newPrice: authoritativePrice
@@ -245,8 +245,8 @@ exports.validateCart = async (req, res) => {
                 }
                 
                 validatedItems.push({
-                    id: productObj._id.toString(),
-                    productId: productObj._id.toString(),
+                    id: String(productObj.id),
+                    productId: String(productObj.id),
                     name: productObj.model || item.name,
                     brand: productObj.brand,
                     price: authoritativePrice, // Server-calculated price
@@ -387,13 +387,13 @@ exports.getCartItems = async (req, res) => {
                 continue;
             }
             
-            const productObj = product.toObject ? product.toObject() : product;
+            const productObj = product.toJSON();
             const requestedQuantity = item.quantity || 1;
             
             if (productObj.stock < requestedQuantity) {
                 warnings.push({
                     itemId: item.id,
-                    productId: productObj._id.toString(),
+                    productId: String(productObj.id),
                     message: `Only ${productObj.stock} item${productObj.stock !== 1 ? 's' : ''} available for "${productObj.model}"`,
                     availableStock: productObj.stock,
                     requestedQuantity: requestedQuantity
