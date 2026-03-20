@@ -7,7 +7,9 @@
       "Bash(npm list:*)",
       "Bash(npm install:*)",
       "Bash(node -e \"require\\(''cors''\\); console.log\\(''cors installed''\\)\")",
-      "Bash(node -e \"require\\(''express-rate-limit''\\); console.log\\(''installed''\\)\")"
+      "Bash(node -e \"require\\(''express-rate-limit''\\); console.log\\(''installed''\\)\")",
+      "Bash(xargs grep:*)",
+      "Bash(grep:*)"
     ]
   }
 }
