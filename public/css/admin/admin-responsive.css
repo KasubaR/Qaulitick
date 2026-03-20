@@ -1,0 +1,663 @@
+/* ========================================
+   RESPONSIVE DESIGN FOR ADMIN DASHBOARD
+   Mobile-First Breakpoints
+   ======================================== */
+
+/* ========================================
+   TABLET (1024px and below)
+   ======================================== */
+@media (max-width: 1024px) {
+    /* Sidebar Toggle */
+    .admin-sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 10000;
+        position: fixed;
+    }
+    
+    .admin-sidebar.active {
+        transform: translateX(0);
+        box-shadow: var(--shadow-2xl);
+    }
+    
+    .admin-main {
+        margin-left: 0;
+    }
+    
+    .sidebar-toggle {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        z-index: 10001 !important;
+        position: relative !important;
+        cursor: pointer !important;
+        pointer-events: auto !important;
+        min-width: 44px !important;
+        min-height: 44px !important;
+        background: rgba(59, 130, 246, 0.1) !important;
+        border-radius: 8px !important;
+    }
+    
+    .sidebar-toggle:hover {
+        background: rgba(59, 130, 246, 0.2) !important;
+    }
+    
+    .sidebar-toggle i {
+        pointer-events: none;
+        font-size: 20px;
+    }
+    
+    /* Hide collapse button on mobile */
+    .sidebar-collapse-btn {
+        display: none !important;
+    }
+    
+    /* Sidebar overlay backdrop - using body class */
+    body.sidebar-open::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 9999;
+        animation: fadeIn 0.3s ease;
+    }
+    
+    /* Header Adjustments */
+    .page-title {
+        font-size: 20px;
+    }
+    
+    /* KPI Grid */
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+    
+    /* Charts */
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    /* Actions & Summary */
+    .actions-orders-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    /* Tables */
+    .tables-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    /* Filters */
+    .filters-section {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-group {
+        width: 100%;
+    }
+    
+    .filter-select,
+    .date-input,
+    .price-input {
+        width: 100%;
+    }
+    
+    .bulk-actions-section {
+        margin-left: 0;
+        width: 100%;
+        justify-content: flex-start;
+    }
+    
+    /* Marketing Grid */
+    body.admin-page .marketing-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    /* Dropdowns */
+    .notifications-dropdown,
+    .profile-dropdown {
+        right: 16px;
+    }
+}
+
+/* ========================================
+   MOBILE LANDSCAPE (768px and below)
+   ======================================== */
+@media (max-width: 768px) {
+    /* Ensure sidebar is hidden by default and properly positioned */
+    .admin-sidebar {
+        transform: translateX(-100%) !important;
+        position: fixed !important;
+        z-index: 10000 !important;
+    }
+    
+    .admin-sidebar.active {
+        transform: translateX(0) !important;
+    }
+    
+    /* Remove margin from main content on mobile */
+    .admin-main {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+    
+    .admin-sidebar.collapsed ~ .admin-main {
+        margin-left: 0 !important;
+    }
+    
+    /* Content Padding */
+    .dashboard-content,
+    .products-content,
+    .orders-content,
+    .flash-sales-content,
+    .payments-content,
+    .customers-content,
+    .settings-content {
+        padding: 20px 16px;
+    }
+    
+    /* Header */
+    .admin-header {
+        padding: 0 16px;
+        height: 64px;
+    }
+    
+    .page-title {
+        font-size: 18px;
+    }
+    
+    /* Search Box */
+    .search-box {
+        display: none;
+    }
+    
+    /* Header Actions */
+    .icon-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
+    
+    .admin-profile {
+        padding: 4px 8px;
+    }
+    
+    .profile-name {
+        display: none;
+    }
+    
+    /* KPI Cards */
+    .kpi-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .kpi-card {
+        padding: 16px;
+    }
+    
+    .kpi-icon {
+        width: 48px;
+        height: 48px;
+        font-size: 24px;
+    }
+    
+    .kpi-value {
+        font-size: 22px;
+    }
+    
+    .kpi-label {
+        font-size: 11px;
+    }
+    
+    /* Actions Grid */
+    .actions-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .action-btn {
+        padding: 16px;
+    }
+    
+    /* Summary Stats */
+    .summary-stats {
+        grid-template-columns: 1fr;
+    }
+    
+    /* Charts */
+    .chart-container {
+        height: 250px;
+    }
+    
+    .chart-card,
+    .table-card {
+        padding: 16px;
+    }
+    
+    .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    
+    .chart-controls {
+        align-self: stretch;
+    }
+    
+    .chart-btn {
+        flex: 1;
+    }
+    
+    /* Tables */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .admin-table {
+        min-width: 600px;
+    }
+    
+    .admin-table th,
+    .admin-table td {
+        padding: 10px 8px;
+        font-size: 12px;
+    }
+    
+    /* Modals */
+    body.admin-page .modal-content {
+        padding: 20px;
+        width: 95%;
+        max-height: 85vh;
+    }
+    
+    body.admin-page .modal-header h2 {
+        font-size: 20px;
+    }
+    
+    /* Dropdowns */
+    .notifications-dropdown,
+    .profile-dropdown {
+        right: 8px;
+        left: 8px;
+        min-width: auto;
+        max-height: 70vh;
+    }
+    
+    /* Pagination */
+    .pagination {
+        flex-wrap: wrap;
+    }
+    
+    .page-numbers {
+        flex-wrap: wrap;
+    }
+    
+    .page-number {
+        width: 36px;
+        height: 36px;
+        font-size: 13px;
+    }
+    
+    /* Toolbars */
+    .products-toolbar,
+    .orders-toolbar {
+        padding: 16px;
+    }
+    
+    /* Marketing Cards */
+    body.admin-page .marketing-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    body.admin-page .marketing-card {
+        padding: 24px;
+    }
+    
+    body.admin-page .marketing-card-icon {
+        font-size: 48px;
+    }
+    
+    body.admin-page .marketing-card h3 {
+        font-size: 20px;
+    }
+}
+
+/* ========================================
+   MOBILE PORTRAIT (480px and below)
+   ======================================== */
+@media (max-width: 480px) {
+    /* Root Variables Adjustment */
+    :root {
+        --sidebar-width: 280px;
+        --header-height: 60px;
+    }
+    
+    /* Content Padding */
+    .dashboard-content,
+    .products-content,
+    .orders-content,
+    .flash-sales-content,
+    .payments-content,
+    .customers-content,
+    .settings-content {
+        padding: 16px 12px;
+    }
+    
+    /* Header */
+    .admin-header {
+        padding: 0 12px;
+    }
+    
+    .page-title {
+        font-size: 16px;
+    }
+    
+    /* KPI Cards */
+    .kpi-card {
+        flex-direction: column;
+        text-align: center;
+        padding: 16px;
+    }
+    
+    .kpi-icon {
+        width: 56px;
+        height: 56px;
+        margin: 0 auto 12px;
+    }
+    
+    .kpi-content {
+        text-align: center;
+    }
+    
+    /* Buttons */
+    body.admin-page .btn,
+    body.admin-page .btn-primary,
+    body.admin-page .btn-outline,
+    body.admin-page .btn-danger {
+        width: 100%;
+        justify-content: center;
+        padding: 12px 16px;
+    }
+    
+    /* Modal Actions */
+    body.admin-page .modal-actions {
+        flex-direction: column-reverse;
+    }
+    
+    body.admin-page .modal-actions .btn {
+        width: 100%;
+    }
+    
+    /* Form Elements */
+    .filter-select,
+    .date-input,
+    .price-input {
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    /* Action Buttons */
+    .action-buttons {
+        flex-wrap: wrap;
+    }
+    
+    /* Status Badges */
+    .status-badge,
+    .payment-status-badge,
+    .order-status-badge {
+        font-size: 10px;
+        padding: 3px 8px;
+    }
+    
+    /* Notifications */
+    body.admin-page .notification {
+        left: 12px;
+        right: 12px;
+        min-width: auto;
+        max-width: none;
+    }
+    
+    /* Sidebar Adjustments */
+    .admin-sidebar {
+        width: 100% !important;
+        max-width: 320px;
+    }
+    
+    .admin-sidebar.active {
+        width: 100% !important;
+        max-width: 320px;
+    }
+    
+    .sidebar-header {
+        padding: 20px 16px;
+    }
+    
+    .nav-item {
+        padding: 12px 16px;
+        margin: 3px 8px;
+        font-size: 14px;
+    }
+    
+    /* Typography */
+    body.admin-page h1 {
+        font-size: 1.75rem;
+    }
+    
+    body.admin-page h2 {
+        font-size: 1.5rem;
+    }
+    
+    body.admin-page h3 {
+        font-size: 1.25rem;
+    }
+    
+    /* Empty State */
+    .empty-state {
+        padding: 40px 16px;
+    }
+    
+    .empty-state i {
+        font-size: 36px;
+    }
+}
+
+/* ========================================
+   MOBILE SMALL (375px and below)
+   ======================================== */
+@media (max-width: 375px) {
+    /* Further reduce padding and spacing */
+    .dashboard-content,
+    .products-content,
+    .orders-content,
+    .flash-sales-content,
+    .payments-content,
+    .customers-content,
+    .settings-content {
+        padding: 12px 8px;
+    }
+    
+    .kpi-grid {
+        gap: 8px;
+    }
+    
+    .kpi-card {
+        padding: 12px;
+    }
+    
+    .kpi-icon {
+        width: 48px;
+        height: 48px;
+        font-size: 20px;
+    }
+    
+    .kpi-value {
+        font-size: 20px;
+    }
+    
+    /* Chart */
+    .chart-container {
+        height: 220px;
+    }
+    
+    /* Modal */
+    body.admin-page .modal-content {
+        padding: 16px;
+    }
+}
+
+/* ========================================
+   LARGE DESKTOP (1440px and above)
+   ======================================== */
+@media (min-width: 1440px) {
+    .kpi-grid {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+    
+    .charts-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .tables-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .dashboard-content,
+    .products-content,
+    .orders-content,
+    .flash-sales-content,
+    .payments-content,
+    .customers-content,
+    .settings-content {
+        padding: 40px;
+    }
+}
+
+/* ========================================
+   ULTRA WIDE (1920px and above)
+   ======================================== */
+@media (min-width: 1920px) {
+    .kpi-grid {
+        grid-template-columns: repeat(6, 1fr);
+    }
+    
+    .charts-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+    
+    .dashboard-content,
+    .products-content,
+    .orders-content,
+    .flash-sales-content,
+    .payments-content,
+    .customers-content,
+    .settings-content {
+        max-width: 1800px;
+        margin: 0 auto;
+        padding: 50px;
+    }
+}
+
+/* ========================================
+   PRINT STYLES
+   ======================================== */
+@media print {
+    .admin-sidebar,
+    .admin-header,
+    .sidebar-toggle,
+    .action-buttons,
+    .bulk-actions-section,
+    .pagination,
+    body.admin-page .btn,
+    body.admin-page .modal {
+        display: none !important;
+    }
+    
+    .admin-main {
+        margin-left: 0;
+    }
+    
+    .dashboard-content,
+    .products-content,
+    .orders-content,
+    .flash-sales-content,
+    .payments-content,
+    .customers-content,
+    .settings-content {
+        padding: 0;
+    }
+    
+    .kpi-card,
+    .chart-card,
+    .table-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+}
+
+/* ========================================
+   ACCESSIBILITY - REDUCED MOTION
+   ======================================== */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ========================================
+   DARK MODE SUPPORT (if needed)
+   ======================================== */
+@media (prefers-color-scheme: dark) {
+    /* Already dark by default, but can add overrides if needed */
+}
+
+/* ========================================
+   TOUCH DEVICE OPTIMIZATIONS
+   ======================================== */
+@media (hover: none) and (pointer: coarse) {
+    /* Increase touch targets */
+    .nav-item,
+    .icon-btn,
+    .action-btn,
+    .page-number,
+    body.admin-page .btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    /* Remove hover effects that don't work on touch */
+    .nav-item:hover,
+    .icon-btn:hover,
+    .action-btn:hover {
+        transform: none;
+    }
+    
+    /* Add active state for touch feedback */
+    .nav-item:active,
+    .icon-btn:active,
+    .action-btn:active,
+    body.admin-page .btn:active {
+        transform: scale(0.95);
+    }
+}
+
+/* ========================================
+   ANIMATIONS
+   ======================================== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}

@@ -1,0 +1,109 @@
+/* ====================================
+   RESPONSIVE CSS
+   Mobile layouts, Tablet layouts, Small screen fixes
+   ==================================== */
+
+/* Mobile Responsive - Tablets and smaller */
+@media (max-width: 768px) {
+    header {
+        padding: 0 5%;
+        height: 64px;
+    }
+
+    .nav-logo {
+        height: 46px;
+    }
+
+    .mobile-menu-btn {
+        display: block;
+    }
+
+    nav {
+        position: fixed;
+        top: 64px;
+        left: 0;
+        right: 0;
+        background: #fff;
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 20px 5%;
+        gap: 16px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        display: none;
+    }
+
+    nav.active {
+        display: flex;
+    }
+
+    .btn-cart span {
+        display: none;
+    }
+
+    .btn-cart {
+        padding: 8px 12px;
+        border-radius: 50%;
+        border-color: transparent;
+        gap: 0;
+    }
+
+    .hero {
+        height: 70vh;
+        text-align: center;
+    }
+
+    .section {
+        padding: 50px 5%;
+    }
+
+    .slider-container {
+        gap: 15px;
+    }
+
+    .product-card {
+        min-width: 250px;
+    }
+
+    .promo-timer {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .timer-box {
+        min-width: 70px;
+        padding: 10px;
+    }
+
+    .timer-value {
+        font-size: 24px;
+    }
+
+    .newsletter-form {
+        flex-direction: column;
+    }
+
+    .newsletter-input {
+        width: 100%;
+    }
+}
+
+/* Small Mobile Responsive - Phones */
+@media (max-width: 480px) {
+    .hero-content h1 {
+        font-size: 28px;
+    }
+
+    .product-card {
+        min-width: 220px;
+    }
+
+    .testimonials {
+        grid-template-columns: 1fr;
+    }
+
+    .footer-content {
+        grid-template-columns: 1fr;
+        gap: 30px;
+    }
+}

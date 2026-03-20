@@ -1,0 +1,16 @@
+1. I'm getting a 404 error when calling /payments/initiate. According to your documentation, the correct endpoint for mobile money collections is /collections/mobile-money. Can you confirm this is the correct endpoint for initiating mobile money payments in Zambia?
+2. Is the correct base URL https://api.lenco.co/access/v2 for production? I want to make sure I'm using the right URL.
+3. For the /collections/mobile-money endpoint, what are the required and optional fields? Here's what I'm currently sending:
+json{
+  "phone": "+260XXXXXXXXX",
+  "operator": "airtel",
+  "amount": 5,
+  "currency": "ZMW",
+  "reference": "QC-ORD-123",
+  "country": "ZM",
+  "description": "Payment for order"
+}
+Is this correct? Are there any other fields I should include?
+4.Do you have a separate sandbox/test environment? If yes, what's the base URL and how do I get test API keys?
+5. What test phone numbers can I use in sandbox to simulate successful, failed, and pending payments for Airtel, MTN, and Zamtel?
+Why: You need to test all scenarios without using real money.
