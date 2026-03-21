@@ -1,0 +1,8 @@
+Area	Approx. # of manual tests
+Customer auth (register, login, logout, forgot/reset, verify email, session/redirect)	10–12
+Account (dashboard, profile, orders scoped to user, layby page, “start next payment” API)	5–7
+Checkout & orders (guest standard, logged-in, layby forbidden/allowed rules, create order)	5–7
+Payments (process standard vs layby, verify poll, retry ownership, optional webhook/sandbox)	8–12
+Admin layby (list, detail, status changes, offline confirm, negative cases)	6–9
+Quick security/regression (CSRF on POSTs, layby verify as wrong user, admin payment list requires admin)	4–6
+So: plan on 

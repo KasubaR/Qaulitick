@@ -45,23 +45,9 @@ class DatabaseService {
                 }
                 const [indexes] = await sequelize.query(`SHOW INDEX FROM \`${table}\``);
 
-                // Group indexes by Key_name, skip PRIMARY
-                const seen = new Set();
-                const toDrop = [];
-
-                for (const idx of indexes) {
-                    const key = idx.Key_name;
-                    if (key === 'PRIMARY') continue;
-                    if (seen.has(key)) {
-                        toDrop.push(key);
-                    } else {
-                        seen.add(key);
-                    }
-                }
-
-                // Also detect indexes on the same column with different names (the sku_2, sku_3 pattern).
-                // Skip composite indexes — any Key_name that appears more than once in SHOW INDEX
-                // covers multiple columns and must not be treated as a single-column duplicate.
+                // Pre-compute which Key_names cover multiple columns — SHOW INDEX returns
+                // one row per column, so a composite index appears N times. These must NOT
+                // be treated as duplicates in the first pass below.
                 const keyRowCount = {};
                 for (const idx of indexes) {
                     if (idx.Key_name === 'PRIMARY') continue;
@@ -70,6 +56,24 @@ class DatabaseService {
                 const multiColumnKeys = new Set(
                     Object.keys(keyRowCount).filter(k => keyRowCount[k] > 1)
                 );
+
+                // Detect truly duplicate index names (same name, same table — shouldn't
+                // happen in MySQL but guard anyway). Skip composite indexes.
+                const seen = new Set();
+                const toDrop = [];
+
+                for (const idx of indexes) {
+                    const key = idx.Key_name;
+                    if (key === 'PRIMARY') continue;
+                    if (multiColumnKeys.has(key)) continue;
+                    if (seen.has(key)) {
+                        if (!toDrop.includes(key)) toDrop.push(key);
+                    } else {
+                        seen.add(key);
+                    }
+                }
+
+                // Detect indexes on the same column with different names (email / email_2 pattern).
                 const columnGroups = {};
                 for (const idx of indexes) {
                     if (idx.Key_name === 'PRIMARY') continue;
