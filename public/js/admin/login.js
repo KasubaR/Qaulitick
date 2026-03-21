@@ -51,23 +51,12 @@ function setupFormValidation() {
 }
 
 /**
- * Trim leading/trailing spaces so pasted credentials submit cleanly
- */
-function trimLoginFields() {
-    const emailInput = document.getElementById('email');
-    const passwordInput = document.getElementById('password');
-    if (emailInput) emailInput.value = emailInput.value.trim();
-    if (passwordInput) passwordInput.value = passwordInput.value.trim();
-}
-
-/**
  * Validate email field
  * @returns {boolean} True if valid, false otherwise
  */
 function validateEmail() {
     const emailInput = document.getElementById('email');
-    if (emailInput) emailInput.value = emailInput.value.trim();
-    const email = emailInput.value;
+    const email = emailInput.value.trim();
     const emailError = document.getElementById('emailError');
 
     if (!email) {
@@ -92,7 +81,6 @@ function validateEmail() {
  */
 function validatePassword() {
     const passwordInput = document.getElementById('password');
-    if (passwordInput) passwordInput.value = passwordInput.value.trim();
     const password = passwordInput.value;
     const passwordError = document.getElementById('passwordError');
 
@@ -115,7 +103,6 @@ function validatePassword() {
  * @returns {boolean} True if form is valid, false otherwise
  */
 function validateForm() {
-    trimLoginFields();
     const isEmailValid = validateEmail();
     const isPasswordValid = validatePassword();
 
