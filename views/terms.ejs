@@ -8,161 +8,173 @@
     ogType: 'website'
 }) %>
 
-    <!-- TERMS & CONDITIONS PAGE CONTENT -->
-    <div class="terms-container">
-        <!-- Breadcrumb -->
-        <div class="breadcrumb">
-            <a href="/">Home</a> <span class="separator"><i class="fas fa-chevron-right"></i></span>
-            <span class="current">Terms & Conditions</span>
+<!-- TERMS & CONDITIONS PAGE -->
+
+<!-- ── HERO ── -->
+<section class="tc-hero">
+    <div class="tc-hero-inner">
+        <span class="tc-eyebrow">Legal</span>
+        <h1 class="tc-hero-title">Terms &amp; Conditions</h1>
+        <p class="tc-hero-sub">Last updated: <%= new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %></p>
+        <p class="tc-hero-desc">Please read these terms carefully before placing an order. By purchasing from Qualitick Collections, you agree to be bound by the following.</p>
+    </div>
+    <img src="/images/icons/watermark.svg" alt="" class="tc-hero-watermark" aria-hidden="true">
+</section>
+
+<!-- ── BREADCRUMB ── -->
+<div class="tc-breadcrumb">
+    <div class="tc-breadcrumb-inner">
+        <a href="/">Home</a>
+        <i class="fas fa-chevron-right"></i>
+        <span>Terms &amp; Conditions</span>
+    </div>
+</div>
+
+<!-- ── CONTENT ── -->
+<div class="tc-body">
+    <div class="tc-body-inner">
+
+        <!-- Product Information -->
+        <div class="tc-section">
+            <div class="tc-section-header">
+                <div class="tc-section-icon"><i class="fas fa-info-circle"></i></div>
+                <h2>Product Information</h2>
+            </div>
+            <div class="tc-section-body">
+                <p>We provide accurate and detailed information about every timepiece in our collection. All images shared on our Instagram and Facebook pages are actual product images unless otherwise stated — what you see is exactly what you receive.</p>
+            </div>
         </div>
 
-        <!-- Hero Section -->
-        <section class="terms-hero">
-            <div class="terms-hero-content">
-                <h1 class="gradient-text gradient-flow">Terms & Conditions</h1>
-                <p class="terms-hero-subtitle">Last Updated: <%= new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %></p>
-                <p class="terms-hero-description">
-                    Please read these terms and conditions carefully before making a purchase. By placing an order with Qualitick Collections, you agree to be bound by these terms.
-                </p>
+        <!-- Pricing and Payments -->
+        <div class="tc-section">
+            <div class="tc-section-header">
+                <div class="tc-section-icon"><i class="fas fa-money-bill-wave"></i></div>
+                <h2>Pricing &amp; Payments</h2>
             </div>
-        </section>
-
-        <!-- Terms Content -->
-        <section class="terms-content">
-            <div class="terms-content-wrapper">
-                
-                <!-- Product Information -->
-                <div class="terms-section">
-                    <h2 class="section-title">
-                        <i class="fas fa-info-circle"></i> Product Information
-                    </h2>
-                    <div class="terms-text">
-                        <p>
-                            We provide accurate and detailed information about each wristwatch. All images shared on our Instagram and Facebook pages are actual product images unless otherwise stated. This ensures that what you see is what you get.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Pricing and Payments -->
-                <div class="terms-section">
-                    <h2 class="section-title">
-                        <i class="fas fa-money-bill-wave"></i> Pricing and Payments
-                    </h2>
-                    <div class="terms-text">
-                        <p>
-                            Prices are clearly indicated in the product caption or on the watch post. Payments are accepted via FNB, Airtel Money, MTN Money, or other secure channels communicated at checkout. We accept Mobile Money, Bank Transfer, and other secure online payments for easy and safe transactions.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Flexible Payment Options -->
-                <div class="terms-section">
-                    <h2 class="section-title">
-                        <i class="fas fa-credit-card"></i> Flexible Payment Options
-                    </h2>
-                    <div class="terms-text">
-                        <p>
-                            At Qualitick Collections, we believe everyone deserves Quality Timepieces. Our flexible plans are here to make your dream watch more accessible.
-                        </p>
-                        <p>
-                            <strong>Important Notes:</strong> Availability of Layby and Hire Purchase may vary depending on the product. Payment options are valid only with proof of communication.
-                        </p>
-                    </div>
-
-                    <!-- Layby Terms -->
-                    <div class="payment-option">
-                        <h3 class="payment-option-title">
-                            <i class="fas fa-calendar-alt"></i> Layby Terms
-                        </h3>
-                        <ul class="terms-list">
-                            <li><strong>Down Payment:</strong> 50% upfront when securing the order.</li>
-                            <li><strong>Payment Period:</strong> 4-6 weeks (weekly or bi-weekly installments).</li>
-                            <li><strong>Collection/Delivery:</strong> After full payment is cleared.</li>
-                            <li><strong>Default Policy:</strong> If full payment is not made after 5 weeks, order may be canceled and deposit forfeited.</li>
-                        </ul>
-                    </div>
-
-                    <!-- Hire Purchase Terms -->
-                    <div class="payment-option">
-                        <h3 class="payment-option-title">
-                            <i class="fas fa-handshake"></i> Hire Purchase Terms
-                        </h3>
-                        <ul class="terms-list">
-                            <li><strong>Down Payment:</strong> 40%-50% upfront.</li>
-                            <li><strong>Payment Period:</strong> 2-4 months, flexible monthly installments.</li>
-                            <li><strong>Eligibility:</strong> Must have purchased at least once before and given feedback on our service delivery.</li>
-                            <li><strong>Delivery:</strong> Item can be delivered after initial payment is made (remaining balance paid within agreed time).</li>
-                            <li><strong>Default Policy:</strong> If more than 1 month behind schedule, the watch may be recalled or sale canceled.</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <!-- Pre-Orders & Delivery -->
-                <div class="terms-section">
-                    <h2 class="section-title">
-                        <i class="fas fa-shipping-fast"></i> Pre-Orders & Delivery
-                    </h2>
-                    <div class="terms-text">
-                        <ul class="terms-list">
-                            <li>Orders can be placed through direct messages (DMS) or comments on product posts.</li>
-                            <li>In-stock items are dispatched within <strong>2 business days</strong>.</li>
-                            <li>Pre-order items are delivered within <strong>10-12 business days</strong>.</li>
-                            <li>Qualitick Collections is not responsible for delays due to unforeseen circumstances or incorrect delivery details provided by the buyer.</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <!-- Returns and Refunds -->
-                <div class="terms-section">
-                    <h2 class="section-title">
-                        <i class="fas fa-undo-alt"></i> Returns and Refunds
-                    </h2>
-                    <div class="terms-text">
-                        <p>
-                            Returns are accepted only if the watch is defective or damaged on delivery. Issues must be reported within <strong>48 hours</strong> if delivery issue or warranty period. Customers are responsible for return shipping costs unless otherwise agreed. Refunds are processed within <strong>10-15 business days</strong> after inspection.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Warranty -->
-                <div class="terms-section">
-                    <h2 class="section-title">
-                        <i class="fas fa-shield-alt"></i> Warranty
-                    </h2>
-                    <div class="terms-text">
-                        <p>
-                            All Qualitick Collections watches come with a <strong>2-month warranty</strong> against manufacturer defects. This warranty does not cover misuse, accidents, or natural wear and tear.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Limitation of Liability -->
-                <div class="terms-section">
-                    <h2 class="section-title">
-                        <i class="fas fa-exclamation-triangle"></i> Limitation of Liability
-                    </h2>
-                    <div class="terms-text">
-                        <p>
-                            We are not responsible for delays caused by couriers, payment processors, or circumstances beyond our control. Once delivery has been confirmed, Qualitick Collections is not liable for lost or stolen items.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Contact Information -->
-                <div class="terms-section">
-                    <h2 class="section-title">
-                        <i class="fas fa-envelope"></i> Questions About These Terms?
-                    </h2>
-                    <div class="terms-text">
-                        <p>
-                            If you have any questions about these Terms & Conditions, please contact us through our <a href="/contact" class="terms-link">contact page</a> or reach out via our social media channels.
-                        </p>
-                    </div>
-                </div>
-
+            <div class="tc-section-body">
+                <p>Prices are clearly displayed on each product listing. We accept the following payment methods:</p>
+                <ul class="tc-list">
+                    <li><i class="fas fa-check"></i><span>Mobile Money — MTN &amp; Airtel</span></li>
+                    <li><i class="fas fa-check"></i><span>Bank Transfer — FNB and other major banks</span></li>
+                    <li><i class="fas fa-check"></i><span>Secure online payment channels communicated at checkout</span></li>
+                </ul>
             </div>
-        </section>
+        </div>
+
+        <!-- Flexible Payment Options -->
+        <div class="tc-section">
+            <div class="tc-section-header">
+                <div class="tc-section-icon"><i class="fas fa-credit-card"></i></div>
+                <h2>Flexible Payment Options</h2>
+            </div>
+            <div class="tc-section-body">
+                <p>We believe everyone deserves a quality timepiece. Our flexible plans are designed to make your dream watch achievable. Availability of Layby and Hire Purchase may vary by product and is only valid with documented proof of communication.</p>
+
+                <div class="tc-plan-grid">
+                    <!-- Layby -->
+                    <div class="tc-plan-card">
+                        <div class="tc-plan-head">
+                            <div class="tc-plan-icon"><i class="fas fa-calendar-alt"></i></div>
+                            <h3>Layby</h3>
+                        </div>
+                        <ul class="tc-list">
+                            <li><i class="fas fa-check"></i><span><strong>Deposit:</strong> 50% upfront to secure your order</span></li>
+                            <li><i class="fas fa-check"></i><span><strong>Duration:</strong> 4–6 weeks via weekly or bi-weekly installments</span></li>
+                            <li><i class="fas fa-check"></i><span><strong>Collection:</strong> After full balance is cleared</span></li>
+                            <li><i class="fas fa-check"></i><span><strong>Default:</strong> Order may be cancelled and deposit forfeited if payment is not completed within 5 weeks</span></li>
+                        </ul>
+                        <a href="/layby" class="tc-plan-link">Learn more about Layby <i class="fas fa-arrow-right"></i></a>
+                    </div>
+
+                    <!-- Hire Purchase -->
+                    <div class="tc-plan-card">
+                        <div class="tc-plan-head">
+                            <div class="tc-plan-icon"><i class="fas fa-handshake"></i></div>
+                            <h3>Hire Purchase</h3>
+                        </div>
+                        <ul class="tc-list">
+                            <li><i class="fas fa-check"></i><span><strong>Deposit:</strong> 40%–50% upfront</span></li>
+                            <li><i class="fas fa-check"></i><span><strong>Duration:</strong> 2–4 months in flexible monthly installments</span></li>
+                            <li><i class="fas fa-check"></i><span><strong>Eligibility:</strong> Must have made at least one prior purchase and provided feedback</span></li>
+                            <li><i class="fas fa-check"></i><span><strong>Delivery:</strong> Item dispatched after initial payment; balance settled within agreed timeline</span></li>
+                            <li><i class="fas fa-check"></i><span><strong>Default:</strong> If over 1 month behind, the watch may be recalled or the sale cancelled</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pre-Orders & Delivery -->
+        <div class="tc-section">
+            <div class="tc-section-header">
+                <div class="tc-section-icon"><i class="fas fa-shipping-fast"></i></div>
+                <h2>Pre-Orders &amp; Delivery</h2>
+            </div>
+            <div class="tc-section-body">
+                <ul class="tc-list">
+                    <li><i class="fas fa-check"></i><span>Orders can be placed via direct message or through our website</span></li>
+                    <li><i class="fas fa-check"></i><span>In-stock items are dispatched within <strong>2 business days</strong></span></li>
+                    <li><i class="fas fa-check"></i><span>Pre-order items are delivered within <strong>10–12 business days</strong></span></li>
+                    <li><i class="fas fa-check"></i><span>Qualitick Collections is not responsible for delays caused by couriers, unforeseen circumstances, or incorrect delivery details provided by the buyer</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Returns and Refunds -->
+        <div class="tc-section">
+            <div class="tc-section-header">
+                <div class="tc-section-icon"><i class="fas fa-undo-alt"></i></div>
+                <h2>Returns &amp; Refunds</h2>
+            </div>
+            <div class="tc-section-body">
+                <p>Returns are accepted only if the watch is defective or damaged upon delivery.</p>
+                <ul class="tc-list">
+                    <li><i class="fas fa-check"></i><span>Issues must be reported within <strong>48 hours</strong> of delivery</span></li>
+                    <li><i class="fas fa-check"></i><span>Customers are responsible for return shipping costs unless otherwise agreed</span></li>
+                    <li><i class="fas fa-check"></i><span>Refunds are processed within <strong>10–15 business days</strong> after inspection and approval</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Warranty -->
+        <div class="tc-section">
+            <div class="tc-section-header">
+                <div class="tc-section-icon"><i class="fas fa-shield-alt"></i></div>
+                <h2>Warranty</h2>
+            </div>
+            <div class="tc-section-body">
+                <p>All watches come with a <strong>2-month warranty</strong> against manufacturer defects from the date of delivery. This warranty does not cover damage resulting from misuse, accidents, water exposure, or natural wear and tear.</p>
+            </div>
+        </div>
+
+        <!-- Limitation of Liability -->
+        <div class="tc-section">
+            <div class="tc-section-header">
+                <div class="tc-section-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                <h2>Limitation of Liability</h2>
+            </div>
+            <div class="tc-section-body">
+                <p>Qualitick Collections is not liable for delays caused by courier services, payment processors, or circumstances beyond our reasonable control. Once delivery has been confirmed by the courier or recipient, we cannot be held responsible for lost or stolen items.</p>
+            </div>
+        </div>
+
+        <!-- Contact -->
+        <div class="tc-section tc-section-contact">
+            <div class="tc-section-header">
+                <div class="tc-section-icon"><i class="fas fa-envelope"></i></div>
+                <h2>Questions About These Terms?</h2>
+            </div>
+            <div class="tc-section-body">
+                <p>If you have any questions or concerns about these Terms &amp; Conditions, we're happy to help. Reach out through our <a href="/contact" class="tc-link">contact page</a> or via our social media channels.</p>
+                <div class="tc-contact-btns">
+                    <a href="/contact" class="btn-hero-primary" style="display:inline-flex; align-items:center; gap:10px; font-size:0.85rem; padding:14px 28px;">
+                        Contact Us <img src="/images/icons/Arrow-Icon.svg" alt="" style="width:16px;">
+                    </a>
+                </div>
+            </div>
+        </div>
+
     </div>
+</div>
 
-    <%- include('partials/footer') %>
-
+<%- include('partials/footer') %>

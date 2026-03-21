@@ -2,8 +2,6 @@
    ABOUT PAGE SPECIFIC STYLES
    ==================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400;1,600&family=DM+Sans:wght@300;400;500;600&display=swap');
-
 /* Page overrides */
 body {
     background: #F9F9F9;
@@ -22,7 +20,7 @@ body {
 }
 
 .about-section-title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Satoshi-Variable', 'Satoshi-Black', sans-serif;
     font-size: clamp(1.9rem, 3.5vw, 2.8rem);
     font-weight: 700;
     color: #070707;
@@ -82,7 +80,7 @@ body {
 }
 
 .about-hero-title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Satoshi-Variable', 'Satoshi-Black', sans-serif;
     font-size: clamp(2.6rem, 5vw, 4rem);
     font-weight: 700;
     color: #fff;
@@ -130,7 +128,7 @@ body {
 }
 
 .about-stat-number {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Satoshi-Variable', 'Satoshi-Black', sans-serif;
     font-size: clamp(2.2rem, 4vw, 3.2rem);
     font-weight: 700;
     color: var(--gold);
@@ -231,7 +229,7 @@ body {
 }
 
 .about-mission-title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Satoshi-Variable', 'Satoshi-Black', sans-serif;
     font-size: clamp(1.9rem, 3.5vw, 2.8rem);
     font-weight: 700;
     color: #fff;
@@ -299,7 +297,7 @@ body {
 }
 
 .about-value-card h3 {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Satoshi-Variable', 'Satoshi-Black', sans-serif;
     font-size: 1.15rem;
     font-weight: 600;
     color: #070707;
@@ -341,7 +339,7 @@ body {
 }
 
 .about-cta-title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Satoshi-Variable', 'Satoshi-Black', sans-serif;
     font-size: clamp(2.2rem, 4vw, 3.2rem);
     font-weight: 700;
     color: #fff;

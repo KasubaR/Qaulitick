@@ -1,0 +1,360 @@
+/* ====================================
+   TERMS & CONDITIONS PAGE
+   ==================================== */
+
+body {
+    background: #F9F9F9;
+    color: #2c2618;
+}
+
+/* ── HERO ── */
+.tc-hero {
+    background: #070707;
+    padding: 110px 5% 80px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.tc-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 60% 70% at 50% 50%, rgba(175,144,68,0.1) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.tc-hero-watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    height: auto;
+    opacity: 0.04;
+    object-fit: contain;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.tc-hero-inner {
+    position: relative;
+    z-index: 2;
+    max-width: 700px;
+    margin: 0 auto;
+    animation: tcFadeUp 0.8s ease both;
+}
+
+.tc-eyebrow {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 20px;
+}
+
+.tc-hero-title {
+    font-family: 'Satoshi-Variable', 'Satoshi-Black', sans-serif;
+    font-size: clamp(2.4rem, 5vw, 3.8rem);
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.12;
+    margin-bottom: 16px;
+}
+
+.tc-hero-sub {
+    font-size: 0.82rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.35);
+    margin-bottom: 20px;
+}
+
+.tc-hero-desc {
+    font-size: 1rem;
+    line-height: 1.75;
+    color: rgba(255,255,255,0.55);
+    max-width: 560px;
+    margin: 0 auto;
+}
+
+/* ── BREADCRUMB ── */
+.tc-breadcrumb {
+    background: #fff;
+    border-bottom: 1px solid rgba(175,144,68,0.12);
+    padding: 14px 5%;
+}
+
+.tc-breadcrumb-inner {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.82rem;
+    color: #9a8e7a;
+}
+
+.tc-breadcrumb-inner a {
+    color: var(--gold);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.tc-breadcrumb-inner a:hover {
+    opacity: 0.75;
+}
+
+.tc-breadcrumb-inner i {
+    font-size: 9px;
+    color: rgba(175,144,68,0.5);
+}
+
+.tc-breadcrumb-inner span {
+    color: #2c2618;
+    font-weight: 500;
+}
+
+/* ── BODY WRAPPER ── */
+.tc-body {
+    padding: 64px 5% 96px;
+    background: #F9F9F9;
+}
+
+.tc-body-inner {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* ── SECTION CARD ── */
+.tc-section {
+    background: #fff;
+    border-radius: 18px;
+    border: 1px solid rgba(175,144,68,0.12);
+    overflow: hidden;
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.tc-section:hover {
+    border-color: rgba(175,144,68,0.3);
+    box-shadow: 0 12px 40px rgba(175,144,68,0.09);
+}
+
+/* ── SECTION HEADER ── */
+.tc-section-header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 28px 36px;
+    border-bottom: 1px solid rgba(175,144,68,0.1);
+    background: #FFFBF3;
+}
+
+.tc-section-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: var(--gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: #fff;
+    flex-shrink: 0;
+    box-shadow: 0 4px 14px rgba(175,144,68,0.3);
+}
+
+.tc-section-header h2 {
+    font-family: 'Satoshi-Variable', 'Satoshi-Black', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #070707;
+    margin: 0;
+    line-height: 1.3;
+}
+
+/* ── SECTION BODY ── */
+.tc-section-body {
+    padding: 32px 36px;
+}
+
+.tc-section-body p {
+    font-size: 0.95rem;
+    line-height: 1.85;
+    color: #5a5040;
+    margin-bottom: 18px;
+}
+
+.tc-section-body p:last-child {
+    margin-bottom: 0;
+}
+
+.tc-section-body p strong {
+    color: #2c2618;
+    font-weight: 600;
+}
+
+/* ── LIST ── */
+.tc-list {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.tc-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 0.92rem;
+    line-height: 1.7;
+    color: #5a5040;
+}
+
+.tc-list li i {
+    color: var(--gold);
+    font-size: 13px;
+    margin-top: 4px;
+    flex-shrink: 0;
+}
+
+.tc-list li span strong {
+    color: #2c2618;
+    font-weight: 600;
+}
+
+/* ── PAYMENT PLAN CARDS ── */
+.tc-plan-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 28px;
+}
+
+.tc-plan-card {
+    background: #F9F9F9;
+    border-radius: 14px;
+    border: 1px solid rgba(175,144,68,0.15);
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.tc-plan-card:hover {
+    border-color: rgba(175,144,68,0.4);
+    box-shadow: 0 8px 28px rgba(175,144,68,0.1);
+}
+
+.tc-plan-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.tc-plan-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: rgba(175,144,68,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: var(--gold);
+    flex-shrink: 0;
+}
+
+.tc-plan-head h3 {
+    font-family: 'Satoshi-Variable', 'Satoshi-Black', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #070707;
+    margin: 0;
+}
+
+.tc-plan-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--gold);
+    text-decoration: none;
+    letter-spacing: 0.03em;
+    margin-top: 4px;
+    transition: opacity 0.2s;
+}
+
+.tc-plan-link:hover {
+    opacity: 0.75;
+}
+
+.tc-plan-link i {
+    font-size: 11px;
+}
+
+/* ── CONTACT SECTION ── */
+.tc-section-contact .tc-section-header {
+    background: #070707;
+    border-bottom-color: rgba(175,144,68,0.15);
+}
+
+.tc-section-contact .tc-section-header h2 {
+    color: #fff;
+}
+
+.tc-section-contact .tc-section-body {
+    background: #070707;
+    border-radius: 0 0 18px 18px;
+}
+
+.tc-section-contact .tc-section-body p {
+    color: rgba(255,255,255,0.55);
+}
+
+.tc-section-contact .tc-section:hover {
+    border-color: rgba(175,144,68,0.35);
+}
+
+.tc-link {
+    color: var(--gold);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    font-weight: 600;
+    transition: opacity 0.2s;
+}
+
+.tc-link:hover {
+    opacity: 0.75;
+}
+
+.tc-contact-btns {
+    margin-top: 28px;
+}
+
+/* ── ANIMATION ── */
+@keyframes tcFadeUp {
+    from { opacity: 0; transform: translateY(28px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 700px) {
+    .tc-hero { padding: 90px 5% 60px; }
+    .tc-body { padding: 40px 5% 64px; }
+    .tc-section-header { padding: 22px 24px; gap: 14px; }
+    .tc-section-body { padding: 24px; }
+    .tc-plan-grid { grid-template-columns: 1fr; }
+    .tc-section-header h2 { font-size: 1.1rem; }
+    .tc-section-icon { width: 42px; height: 42px; font-size: 17px; }
+}

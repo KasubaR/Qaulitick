@@ -808,6 +808,13 @@ app.get('/privacy', (req, res) => {
     });
 });
 
+app.get('/layby', (req, res) => {
+    res.render('layby', {
+        title: 'How Layby Works | Qualitick Collections',
+        page: 'layby'
+    });
+});
+
 // Cart and checkout routes
 app.get('/cart', async (req, res) => {
     try {

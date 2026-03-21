@@ -36,7 +36,7 @@ header {
     align-items: center;
     justify-content: space-between;
     padding: 0 5%;
-    height: 72px;
+    height: 88px;
     background: #fff;
     backdrop-filter: blur(12px);
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);
@@ -50,7 +50,7 @@ header {
 }
 
 .nav-logo {
-    height: 56px;
+    height: 72px;
     width: auto;
 }
 
@@ -292,6 +292,7 @@ footer {
     border-top: 1px solid rgba(175, 144, 68, 0.22);
     position: relative;
     color: #e5e1d8;
+    font-family: 'Satoshi-Variable', 'Satoshi-Regular', sans-serif;
 }
 
 .footer-content {
