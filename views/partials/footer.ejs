@@ -68,6 +68,10 @@
     <script src="/js/contact.js"></script>
 <% } %>
 
+<% if (typeof page !== 'undefined' && page === 'account' && typeof accountSection !== 'undefined' && accountSection === 'login') { %>
+    <script src="/js/account-login.js"></script>
+<% } %>
+
         </body>
 
         </html>
