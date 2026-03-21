@@ -883,3 +883,45 @@ select.form-input:disabled {
     }
 }
 
+.checkout-auth-context {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.login-prompt--hidden {
+    display: none;
+}
+
+.layby-checkout-section--hidden {
+    display: none;
+}
+
+.layby-checkout-intro {
+    font-size: 14px;
+    color: #555;
+    margin-bottom: 16px;
+    line-height: 1.5;
+}
+
+.layby-mode-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.layby-radio-label {
+    align-items: flex-start;
+}
+
+.layby-deposit-wrap--hidden {
+    display: none;
+}
+

@@ -1,0 +1,50 @@
+<%- include('../partials/header', {
+    title: typeof title !== 'undefined' ? title : 'Order history | Qualitick Collections',
+    page: 'account',
+    canonicalUrl: typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com/account/orders',
+    url: '/account/orders'
+}) %>
+
+<div class="account-page-wrap">
+    <div class="account-hero">
+        <h1>Order history</h1>
+        <p>Orders placed while signed in to your account.</p>
+    </div>
+
+    <%- include('./_subnav') %>
+
+    <% if (typeof error !== 'undefined' && error) { %>
+        <div class="account-alert account-alert--error" role="alert"><%= error %></div>
+    <% } %>
+
+    <% if (typeof orders === 'undefined' || !orders.length) { %>
+        <p class="account-empty">You have no orders linked to this account yet.</p>
+    <% } else { %>
+        <div class="account-card account-table-wrap">
+            <table class="account-table">
+                <thead>
+                    <tr>
+                        <th>Order</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Payment</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% orders.forEach(function(o) { %>
+                        <tr>
+                            <td><%= o.orderNumber %></td>
+                            <td><%= o.createdAt ? new Date(o.createdAt).toLocaleDateString() : '—' %></td>
+                            <td><%= o.status || '—' %></td>
+                            <td><%= o.paymentStatus || '—' %></td>
+                            <td><%= o.totals && o.totals.total != null ? o.totals.total : '—' %></td>
+                        </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </div>
+    <% } %>
+</div>
+
+<%- include('../partials/footer') %>

@@ -1,5 +1,7 @@
 // Validation and Sanitization Utilities
 
+const validator = require('validator');
+
 /**
  * Sanitize string input to prevent XSS attacks
  * @param {string} input - Input string to sanitize
@@ -242,6 +244,83 @@ function validateFilters(filters) {
  * @param {object} orderData - Order data to validate
  * @returns {object} - Validation result { valid: boolean, errors: array }
  */
+/**
+ * Password policy: min 8 chars, at least one letter and one number.
+ */
+function validatePasswordStrength(password) {
+    if (!password || typeof password !== 'string' || password.length < 8) {
+        return false;
+    }
+    if (password.length > 128) {
+        return false;
+    }
+    const hasLetter = /[a-zA-Z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    return hasLetter && hasNumber;
+}
+
+/**
+ * @param {{ name?: string, email?: string, phone?: string, password?: string }} body
+ */
+function validateRegister(body) {
+    const errors = [];
+    if (!body.name || typeof body.name !== 'string' || body.name.trim().length < 2) {
+        errors.push('Name must be at least 2 characters.');
+    }
+    if (!body.email || !validator.isEmail(String(body.email).trim())) {
+        errors.push('A valid email address is required.');
+    }
+    if (!body.phone || !validatePhone(body.phone)) {
+        errors.push('A valid Zambian phone number is required.');
+    }
+    if (!validatePasswordStrength(body.password)) {
+        errors.push('Password must be at least 8 characters and include at least one letter and one number.');
+    }
+    return { valid: errors.length === 0, errors };
+}
+
+/**
+ * @param {{ email?: string, password?: string }} body
+ */
+function validateLogin(body) {
+    const errors = [];
+    if (!body.email || !validator.isEmail(String(body.email).trim())) {
+        errors.push('A valid email address is required.');
+    }
+    if (!body.password || typeof body.password !== 'string' || body.password.length < 1) {
+        errors.push('Password is required.');
+    }
+    return { valid: errors.length === 0, errors };
+}
+
+/**
+ * @param {{ email?: string }} body
+ */
+function validateForgotPasswordEmail(body) {
+    const errors = [];
+    if (!body.email || !validator.isEmail(String(body.email).trim())) {
+        errors.push('A valid email address is required.');
+    }
+    return { valid: errors.length === 0, errors };
+}
+
+/**
+ * @param {{ token?: string, password?: string, passwordConfirm?: string }} body
+ */
+function validateResetPassword(body) {
+    const errors = [];
+    if (!body.token || typeof body.token !== 'string' || body.token.trim().length < 32) {
+        errors.push('Reset link is invalid or missing.');
+    }
+    if (!validatePasswordStrength(body.password)) {
+        errors.push('Password must be at least 8 characters and include at least one letter and one number.');
+    }
+    if (!body.passwordConfirm || body.password !== body.passwordConfirm) {
+        errors.push('Passwords do not match.');
+    }
+    return { valid: errors.length === 0, errors };
+}
+
 function validateOrder(orderData) {
     const errors = [];
     
@@ -301,6 +380,20 @@ function validateOrder(orderData) {
     const validPaymentMethods = ['mobile', 'mobile_money', 'card', 'paypal', 'bank', 'bank_transfer', 'crypto', 'cash_on_delivery'];
     if (!orderData.paymentMethod || !validPaymentMethods.includes(orderData.paymentMethod)) {
         errors.push('Valid payment method is required');
+    }
+
+    const checkoutMode = orderData.checkoutMode || 'standard';
+    if (checkoutMode !== 'standard' && checkoutMode !== 'layby') {
+        errors.push('Invalid checkout mode');
+    }
+    if (checkoutMode === 'layby') {
+        const p = orderData.laybyDepositPercent;
+        if (p !== undefined && p !== null && p !== '') {
+            const num = parseFloat(String(p));
+            if (Number.isNaN(num) || num < 1 || num > 100) {
+                errors.push('Layby deposit percent must be a number between 1 and 100');
+            }
+        }
     }
     
     return {
@@ -424,6 +517,11 @@ module.exports = {
     sanitizeObject,
     validateEmail,
     validatePhone,
+    validatePasswordStrength,
+    validateRegister,
+    validateLogin,
+    validateForgotPasswordEmail,
+    validateResetPassword,
     validateURL,
     validateProductId,
     validatePrice,

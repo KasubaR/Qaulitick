@@ -412,9 +412,10 @@ function createAxiosInstance() {
  * @param {object} orderData - Order information
  * @param {string} customerPhone - Customer phone number (format: +260XXXXXXXXX)
  * @param {string} provider - Mobile money provider ('airtel', 'mtn')
+ * @param {number|null} [amountOverride] - When set (e.g. layby installment), charge this amount instead of orderData.totals.total
  * @returns {Promise<object>} Payment initiation response
  */
-async function initiateMobileMoneyPayment(orderData, customerPhone, provider) {
+async function initiateMobileMoneyPayment(orderData, customerPhone, provider, amountOverride = null) {
     // Validate API Secret Key
     if (!LENCO_CONFIG.apiSecretKey || LENCO_CONFIG.apiSecretKey === 'xxxxxxxxxxxxxxxxxxxxxxx') {
         log('error', 'API Secret Key not configured', { function: 'initiateMobileMoneyPayment' });
@@ -440,11 +441,16 @@ async function initiateMobileMoneyPayment(orderData, customerPhone, provider) {
     }
 
     const paymentReference = generatePaymentReference(orderData.orderNumber);
+
+    const chargeAmount =
+        amountOverride != null && !Number.isNaN(Number(amountOverride))
+            ? Number(amountOverride)
+            : orderData.totals.total;
     
     log('info', 'Initiating mobile money payment', {
         orderNumber: orderData.orderNumber,
         provider: provider.toLowerCase(),
-        amount: orderData.totals.total,
+        amount: chargeAmount,
         reference: paymentReference,
         customerPhone: customerPhone.replace(/(\d{3})(\d{3})(\d{3})/, '***-***-$3') // Mask phone for privacy
     });
@@ -454,11 +460,14 @@ async function initiateMobileMoneyPayment(orderData, customerPhone, provider) {
         const paymentPayload = {
             phone: customerPhone,              // Required: Customer's phone number
             operator: provider.toLowerCase(),  // Required: airtel or mtn
-            amount: orderData.totals.total,   // Required: Amount to collect
+            amount: chargeAmount,   // Required: Amount to collect
             currency: 'ZMW',                  // Required: Currency code
             reference: paymentReference,       // Required: Your unique reference
             country: 'ZM',                    // Required: Country code
-            description: `Payment for order ${orderData.orderNumber}` // Optional
+            description:
+                amountOverride != null
+                    ? `Layby payment for order ${orderData.orderNumber}`
+                    : `Payment for order ${orderData.orderNumber}` // Optional
         };
 
         // Make API request with retry logic

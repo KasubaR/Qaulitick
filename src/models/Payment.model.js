@@ -54,6 +54,14 @@ const Payment = sequelize.define('Payment', {
     completedAt: { type: DataTypes.DATE, allowNull: true },
     retryOf: { type: DataTypes.INTEGER, allowNull: true },
     retryCount: { type: DataTypes.INTEGER, defaultValue: 0 },
+    /** When set, this Payment row is for a specific layby installment (see layby_payments.id). */
+    laybyPaymentId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: { model: 'layby_payments', key: 'id' },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL'
+    },
     metadata: { type: DataTypes.JSON, allowNull: true, defaultValue: {} }
 }, {
     tableName: 'payments',
@@ -104,6 +112,22 @@ Payment.findByTransactionId = function(transactionId) {
 
 Payment.findByOrderNumber = function(orderNumber) {
     return this.findOne({ where: { orderNumber } });
+};
+
+/** All gateway payments for an order, oldest first. */
+Payment.findPaymentsByOrderNumber = function(orderNumber) {
+    return this.findAll({
+        where: { orderNumber },
+        order: [['createdAt', 'ASC']]
+    });
+};
+
+/** Latest payment row for an order (admin UI / enrichment). */
+Payment.findLatestPaymentByOrderNumber = function(orderNumber) {
+    return this.findOne({
+        where: { orderNumber },
+        order: [['createdAt', 'DESC']]
+    });
 };
 
 Payment.findPendingPayments = function() {

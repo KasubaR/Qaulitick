@@ -19,10 +19,15 @@ async function startServer() {
 
         // Verify email transporter early so auth failures surface at startup rather
         // than silently on the first real email. Skipped when credentials are absent
-        // (e.g. local dev without Gmail configured).
+        // (e.g. local dev without Gmail configured). Non-fatal: a network/DNS error
+        // at boot should not prevent the server from starting.
         if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
             const emailService = require('./src/services/email.service');
-            await emailService.verifyTransporter();
+            try {
+                await emailService.verifyTransporter();
+            } catch (emailErr) {
+                console.warn('⚠️  Email transporter verification failed (server will still start):', emailErr.message);
+            }
         }
 
         // Start scheduled tasks

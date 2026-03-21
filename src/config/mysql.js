@@ -26,8 +26,8 @@ const config = {
     dialect: 'mysql',
     pool: {
         max: 10,
-        min: 0,
-        acquire: 30000,
+        min: 2,       // Keep 2 connections warm to avoid cold-start latency
+        acquire: 5000, // Fail fast after 5s — 30s would freeze the UI under DB pressure
         idle: 10000
     },
     define: {
@@ -52,4 +52,15 @@ const sequelize = new Sequelize(
     }
 );
 
-module.exports = { sequelize, config };
+/**
+ * Verify the database connection is reachable.
+ * Call this at startup (app.js already does so via config/database.js → database.service.js).
+ * Exported here so that any module importing sequelize directly can also verify connectivity
+ * without depending on the full database service bootstrap.
+ */
+async function authenticate() {
+    await sequelize.authenticate();
+    console.log('[DB] Connection established successfully.');
+}
+
+module.exports = { sequelize, config, authenticate };

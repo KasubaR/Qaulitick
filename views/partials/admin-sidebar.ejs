@@ -19,6 +19,10 @@
             <span>Orders</span>
             <span class="badge" id="newOrdersBadge">0</span>
         </a>
+        <a href="/admin/layby" class="nav-item <%= typeof activePage !== 'undefined' && activePage === 'layby' ? 'active' : '' %>">
+            <i class="fas fa-calendar-check"></i>
+            <span>Layby</span>
+        </a>
         <a href="/admin/contact-submissions" class="nav-item <%= typeof activePage !== 'undefined' && activePage === 'contact-submissions' ? 'active' : '' %>">
             <i class="fas fa-envelope"></i>
             <span>Contact Submissions</span>
@@ -77,10 +81,13 @@
         </a>
         
         <!-- Logout -->
-        <a href="/admin/logout" class="nav-item logout">
-            <i class="fas fa-sign-out-alt"></i>
-            <span>Logout</span>
-        </a>
+        <form method="POST" action="/admin/logout" style="display:inline">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" class="nav-item logout">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </button>
+        </form>
     </nav>
 </aside>
 

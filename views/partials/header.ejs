@@ -207,6 +207,10 @@
         <link rel="stylesheet" href="/css/layby.css">
     <% } %>
 
+    <% if (typeof page !=='undefined' && page==='account' ) { %>
+        <link rel="stylesheet" href="/css/account.css">
+    <% } %>
+
     <!-- Analytics Events Helper (load after cookie-utils) -->
     <% if (typeof GA4_MEASUREMENT_ID !== 'undefined' && GA4_MEASUREMENT_ID) { %>
         <script src="/js/analytics-events.js"></script>

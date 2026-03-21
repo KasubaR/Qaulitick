@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const paymentController = require('../controllers/payment.controller');
 const { rateLimit } = require('../middlewares/security.middleware');
+const { authenticateAdmin } = require('../middlewares/auth.middleware');
 
 /**
  * Payment Routes
@@ -34,16 +35,16 @@ router.get('/methods', paymentController.getPaymentMethods);
 router.get('/banks', paymentController.getBanks);
 
 // Get all payments (admin) - MUST come before /:id route
-router.get('/', paymentController.getAllPayments);
+router.get('/', authenticateAdmin, paymentController.getAllPayments);
 
 // Export payments (admin) - MUST come before /:id route
-router.get('/export', paymentController.exportPayments);
+router.get('/export', authenticateAdmin, paymentController.exportPayments);
 
 // Retry failed payment (must come before /:id to avoid route conflict)
 router.post('/retry/:orderNumber', paymentController.retryPayment);
 
 // Get payment by ID (admin) - MUST be last to avoid matching other routes
-router.get('/:id', paymentController.getPaymentById);
+router.get('/:id', authenticateAdmin, paymentController.getPaymentById);
 
 /**
  * Lenco Webhook Route

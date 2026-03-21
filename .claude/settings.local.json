@@ -9,7 +9,8 @@
       "Bash(node -e \"require\\(''cors''\\); console.log\\(''cors installed''\\)\")",
       "Bash(node -e \"require\\(''express-rate-limit''\\); console.log\\(''installed''\\)\")",
       "Bash(xargs grep:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(node -e \"require\\(''''./src/app''''\\)\")"
     ]
   }
 }

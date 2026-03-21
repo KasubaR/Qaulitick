@@ -1,5 +1,9 @@
 // Security Middleware
 // Input sanitization, rate limiting, XSS protection
+//
+// Raw SQL: use Sequelize `replacements` / bind parameters (see rateLimit below). Static DDL
+// (CREATE TABLE IF NOT EXISTS) uses no user input. Other code should follow the same pattern;
+// database.service validates identifiers before any dynamic identifier is embedded in SQL.
 
 const { sanitizeObject, validatePagination, validateSearch, validateSort, validateFilters } = require('../utils/validators');
 const { sequelize } = require('../config/mysql');

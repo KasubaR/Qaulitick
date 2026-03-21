@@ -1,0 +1,49 @@
+<%- include('../partials/header', {
+    title: typeof title !== 'undefined' ? title : 'Profile | Qualitick Collections',
+    page: 'account',
+    canonicalUrl: typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com/account/profile',
+    url: '/account/profile'
+}) %>
+
+<div class="account-page-wrap">
+    <div class="account-hero">
+        <h1>Profile</h1>
+        <p>Update your contact details. Email cannot be changed here.</p>
+    </div>
+
+    <%- include('./_subnav') %>
+
+    <% if (typeof error !== 'undefined' && error) { %>
+        <div class="account-alert account-alert--error" role="alert"><%= error %></div>
+    <% } %>
+    <% if (typeof message !== 'undefined' && message) { %>
+        <div class="account-alert account-alert--success" role="status"><%= message %></div>
+    <% } %>
+
+    <div class="account-card account-form">
+        <form method="post" action="/account/profile" novalidate>
+            <input type="hidden" name="csrfToken" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+
+            <div class="form-group">
+                <label for="profileName">Full name <span class="required">*</span></label>
+                <input type="text" id="profileName" name="name" required autocomplete="name" value="<%= typeof customer !== 'undefined' && customer.name ? customer.name : '' %>">
+            </div>
+
+            <div class="form-group">
+                <label for="profileEmail">Email</label>
+                <input type="email" id="profileEmail" name="email" readonly disabled value="<%= typeof customer !== 'undefined' && customer.email ? customer.email : '' %>">
+            </div>
+
+            <div class="form-group">
+                <label for="profilePhone">Phone</label>
+                <input type="tel" id="profilePhone" name="phone" autocomplete="tel" placeholder="+260 or 0…" value="<%= typeof customer !== 'undefined' && customer.phone ? customer.phone : '' %>">
+            </div>
+
+            <div class="account-actions">
+                <button type="submit" class="account-btn-primary">Save changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

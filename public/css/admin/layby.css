@@ -1,0 +1,91 @@
+/* Admin layby list + detail */
+
+.layby-table-link {
+    display: inline-block;
+    padding: 6px 12px;
+    font-size: 13px;
+    text-decoration: none;
+}
+
+.layby-detail-content--hidden {
+    display: none;
+}
+
+.layby-detail-alert {
+    margin: 16px 24px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.layby-detail-alert--error {
+    background: #ffebee;
+    color: #b71c1c;
+    border: 1px solid #ffcdd2;
+}
+
+.layby-detail-alert--hidden {
+    display: none;
+}
+
+.layby-detail-content {
+    padding: 0 24px 32px;
+}
+
+.layby-detail-section-title {
+    font-size: 1.05rem;
+    margin: 0 0 16px;
+    font-weight: 600;
+}
+
+.layby-detail-dl {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 8px 16px;
+    margin: 0 0 20px;
+    font-size: 14px;
+}
+
+.layby-detail-dl dt {
+    color: #64748b;
+    font-weight: 500;
+}
+
+.layby-detail-dl dd {
+    margin: 0;
+    color: #1e293b;
+}
+
+.layby-detail-status-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.layby-detail-status-row label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+}
+
+.layby-detail-hint {
+    font-size: 12px;
+    color: #64748b;
+    margin: 0;
+}
+
+.layby-detail-summary {
+    margin-bottom: 24px;
+    padding: 20px;
+}
+
+.layby-installments-section {
+    padding: 20px;
+}
+
+.layby-confirm-offline-btn {
+    font-size: 12px;
+    padding: 6px 10px;
+}

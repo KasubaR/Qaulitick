@@ -4,7 +4,42 @@ const Payment = require('../models/Payment.model');
 const Order = require('../models/Order.model');
 const lencoService = require('../services/lenco.service');
 const orderService = require('../services/order.service');
+const laybyService = require('../services/layby.service');
+const LaybyPayment = require('../models/LaybyPayment.model');
+const LaybyPlan = require('../models/LaybyPlan.model');
+const { getAuthenticatedAdmin } = require('../middlewares/auth.middleware');
 const logger = require('../utils/logger').child({ module: 'PaymentController' });
+
+/**
+ * Layby payments: only the plan owner (or an admin) may poll verify — transaction IDs are not public secrets.
+ * @returns {Promise<{ status: number, body: object }|null>} Error response to send, or null if allowed
+ */
+async function assertLaybyPaymentVerifyAuthorized(req, payment) {
+    if (!payment.laybyPaymentId) {
+        return null;
+    }
+    const admin = await getAuthenticatedAdmin(req);
+    if (admin) {
+        return null;
+    }
+    if (!req.session || req.session.userId == null) {
+        return {
+            status: 401,
+            body: { success: false, message: 'Sign in to verify this layby payment.' }
+        };
+    }
+    const uid = parseInt(String(req.session.userId), 10);
+    const installment = await LaybyPayment.findByPk(payment.laybyPaymentId, {
+        include: [{ model: LaybyPlan, as: 'laybyPlan', required: true }]
+    });
+    if (!installment || !installment.laybyPlan) {
+        return { status: 404, body: { success: false, message: 'Payment not found' } };
+    }
+    if (installment.laybyPlan.userId !== uid) {
+        return { status: 403, body: { success: false, message: 'Not authorized' } };
+    }
+    return null;
+}
 
 // Payment retry limit (configurable via environment variable)
 const MAX_PAYMENT_RETRIES = parseInt(process.env.MAX_PAYMENT_RETRIES || '3', 10);
@@ -26,11 +61,18 @@ exports.processPayment = async (req, res) => {
             orderNumber,
             paymentMethod,
             customerInfo,
+            laybyPaymentId: rawLaybyPaymentId,
             // Lenco-specific fields
             provider, // For mobile money: 'airtel', 'mtn'
             customerPhone, // For mobile money: phone number
             bankDetails // For bank transfer: { bankName, accountNumber, accountName }
         } = req.body;
+
+        const laybyPaymentId =
+            rawLaybyPaymentId !== undefined && rawLaybyPaymentId !== null && rawLaybyPaymentId !== ''
+                ? parseInt(String(rawLaybyPaymentId), 10)
+                : null;
+        const laybyIdValid = laybyPaymentId !== null && !Number.isNaN(laybyPaymentId);
 
         // Validate required fields
         if (!orderNumber || !paymentMethod || !customerInfo) {
@@ -50,8 +92,52 @@ exports.processPayment = async (req, res) => {
             });
         }
 
-        // Authoritative amount — never derived from req.body.
-        const authoritativeAmount = order.totals.total;
+        // Authoritative amount — never derived from req.body (except layby installment from DB row).
+        let authoritativeAmount = Number(order.totals.total);
+        let orderDataForLenco = order.toJSON();
+
+        if (laybyIdValid) {
+            if (!req.session || !req.session.userId) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Sign in to pay this layby installment.'
+                });
+            }
+            const sessionUserId = parseInt(String(req.session.userId), 10);
+            const installment = await LaybyPayment.findByPk(laybyPaymentId, {
+                include: [{ model: LaybyPlan, as: 'laybyPlan', required: true }]
+            });
+            if (!installment || !installment.laybyPlan) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Layby installment not found.'
+                });
+            }
+            const plan = installment.laybyPlan;
+            if (plan.userId !== sessionUserId) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'You cannot pay this installment.'
+                });
+            }
+            if (plan.orderId !== order.id) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Order does not match this layby installment.'
+                });
+            }
+            if (installment.status !== 'pending') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'This installment is not awaiting payment.'
+                });
+            }
+            authoritativeAmount = Number(installment.amount);
+            orderDataForLenco = {
+                ...order.toJSON(),
+                totals: { ...order.totals, total: authoritativeAmount }
+            };
+        }
 
         // Validate payment method based on feature flags
         const validPaymentMethods = ['mobile_money'];
@@ -74,17 +160,20 @@ exports.processPayment = async (req, res) => {
             });
         }
 
-        // Use order data from database (authoritative source)
-        // Convert Mongoose document to plain object for Lenco service
-        const orderData = order.toJSON();
-
         let lencoResponse;
         let paymentRecord;
 
-        // Idempotency: reject if a pending/processing payment already exists for this order
-        const existingPending = await Payment.findOne({
-            where: { orderNumber, status: { [Op.in]: ['pending', 'processing'] } }
-        });
+        // Idempotency: one pending/processing payment per order (standard) or per layby installment
+        const pendingWhere = {
+            orderNumber,
+            status: { [Op.in]: ['pending', 'processing'] }
+        };
+        if (laybyIdValid) {
+            pendingWhere.laybyPaymentId = laybyPaymentId;
+        } else {
+            pendingWhere.laybyPaymentId = { [Op.is]: null };
+        }
+        const existingPending = await Payment.findOne({ where: pendingWhere });
         if (existingPending) {
             return res.status(409).json({
                 success: false,
@@ -113,9 +202,10 @@ exports.processPayment = async (req, res) => {
             try {
                 // Initiate mobile money payment with Lenco
                 lencoResponse = await lencoService.initiateMobileMoneyPayment(
-                    orderData,
+                    orderDataForLenco,
                     customerPhone,
-                    provider.toLowerCase()
+                    provider.toLowerCase(),
+                    laybyIdValid ? authoritativeAmount : null
                 );
 
                 // Create payment record with Lenco collection data
@@ -130,6 +220,7 @@ exports.processPayment = async (req, res) => {
                     currency: lencoResponse.currency || 'ZMW',
                     status: mappedStatus, // Mapped from lencoStatus
                     customerInfo,
+                    laybyPaymentId: laybyIdValid ? laybyPaymentId : null,
                     
                     // Lenco-specific fields
                     lencoTransactionId: lencoResponse.transactionId,      // Collection ID (col_xxx)
@@ -153,11 +244,25 @@ exports.processPayment = async (req, res) => {
                         provider: provider.toLowerCase(),
                         customerPhone: customerPhone,
                         initiatedAt: lencoResponse.initiatedAt,
-                        mobileMoneyDetails: lencoResponse.mobileMoneyDetails
+                        mobileMoneyDetails: lencoResponse.mobileMoneyDetails,
+                        laybyPaymentId: laybyIdValid ? laybyPaymentId : undefined
                     }
                 });
 
                 logger.debug({ orderNumber, provider }, 'Mobile money payment initiated');
+
+                if (laybyIdValid) {
+                    try {
+                        await orderService.updateOrderStatusFromPayment(
+                            orderNumber,
+                            'pending',
+                            paymentRecord.lencoTransactionId,
+                            'Layby installment payment initiated'
+                        );
+                    } catch (ordErr) {
+                        logger.warn({ err: ordErr }, 'Order status update after layby payment start');
+                    }
+                }
 
             } catch (error) {
                 console.error('[Payment Controller] Error initiating mobile money payment:', error);
@@ -170,6 +275,7 @@ exports.processPayment = async (req, res) => {
                     currency: 'ZMW',
                     status: 'failed',
                     customerInfo,
+                    laybyPaymentId: laybyIdValid ? laybyPaymentId : null,
                     lencoProvider: provider.toLowerCase(),
                     failureReason: error.message,
                     failedAt: new Date(),
@@ -292,6 +398,7 @@ exports.processPayment = async (req, res) => {
             paymentMethod,
             amount: authoritativeAmount, // Use authoritative amount from database order
             status: 'pending',
+            laybyPaymentId: laybyIdValid ? laybyPaymentId : undefined,
             paymentInstructions: lencoResponse.paymentInstructions,
             qrCode: lencoResponse.qrCode,
             paymentUrl: lencoResponse.paymentUrl,
@@ -395,29 +502,41 @@ exports.verifyPayment = async (req, res) => {
                     lencoResponse: lencoResult.rawResponse || lencoResult
                 };
 
-                // Update order status if payment completed or failed
                 if (lencoResult.status === 'successful' || lencoResult.status === 'completed') {
                     updatePayload.completedAt = lencoResult.completedAt
                         ? new Date(lencoResult.completedAt)
                         : new Date();
-
-                    try {
-                        await orderService.updateOrderStatusFromPayment(
-                            payment.orderNumber,
-                            'completed',
-                            payment.lencoTransactionId,
-                            'Payment completed via Lenco verification'
-                        );
-                        logger.debug({ orderNumber: payment.orderNumber }, 'Order status updated to paid');
-                    } catch (orderError) {
-                        console.error(`[Payment Controller] Error updating order status:`, orderError);
-                    }
                 } else if (lencoResult.status === 'failed') {
                     updatePayload.failedAt = lencoResult.failedAt
                         ? new Date(lencoResult.failedAt)
                         : new Date();
                     updatePayload.failureReason = lencoResult.failureReason || 'Payment failed';
+                }
 
+                await Payment.update(updatePayload, { where: { id: payment.id } });
+                payment = await Payment.findByPk(payment.id);
+
+                if (lencoResult.status === 'successful' || lencoResult.status === 'completed') {
+                    if (payment.laybyPaymentId) {
+                        try {
+                            await laybyService.recordLaybyInstallmentPaid(payment);
+                        } catch (lbErr) {
+                            logger.error({ err: lbErr }, 'Layby installment apply failed after verify');
+                        }
+                    } else {
+                        try {
+                            await orderService.updateOrderStatusFromPayment(
+                                payment.orderNumber,
+                                'completed',
+                                payment.lencoTransactionId,
+                                'Payment completed via Lenco verification'
+                            );
+                            logger.debug({ orderNumber: payment.orderNumber }, 'Order status updated to paid');
+                        } catch (orderError) {
+                            console.error('[Payment Controller] Error updating order status:', orderError);
+                        }
+                    }
+                } else if (lencoResult.status === 'failed' && !payment.laybyPaymentId) {
                     try {
                         await orderService.updateOrderStatusFromPayment(
                             payment.orderNumber,
@@ -427,14 +546,9 @@ exports.verifyPayment = async (req, res) => {
                         );
                         logger.debug({ orderNumber: payment.orderNumber }, 'Order status updated to payment_failed');
                     } catch (orderError) {
-                        console.error(`[Payment Controller] Error updating order status:`, orderError);
+                        console.error('[Payment Controller] Error updating order status:', orderError);
                     }
                 }
-
-                // Atomic update — if this throws, DB and in-memory state can't desync
-                // because we haven't mutated the instance yet
-                await Payment.update(updatePayload, { where: { id: payment.id } });
-                payment = await Payment.findByPk(payment.id);
 
                 // Send notification now that DB is confirmed updated
                 if (previousPaymentStatus !== newStatus &&
@@ -725,43 +839,41 @@ exports.handleLencoWebhook = async (req, res) => {
         
         if (orderNumberToUpdate) {
             try {
-                // Map payment status to order payment status
-                // payment.status is already mapped (completed, failed, etc.)
-                // We need to pass the correct status to updateOrderStatusFromPayment
-                let paymentStatusForOrder = payment.status;
-                
-                // If payment is completed, order should be marked as paid
-                if (payment.status === 'completed') {
-                    paymentStatusForOrder = 'completed';
-                } else if (payment.status === 'failed') {
-                    paymentStatusForOrder = 'failed';
-                } else if (payment.status === 'pending') {
-                    paymentStatusForOrder = 'pending';
-                }
-                
-                // Update order status from payment webhook
-                const updatedOrder = await orderService.updateOrderStatusFromPayment(
-                    orderNumberToUpdate,
-                    paymentStatusForOrder, // Payment status for order update
-                    webhookData.transactionId || payment.lencoTransactionId, // Transaction ID
-                    `Payment status updated via webhook: ${payment.status}` // Notes
-                );
-                
-                if (updatedOrder) {
-                    logger.debug(
-                        {
-                            orderNumber: orderNumberToUpdate,
-                            status: updatedOrder.status,
-                            paymentStatus: updatedOrder.paymentStatus
-                        },
-                        'Order status updated successfully'
+                if (payment.status === 'completed' && payment.laybyPaymentId) {
+                    await laybyService.recordLaybyInstallmentPaid(payment);
+                    logger.debug({ orderNumber: orderNumberToUpdate }, 'Layby installment applied from webhook');
+                } else if (!payment.laybyPaymentId) {
+                    let paymentStatusForOrder = payment.status;
+                    if (payment.status === 'completed') {
+                        paymentStatusForOrder = 'completed';
+                    } else if (payment.status === 'failed') {
+                        paymentStatusForOrder = 'failed';
+                    } else if (payment.status === 'pending') {
+                        paymentStatusForOrder = 'pending';
+                    }
+
+                    const updatedOrder = await orderService.updateOrderStatusFromPayment(
+                        orderNumberToUpdate,
+                        paymentStatusForOrder,
+                        webhookData.transactionId || payment.lencoTransactionId,
+                        `Payment status updated via webhook: ${payment.status}`
                     );
-                } else {
-                    console.warn(`[Payment Controller] Order ${orderNumberToUpdate} not found for status update`);
+
+                    if (updatedOrder) {
+                        logger.debug(
+                            {
+                                orderNumber: orderNumberToUpdate,
+                                status: updatedOrder.status,
+                                paymentStatus: updatedOrder.paymentStatus
+                            },
+                            'Order status updated successfully'
+                        );
+                    } else {
+                        console.warn(`[Payment Controller] Order ${orderNumberToUpdate} not found for status update`);
+                    }
                 }
             } catch (error) {
                 console.error('[Payment Controller] Error updating order status:', error);
-                // Don't fail webhook if order update fails - log error but continue
             }
         } else {
             console.warn(`[Payment Controller] No order number found in payment record or webhook data. Payment ID: ${payment.id}`);
@@ -875,10 +987,40 @@ exports.getBanks = async (req, res) => {
 exports.retryPayment = async (req, res) => {
     try {
         const { orderNumber } = req.params;
-        
-        // Find existing payment
-        const existingPayment = await Payment.findByOrderNumber(orderNumber);
-        
+
+        const order = await Order.findByOrderNumber(orderNumber);
+
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: 'Order not found for this payment'
+            });
+        }
+
+        if (order.checkoutMode === 'layby') {
+            return res.status(400).json({
+                success: false,
+                message: 'Layby orders: use My account → Layby to pay the next installment.'
+            });
+        }
+
+        const admin = await getAuthenticatedAdmin(req);
+        const customerUserId =
+            req.session && req.session.userId != null ? parseInt(String(req.session.userId), 10) : null;
+        if (!admin && order.userId != null) {
+            if (customerUserId == null || Number(order.userId) !== customerUserId) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Not authorized to retry payment for this order.'
+                });
+            }
+        }
+
+        const existingPayment = await Payment.findOne({
+            where: { orderNumber, status: 'failed', laybyPaymentId: { [Op.is]: null } },
+            order: [['createdAt', 'DESC']]
+        });
+
         if (!existingPayment) {
             return res.status(404).json({
                 success: false,
@@ -893,7 +1035,6 @@ exports.retryPayment = async (req, res) => {
             });
         }
 
-        // Check retry limit to prevent abuse
         const currentRetryCount = existingPayment.retryCount || 0;
         if (currentRetryCount >= MAX_PAYMENT_RETRIES) {
             return res.status(429).json({
@@ -901,17 +1042,6 @@ exports.retryPayment = async (req, res) => {
                 message: `Maximum retry limit (${MAX_PAYMENT_RETRIES}) reached. Please contact support for assistance with your payment.`,
                 retryCount: currentRetryCount,
                 maxRetries: MAX_PAYMENT_RETRIES
-            });
-        }
-
-        // Get order data for retry
-        const Order = require('../models/Order.model');
-        const order = await Order.findByOrderNumber(orderNumber);
-        
-        if (!order) {
-            return res.status(404).json({
-                success: false,
-                message: 'Order not found for this payment'
             });
         }
 
@@ -952,7 +1082,8 @@ exports.retryPayment = async (req, res) => {
                 lencoResponse = await lencoService.initiateMobileMoneyPayment(
                     orderData,
                     customerPhone,
-                    provider
+                    provider,
+                    null
                 );
 
                 // Create new payment record

@@ -85,11 +85,10 @@ function csrfTokenValidator(options = {}) {
         
         // Get token from request (check multiple sources)
         const requestToken = 
-            req.headers['x-csrf-token'] || 
+            req.headers['x-csrf-token'] ||
             req.headers['x-csrftoken'] ||
             req.body?._csrf ||
-            req.body?.csrfToken ||
-            req.query?._csrf;
+            req.body?.csrfToken;
         
         if (!requestToken) {
             return res.status(403).json({
@@ -98,18 +97,21 @@ function csrfTokenValidator(options = {}) {
             });
         }
         
-        // Validate token (use constant-time comparison to prevent timing attacks)
-        // timingSafeEqual requires buffers of the same length
+        // Validate token using constant-time comparison to prevent timing attacks.
+        // crypto.timingSafeEqual requires equal-length buffers, so the length check
+        // comes first — but both branches return the SAME error message intentionally.
+        // Distinct messages would create an oracle that leaks token length information
+        // to an attacker probing valid token lengths. Do NOT make these messages different.
         const sessionBuffer = Buffer.from(sessionToken, 'utf8');
         const requestBuffer = Buffer.from(requestToken, 'utf8');
-        
+
         if (sessionBuffer.length !== requestBuffer.length) {
             return res.status(403).json({
                 success: false,
                 message: 'Invalid CSRF token. Please refresh the page and try again.'
             });
         }
-        
+
         if (!crypto.timingSafeEqual(sessionBuffer, requestBuffer)) {
             return res.status(403).json({
                 success: false,
@@ -117,12 +119,21 @@ function csrfTokenValidator(options = {}) {
             });
         }
         
-        // Optionally rotate token after successful validation
+        // Optionally rotate token after successful validation.
+        // Must call session.save() explicitly: with resave: false, express-session
+        // only auto-persists if the session was modified *before* the response is sent.
+        // Without save(), the rotated token lives only in memory and the next request
+        // will fail validation because the store still holds the old token.
         if (rotateToken) {
             req.session.csrfToken = generateCSRFToken();
             res.locals.csrfToken = req.session.csrfToken;
+            req.session.save((err) => {
+                if (err) return next(err);
+                next();
+            });
+            return; // prevent double-calling next()
         }
-        
+
         next();
     };
 }

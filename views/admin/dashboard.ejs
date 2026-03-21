@@ -395,9 +395,12 @@
             <i class="fas fa-history"></i> Activity Logs
         </a>
         <div class="dropdown-divider"></div>
-        <a href="/admin/logout" class="dropdown-item logout">
-            <i class="fas fa-sign-out-alt"></i> Logout
-        </a>
+        <form method="POST" action="/admin/logout" style="display:inline">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" class="dropdown-item logout">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </form>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>

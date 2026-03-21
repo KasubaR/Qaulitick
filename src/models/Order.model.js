@@ -8,6 +8,18 @@ const Order = sequelize.define('Order', {
         autoIncrement: true
     },
     orderNumber: { type: DataTypes.STRING(50), allowNull: false, unique: true },
+    userId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: { model: 'users', key: 'id' },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL'
+    },
+    checkoutMode: {
+        type: DataTypes.ENUM('standard', 'layby'),
+        allowNull: false,
+        defaultValue: 'standard'
+    },
     customer: { type: DataTypes.JSON, allowNull: false },
     shipping: { type: DataTypes.JSON, allowNull: true },
     paymentMethod: {

@@ -1,0 +1,41 @@
+<%- include('../partials/header', {
+    title: typeof title !== 'undefined' ? title : 'My account | Qualitick Collections',
+    page: 'account',
+    canonicalUrl: typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com/account',
+    url: '/account'
+}) %>
+
+<div class="account-page-wrap">
+    <div class="account-hero">
+        <h1>My account</h1>
+        <p>Welcome back<%= typeof customer !== 'undefined' && customer.name ? ', ' + customer.name : '' %>.</p>
+    </div>
+
+    <%- include('./_subnav') %>
+
+    <% if (typeof emailVerified !== 'undefined' && !emailVerified) { %>
+        <div class="account-alert account-alert--info" role="status">
+            Verify your email to use <strong>layby</strong> at checkout. Check your inbox for the verification link.
+        </div>
+    <% } %>
+
+    <div class="account-card">
+        <h2>Account summary</h2>
+        <dl class="account-dl">
+            <dt>Name</dt>
+            <dd><%= typeof customer !== 'undefined' && customer.name ? customer.name : '—' %></dd>
+            <dt>Email</dt>
+            <dd><%= typeof customer !== 'undefined' && customer.email ? customer.email : '—' %></dd>
+            <dt>Phone</dt>
+            <dd><%= typeof customer !== 'undefined' && customer.phone ? customer.phone : '—' %></dd>
+            <dt>Email status</dt>
+            <dd><%= typeof emailVerified !== 'undefined' && emailVerified ? 'Verified' : 'Not verified' %></dd>
+        </dl>
+        <div class="account-actions account-dashboard-actions">
+            <a class="account-btn-primary" href="/account/profile">Edit profile</a>
+            <a class="account-btn-secondary" href="/account/orders">View orders</a>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

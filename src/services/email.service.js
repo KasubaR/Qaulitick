@@ -918,6 +918,93 @@ async function sendPaymentNotificationToAdmin(payment, order = null) {
     }
 }
 
+/**
+ * Send email verification link to a new storefront account.
+ * @param {{ to: string, name: string, verifyUrl: string }} params
+ */
+async function sendCustomerEmailVerification({ to, name, verifyUrl }) {
+    const transporter = getTransporter();
+    if (!transporter) {
+        logger.warn('Cannot send verification email: transporter not configured');
+        return { success: false, error: 'Email service not configured' };
+    }
+
+    const safeName = esc(name);
+    const safeUrl = esc(verifyUrl);
+
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.5; color: #222;">
+            <p>Hi ${safeName},</p>
+            <p>Thanks for creating an account with Qualitick Collections. Please verify your email to unlock layby at checkout (when logged in).</p>
+            <p><a href="${safeUrl}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:4px;">Verify email</a></p>
+            <p>Or copy this link into your browser:<br><span style="word-break:break-all;">${safeUrl}</span></p>
+            <p>If you did not create an account, you can ignore this message.</p>
+        </body>
+        </html>
+    `;
+
+    try {
+        const info = await transporter.sendMail({
+            from: `"Qualitick Collections" <${process.env.GMAIL_USER}>`,
+            to,
+            subject: 'Verify your email — Qualitick Collections',
+            html
+        });
+        logger.info({ messageId: info.messageId }, 'Customer verification email sent');
+        return { success: true, messageId: info.messageId };
+    } catch (error) {
+        logger.error({ err: error }, 'Error sending customer verification email');
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * @param {{ to: string, name: string, resetUrl: string }} params
+ */
+async function sendCustomerPasswordResetEmail({ to, name, resetUrl }) {
+    const transporter = getTransporter();
+    if (!transporter) {
+        logger.warn('Cannot send password reset email: transporter not configured');
+        return { success: false, error: 'Email service not configured' };
+    }
+
+    const safeName = esc(name);
+    const safeUrl = esc(resetUrl);
+    const expiryNote = `This link expires in ${parseInt(process.env.PASSWORD_RESET_EXPIRY_MINUTES || '60', 10)} minutes.`;
+
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.5; color: #222;">
+            <p>Hi ${safeName},</p>
+            <p>We received a request to reset your Qualitick Collections account password.</p>
+            <p><a href="${safeUrl}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:4px;">Reset password</a></p>
+            <p>Or copy this link into your browser:<br><span style="word-break:break-all;">${safeUrl}</span></p>
+            <p>${esc(expiryNote)}</p>
+            <p>If you did not request this, you can ignore this email. Your password will not change.</p>
+        </body>
+        </html>
+    `;
+
+    try {
+        const info = await transporter.sendMail({
+            from: `"Qualitick Collections" <${process.env.GMAIL_USER}>`,
+            to,
+            subject: 'Reset your password — Qualitick Collections',
+            html
+        });
+        logger.info({ messageId: info.messageId }, 'Password reset email sent');
+        return { success: true, messageId: info.messageId };
+    } catch (error) {
+        logger.error({ err: error }, 'Error sending password reset email');
+        return { success: false, error: error.message };
+    }
+}
+
 module.exports = {
     sendContactNotificationToAdmin,
     sendContactConfirmationToUser,
@@ -925,6 +1012,8 @@ module.exports = {
     sendOrderNotificationToAdmin,
     sendLowStockNotificationToAdmin,
     sendPaymentNotificationToAdmin,
+    sendCustomerEmailVerification,
+    sendCustomerPasswordResetEmail,
     verifyTransporter
 };
 

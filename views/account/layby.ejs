@@ -1,0 +1,90 @@
+<%- include('../partials/header', {
+    title: typeof title !== 'undefined' ? title : 'Layby plans | Qualitick Collections',
+    page: 'account',
+    canonicalUrl: typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com/account/layby',
+    url: '/account/layby'
+}) %>
+
+<script type="application/json" id="account-layby-customer"><%- JSON.stringify(typeof payCustomerInfo !== 'undefined' ? payCustomerInfo : {}) %></script>
+
+<div class="account-page-wrap">
+    <div class="account-hero">
+        <h1>Layby plans</h1>
+        <p>Track deposits, installments, and balances.</p>
+    </div>
+
+    <%- include('./_subnav') %>
+
+    <% if (typeof error !== 'undefined' && error) { %>
+        <div class="account-alert account-alert--error" role="alert"><%= error %></div>
+    <% } %>
+
+    <% if (typeof plans === 'undefined' || !plans.length) { %>
+        <p class="account-empty">You have no layby plans yet. Complete checkout with layby (verified email required) to see plans here.</p>
+    <% } else { %>
+        <% plans.forEach(function(plan) { %>
+            <% var ot = Number(plan.orderTotal); var br = Number(plan.balanceRemaining); var paid = ot > 0 ? Math.max(0, ot - br) : 0; %>
+            <div class="layby-plan-block" data-plan-id="<%= plan.id %>">
+                <h3>Order <%= plan.order && plan.order.orderNumber ? plan.order.orderNumber : ('#' + plan.orderId) %></h3>
+                <div class="layby-plan-meta">
+                    Status: <strong><%= plan.status %></strong>
+                    · Total <%= plan.orderTotal %> <%= plan.currency %>
+                    · Balance <%= plan.balanceRemaining %> <%= plan.currency %>
+                    <% if (plan.nextDueAt) { %>
+                        · Next due <%= new Date(plan.nextDueAt).toLocaleDateString() %>
+                    <% } %>
+                </div>
+                <% if (ot > 0) { %>
+                    <div class="layby-progress-wrap">
+                        <label class="layby-progress-label" for="layby-meter-<%= plan.id %>">Paid toward total</label>
+                        <meter id="layby-meter-<%= plan.id %>" class="layby-progress-meter" min="0" max="<%= ot %>" value="<%= paid %>"></meter>
+                        <span class="layby-progress-caption"><%= paid.toFixed(2) %> / <%= ot.toFixed(2) %> <%= plan.currency %></span>
+                    </div>
+                <% } %>
+                <% if (plan.laybyPayments && plan.laybyPayments.length) { %>
+                    <ul class="layby-payments-list">
+                        <% plan.laybyPayments.forEach(function(p) { %>
+                            <li>
+                                <span>
+                                    #<%= p.sequence %> — <%= p.status %><% if (p.dueAt) { %> (due <%= new Date(p.dueAt).toLocaleDateString() %>)<% } %>
+                                    <% if (p.payment) { %>
+                                        <span class="layby-payment-ref"> · Payment <%= p.payment.status %><% if (p.payment.lencoReference) { %> (<%= p.payment.lencoReference %>)<% } %></span>
+                                    <% } %>
+                                </span>
+                                <span><%= p.amount %> <%= plan.currency %></span>
+                            </li>
+                        <% }); %>
+                    </ul>
+                <% } %>
+                <% if (plan.status === 'active') { %>
+                    <div class="account-card account-form account-layby-pay-block">
+                        <div class="form-group">
+                            <label for="layby-provider-<%= plan.id %>">Mobile money provider</label>
+                            <select id="layby-provider-<%= plan.id %>" class="account-layby-provider" autocomplete="off">
+                                <option value="">Select provider</option>
+                                <option value="airtel">Airtel Money</option>
+                                <option value="mtn">MTN Mobile Money</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="layby-phone-<%= plan.id %>">Number to charge</label>
+                            <input type="tel" id="layby-phone-<%= plan.id %>" class="account-layby-phone" inputmode="tel" autocomplete="tel" value="<%= typeof payCustomerInfo !== 'undefined' && payCustomerInfo.phone ? payCustomerInfo.phone : '' %>">
+                        </div>
+                        <button type="button" class="account-btn-secondary account-layby-pay-btn">Pay next installment</button>
+                        <p class="account-layby-pay-status" aria-live="polite"></p>
+                        <div class="account-layby-pay-followup account-layby-pay-followup--hidden">
+                            <p class="account-layby-pay-followup-text"></p>
+                            <p class="account-layby-pay-url-wrap account-layby-pay-url-wrap--hidden">
+                                <a class="account-layby-pay-url" href="#" target="_blank" rel="noopener noreferrer">Open payment page</a>
+                            </p>
+                            <pre class="account-layby-pay-instructions account-layby-pay-instructions--hidden"></pre>
+                        </div>
+                    </div>
+                <% } %>
+            </div>
+        <% }); %>
+    <% } %>
+</div>
+
+<script src="/js/account-layby.js"></script>
+<%- include('../partials/footer') %>

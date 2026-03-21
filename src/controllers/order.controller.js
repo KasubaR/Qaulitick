@@ -5,6 +5,9 @@ const { sequelize } = require('../config/mysql');
 const Order = require('../models/Order.model');
 const Payment = require('../models/Payment.model');
 const Product = require('../models/Product.model');
+const User = require('../models/User.model');
+const LaybyPlan = require('../models/LaybyPlan.model');
+const LaybyPayment = require('../models/LaybyPayment.model');
 const orderService = require('../services/order.service');
 const logger = require('../utils/logger').child({ module: 'OrderController' });
 
@@ -28,7 +31,7 @@ async function enrichOrderWithPaymentStatus(order) {
     const orderObj = order.toJSON();
     
     // Find payment for this order (Payment model is source of truth)
-    const payment = await Payment.findByOrderNumber(orderObj.orderNumber);
+    const payment = await Payment.findLatestPaymentByOrderNumber(orderObj.orderNumber);
     
     // Use payment status from Payment model if available
     if (payment) {
@@ -59,8 +62,12 @@ exports.createOrder = async (req, res) => {
             paymentMethod,
             items,
             totals,
-            coupon
+            coupon,
+            checkoutMode: rawCheckoutMode,
+            laybyDepositPercent: rawLaybyDepositPercent
         } = sanitizedBody;
+
+        const checkoutMode = rawCheckoutMode === 'layby' ? 'layby' : 'standard';
         
         // Debug-level log (no request body / no customer PII)
         logger.debug({ sanitizedItemCount: Array.isArray(items) ? items.length : 0 }, 'Order items after sanitization');
@@ -152,8 +159,26 @@ exports.createOrder = async (req, res) => {
             const couponDiscount = 0;
             const total = calculateTotal(subtotal, couponDiscount, deliveryFee);
 
+            const loggedUserId = req.session && req.session.userId ? parseInt(req.session.userId, 10) : null;
+
+            if (checkoutMode === 'layby') {
+                if (!loggedUserId) {
+                    const err = new Error('Sign in with a verified email to use layby.');
+                    err.statusCode = 403;
+                    throw err;
+                }
+                const user = await User.findByPk(loggedUserId, { transaction: t });
+                if (!user || !user.emailVerifiedAt) {
+                    const err = new Error('Verify your email to use layby at checkout.');
+                    err.statusCode = 403;
+                    throw err;
+                }
+            }
+
             const orderData = {
                 orderNumber: `TEMP-${crypto.randomUUID()}`, // replaced immediately below
+                userId: loggedUserId,
+                checkoutMode,
                 customer: {
                     name: customer.name,
                     phone: customer.phone,
@@ -214,12 +239,38 @@ exports.createOrder = async (req, res) => {
             const created = await Order.create(orderData, { transaction: t });
             const orderNumber = `ORD-${String(created.id).padStart(6, '0')}`;
             await created.update({ orderNumber }, { transaction: t });
+
+            if (checkoutMode === 'layby') {
+                const laybyService = require('../services/layby.service');
+                await laybyService.createLaybyPlanAndPayments({
+                    order: created,
+                    userId: loggedUserId,
+                    depositPercentInput: rawLaybyDepositPercent,
+                    transaction: t
+                });
+            }
+
             return created;
         });
 
         const orderNumber = order.orderNumber;
-        logger.info({ orderNumber }, 'Order created');
+        logger.info({ orderNumber, checkoutMode }, 'Order created');
         logger.debug({ orderNumber }, 'Stock validation passed for all items');
+
+        let laybyPaymentId = null;
+        let laybyFirstAmount = null;
+        if (checkoutMode === 'layby') {
+            const plan = await LaybyPlan.findOne({ where: { orderId: order.id } });
+            if (plan) {
+                const first = await LaybyPayment.findOne({
+                    where: { laybyPlanId: plan.id, sequence: 1 }
+                });
+                if (first) {
+                    laybyPaymentId = first.id;
+                    laybyFirstAmount = Number(first.amount);
+                }
+            }
+        }
 
         // Send new order notification to admin (if enabled)
         try {
@@ -235,13 +286,23 @@ exports.createOrder = async (req, res) => {
             success: true,
             orderNumber: order.orderNumber,
             order: order.toJSON(),
-            message: 'Order created successfully'
+            message: 'Order created successfully',
+            checkoutMode,
+            laybyPaymentId,
+            laybyFirstAmount
         });
     } catch (error) {
         logger.error({ err: error }, 'Error creating order');
 
         if (error.statusCode === 409) {
             return res.status(409).json({
+                success: false,
+                message: error.message
+            });
+        }
+
+        if (error.statusCode === 403) {
+            return res.status(403).json({
                 success: false,
                 message: error.message
             });
@@ -559,7 +620,7 @@ exports.verifyOrderPayment = async (req, res) => {
 
         // Find payment record for this order
         const Payment = require('../models/Payment.model');
-        let payment = await Payment.findByOrderNumber(orderNumber);
+        let payment = await Payment.findLatestPaymentByOrderNumber(orderNumber);
         
         if (!payment) {
             return res.status(404).json({

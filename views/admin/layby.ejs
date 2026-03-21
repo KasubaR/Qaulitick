@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Layby plans | Admin Panel</title>
+    <% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
+        <meta name="csrf-token" content="<%= csrfToken %>">
+    <% } %>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
+    <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
+    <link rel="stylesheet" href="/css/admin/admin-professional.css">
+    <link rel="stylesheet" href="/css/admin/admin-components.css">
+    <link rel="stylesheet" href="/css/admin/admin-responsive.css">
+    <link rel="stylesheet" href="/css/admin/dashboard.css">
+    <link rel="stylesheet" href="/css/admin/orders.css">
+    <link rel="stylesheet" href="/css/admin/layby.css">
+</head>
+<body class="admin-page">
+    <div class="admin-container">
+        <%- include('../partials/admin-sidebar', { activePage: 'layby' }) %>
+
+        <main class="admin-main">
+            <header class="admin-header">
+                <div class="header-left">
+                    <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Toggle sidebar">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 class="page-title">Layby plans</h1>
+                </div>
+                <div class="header-right">
+                    <button class="btn-outline" id="refreshBtn" type="button">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </header>
+
+            <div class="orders-content">
+                <div class="orders-toolbar">
+                    <div class="search-section">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="laybySearch" placeholder="Search by order number…" autocomplete="off">
+                            <button class="search-btn" id="searchBtn" type="button">Search</button>
+                        </div>
+                    </div>
+                    <div class="filters-section">
+                        <div class="filter-group">
+                            <label for="filterPlanStatus">Plan status</label>
+                            <select id="filterPlanStatus" class="filter-select">
+                                <option value="">All</option>
+                                <option value="active">Active</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <button class="btn-outline" id="clearFiltersBtn" type="button">
+                            <i class="fas fa-times"></i> Clear
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-header">
+                        <div class="table-info">
+                            <span id="laybyCount">0</span> plans
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="admin-table" id="laybyTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Order</th>
+                                    <th>Customer</th>
+                                    <th>Status</th>
+                                    <th>Balance</th>
+                                    <th>Total</th>
+                                    <th>Next due</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="laybyBody">
+                                <tr>
+                                    <td colspan="8" class="empty-state">Loading…</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="pagination" id="pagination">
+                        <button class="pagination-btn" id="prevPage" type="button" disabled>
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </button>
+                        <div class="pagination-info">
+                            <span id="pageInfo">Page 1</span>
+                        </div>
+                        <button class="pagination-btn" id="nextPage" type="button" disabled>
+                            Next <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/admin/auth-utils.js"></script>
+    <script src="/js/admin/sidebar.js"></script>
+    <script src="/js/admin/orders-badge.js"></script>
+    <script src="/js/admin/admin-layby.api.js"></script>
+    <script src="/js/admin/layby-list.js"></script>
+</body>
+</html>

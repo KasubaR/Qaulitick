@@ -4,6 +4,7 @@
 const adminService = require('../services/admin.service');
 const { validateSecretToken } = require('../middlewares/auth.middleware');
 const { sanitizeObject } = require('../utils/validators');
+const { cookieName: sessionCookieName } = require('../config/session.constants');
 
 /**
  * Render login page (validates secret URL first)
@@ -164,10 +165,11 @@ exports.handleLogout = async (req, res) => {
             }
             
             // Clear session cookie
-            res.clearCookie('admin.sid', {
+            res.clearCookie(sessionCookieName, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict'
+                sameSite: 'strict',
+                path: '/'
             });
             
             // Redirect to home page
@@ -176,7 +178,7 @@ exports.handleLogout = async (req, res) => {
     } catch (error) {
         console.error('[Auth Controller] Error handling logout:', error);
         // Clear cookie and redirect even on error
-        res.clearCookie('admin.sid');
+        res.clearCookie(sessionCookieName, { path: '/' });
         res.redirect('/');
     }
 };

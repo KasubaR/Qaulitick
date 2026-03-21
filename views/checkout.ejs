@@ -1,5 +1,7 @@
 <%- include('partials/header', {title: 'Checkout | Qualitick Collections', page: 'checkout'}) %>
 
+    <div id="checkout-auth-context" class="checkout-auth-context" data-logged-in="<%= typeof loggedIn !== 'undefined' && loggedIn ? 'true' : 'false' %>" data-layby-eligible="<%= typeof laybyEligible !== 'undefined' && laybyEligible ? 'true' : 'false' %>" aria-hidden="true"></div>
+
     <!-- BREADCRUMB -->
     <div class="breadcrumb">
         <div class="breadcrumb-container">
@@ -74,8 +76,8 @@
                                 </label>
                             </div>
 
-                            <div class="login-prompt" id="loginPrompt" style="display: none;">
-                                <p>Already have an account? <a href="#" id="loginLink">Log in</a></p>
+                            <div class="login-prompt login-prompt--hidden" id="loginPrompt">
+                                <p>Already have an account? <a href="/login?returnUrl=/checkout" id="loginLink">Log in</a></p>
                             </div>
                         </div>
 
@@ -151,6 +153,36 @@
 
                             <div class="delivery-fee-display" id="deliveryFeeDisplay" style="display: none;">
                                 <p>Estimated Delivery Fee: <strong id="deliveryFeeAmount">K0</strong></p>
+                            </div>
+                        </div>
+
+                        <!-- Layby (verified account only; amounts computed server-side) -->
+                        <div id="laybyCheckoutSection" class="form-section layby-checkout-section layby-checkout-section--hidden">
+                            <h2 class="section-title">
+                                <i class="fas fa-calendar-alt"></i> Payment schedule
+                            </h2>
+                            <p class="layby-checkout-intro">Pay a deposit now and the rest in weekly installments. Deposit percentage is chosen below; amounts are calculated on the server.</p>
+                            <div class="form-group layby-mode-options">
+                                <label class="checkbox-label layby-radio-label">
+                                    <input type="radio" name="checkoutMode" value="standard" id="checkoutModeStandard" checked>
+                                    <span>Pay in full today</span>
+                                </label>
+                                <label class="checkbox-label layby-radio-label">
+                                    <input type="radio" name="checkoutMode" value="layby" id="checkoutModeLayby">
+                                    <span>Layby (deposit + installments)</span>
+                                </label>
+                            </div>
+                            <div id="laybyDepositWrap" class="form-group layby-deposit-wrap layby-deposit-wrap--hidden">
+                                <label for="laybyDepositPercent">Deposit (%)</label>
+                                <select id="laybyDepositPercent" name="laybyDepositPercent" class="form-input">
+                                    <option value="20">20%</option>
+                                    <option value="25">25%</option>
+                                    <option value="30" selected>30%</option>
+                                    <option value="35">35%</option>
+                                    <option value="40">40%</option>
+                                    <option value="45">45%</option>
+                                    <option value="50">50%</option>
+                                </select>
                             </div>
                         </div>
 

@@ -1,0 +1,205 @@
+const { Order, LaybyPlan, LaybyPayment, Payment } = require('../models');
+const userService = require('../services/user.service');
+const { sanitizeObject, validatePhone } = require('../utils/validators');
+const logger = require('../utils/logger').child({ module: 'CustomerAccountController' });
+
+exports.renderDashboard = (req, res) => {
+    const u = req.customerUser.toJSON();
+    res.render('account/dashboard', {
+        title: 'My account | Qualitick Collections',
+        page: 'account',
+        accountSection: 'dashboard',
+        customer: u,
+        emailVerified: !!u.emailVerifiedAt
+    });
+};
+
+exports.renderProfile = (req, res) => {
+    const u = req.customerUser.toJSON();
+    res.render('account/profile', {
+        title: 'Profile | Qualitick Collections',
+        page: 'account',
+        accountSection: 'profile',
+        customer: u,
+        error: null,
+        message: null,
+        csrfToken: res.locals.csrfToken || ''
+    });
+};
+
+exports.updateProfile = async (req, res) => {
+    try {
+        const body = sanitizeObject(req.body);
+        const nameOk = body.name && typeof body.name === 'string' && body.name.trim().length >= 2;
+        if (!nameOk) {
+            return res.status(400).render('account/profile', {
+                title: 'Profile | Qualitick Collections',
+                page: 'account',
+                accountSection: 'profile',
+                customer: req.customerUser.toJSON(),
+                error: 'Name must be at least 2 characters.',
+                message: null,
+                csrfToken: res.locals.csrfToken || ''
+            });
+        }
+        if (body.phone && typeof body.phone === 'string' && body.phone.trim() && !validatePhone(body.phone)) {
+            return res.status(400).render('account/profile', {
+                title: 'Profile | Qualitick Collections',
+                page: 'account',
+                accountSection: 'profile',
+                customer: req.customerUser.toJSON(),
+                error: 'Please enter a valid Zambian phone number.',
+                message: null,
+                csrfToken: res.locals.csrfToken || ''
+            });
+        }
+
+        await userService.updateProfile(req.customerUser.id, {
+            name: body.name,
+            phone: body.phone
+        });
+        const refreshed = await userService.findById(req.customerUser.id);
+        req.customerUser = refreshed;
+
+        res.render('account/profile', {
+            title: 'Profile | Qualitick Collections',
+            page: 'account',
+            accountSection: 'profile',
+            customer: refreshed.toJSON(),
+            error: null,
+            message: 'Profile updated.',
+            csrfToken: res.locals.csrfToken || ''
+        });
+    } catch (error) {
+        logger.error({ err: error }, 'updateProfile failed');
+        res.status(500).render('account/profile', {
+            title: 'Profile | Qualitick Collections',
+            page: 'account',
+            accountSection: 'profile',
+            customer: req.customerUser.toJSON(),
+            error: 'Could not update profile. Try again later.',
+            message: null,
+            csrfToken: res.locals.csrfToken || ''
+        });
+    }
+};
+
+exports.renderOrders = async (req, res) => {
+    try {
+        const orders = await Order.findAll({
+            where: { userId: req.customerUser.id },
+            order: [['createdAt', 'DESC']],
+            limit: 100
+        });
+        res.render('account/orders', {
+            title: 'Order history | Qualitick Collections',
+            page: 'account',
+            accountSection: 'orders',
+            orders: orders.map((o) => o.toJSON())
+        });
+    } catch (error) {
+        logger.error({ err: error }, 'renderOrders failed');
+        res.status(500).render('account/orders', {
+            title: 'Order history | Qualitick Collections',
+            page: 'account',
+            accountSection: 'orders',
+            orders: [],
+            error: 'Could not load orders.'
+        });
+    }
+};
+
+exports.renderLayby = async (req, res) => {
+    try {
+        const plans = await LaybyPlan.findAll({
+            where: { userId: req.customerUser.id },
+            include: [
+                {
+                    model: LaybyPayment,
+                    as: 'laybyPayments',
+                    separate: true,
+                    order: [['sequence', 'ASC']],
+                    include: [
+                        {
+                            model: Payment,
+                            as: 'payment',
+                            required: false,
+                            attributes: ['id', 'status', 'lencoReference', 'transactionId', 'createdAt']
+                        }
+                    ]
+                },
+                { model: Order, as: 'order', attributes: ['id', 'orderNumber', 'status', 'paymentStatus', 'createdAt'] }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+        const cu = req.customerUser.toJSON();
+        res.render('account/layby', {
+            title: 'Layby plans | Qualitick Collections',
+            page: 'account',
+            accountSection: 'layby',
+            plans: plans.map((p) => p.toJSON()),
+            csrfToken: res.locals.csrfToken || '',
+            payCustomerInfo: {
+                name: cu.name || '',
+                email: cu.email || '',
+                phone: cu.phone || ''
+            }
+        });
+    } catch (error) {
+        logger.error({ err: error }, 'renderLayby failed');
+        res.status(500).render('account/layby', {
+            title: 'Layby plans | Qualitick Collections',
+            page: 'account',
+            accountSection: 'layby',
+            plans: [],
+            csrfToken: res.locals.csrfToken || '',
+            payCustomerInfo: { name: '', email: '', phone: '' },
+            error: 'Could not load layby plans.'
+        });
+    }
+};
+
+/**
+ * Returns next pending installment metadata for future payment integration (Lenco).
+ */
+exports.startLaybyPayment = async (req, res) => {
+    try {
+        const planId = parseInt(req.params.id, 10);
+        if (Number.isNaN(planId)) {
+            return res.status(400).json({ success: false, message: 'Invalid plan id' });
+        }
+
+        const plan = await LaybyPlan.findOne({
+            where: { id: planId, userId: req.customerUser.id },
+            include: [{ model: Order, as: 'order', attributes: ['orderNumber'] }]
+        });
+
+        if (!plan) {
+            return res.status(404).json({ success: false, message: 'Layby plan not found' });
+        }
+        if (plan.status !== 'active') {
+            return res.status(400).json({ success: false, message: 'This layby plan is not active' });
+        }
+
+        const nextPayment = await LaybyPayment.findOne({
+            where: { laybyPlanId: plan.id, status: 'pending' },
+            order: [['sequence', 'ASC']]
+        });
+
+        if (!nextPayment) {
+            return res.status(400).json({ success: false, message: 'No pending payment for this plan' });
+        }
+
+        const orderRow = plan.order;
+        return res.json({
+            success: true,
+            laybyPaymentId: nextPayment.id,
+            orderNumber: orderRow ? orderRow.orderNumber : null,
+            amount: Number(nextPayment.amount),
+            currency: plan.currency
+        });
+    } catch (error) {
+        logger.error({ err: error }, 'startLaybyPayment failed');
+        return res.status(500).json({ success: false, message: 'Server error' });
+    }
+};

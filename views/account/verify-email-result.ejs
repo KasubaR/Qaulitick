@@ -1,0 +1,24 @@
+<%- include('../partials/header', {
+    title: typeof title !== 'undefined' ? title : 'Email verification | Qualitick Collections',
+    page: 'account',
+    canonicalUrl: typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com/verify-email',
+    url: '/verify-email'
+}) %>
+
+<div class="account-page-wrap">
+    <div class="account-hero">
+        <h1>Email verification</h1>
+    </div>
+
+    <div class="account-card">
+        <% if (typeof success !== 'undefined' && success) { %>
+            <div class="account-alert account-alert--success" role="status"><%= typeof message !== 'undefined' ? message : 'Your email is verified.' %></div>
+            <p class="account-auth-switch"><a href="/login">Sign in</a> or go to <a href="/checkout">checkout</a> for layby (when logged in).</p>
+        <% } else { %>
+            <div class="account-alert account-alert--error" role="alert"><%= typeof message !== 'undefined' ? message : 'Verification failed.' %></div>
+            <p class="account-auth-switch"><a href="/register">Create an account</a> or <a href="/login">sign in</a> for help.</p>
+        <% } %>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Layby plan | Admin Panel</title>
+    <% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
+        <meta name="csrf-token" content="<%= csrfToken %>">
+    <% } %>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
+    <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
+    <link rel="stylesheet" href="/css/admin/admin-professional.css">
+    <link rel="stylesheet" href="/css/admin/admin-components.css">
+    <link rel="stylesheet" href="/css/admin/admin-responsive.css">
+    <link rel="stylesheet" href="/css/admin/dashboard.css">
+    <link rel="stylesheet" href="/css/admin/orders.css">
+    <link rel="stylesheet" href="/css/admin/layby.css">
+</head>
+<body class="admin-page">
+    <div class="admin-container">
+        <%- include('../partials/admin-sidebar', { activePage: 'layby' }) %>
+
+        <main class="admin-main" id="laybyDetailMain" data-plan-id="<%= typeof planId !== 'undefined' ? planId : '' %>">
+            <header class="admin-header">
+                <div class="header-left">
+                    <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Toggle sidebar">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 class="page-title">Layby plan #<span id="detailPlanIdLabel"><%= typeof planId !== 'undefined' ? planId : '' %></span></h1>
+                </div>
+                <div class="header-right">
+                    <a class="btn-outline" href="/admin/layby"><i class="fas fa-arrow-left"></i> All plans</a>
+                    <button class="btn-outline" id="refreshDetailBtn" type="button">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </header>
+
+            <div id="laybyDetailError" class="layby-detail-alert layby-detail-alert--error layby-detail-alert--hidden" role="alert"></div>
+
+            <div id="laybyDetailContent" class="layby-detail-content layby-detail-content--hidden">
+                <section class="layby-detail-summary table-card">
+                    <h2 class="layby-detail-section-title">Summary</h2>
+                    <dl class="layby-detail-dl">
+                        <dt>Order</dt>
+                        <dd id="summaryOrderNumber">—</dd>
+                        <dt>Checkout</dt>
+                        <dd id="summaryCheckout">—</dd>
+                        <dt>Customer</dt>
+                        <dd id="summaryCustomer">—</dd>
+                        <dt>Plan status</dt>
+                        <dd id="summaryPlanStatus">—</dd>
+                        <dt>Balance / total</dt>
+                        <dd id="summaryBalance">—</dd>
+                        <dt>Next due</dt>
+                        <dd id="summaryNextDue">—</dd>
+                    </dl>
+                    <div class="layby-detail-status-row">
+                        <label for="planStatusSelect">Update plan status</label>
+                        <select id="planStatusSelect" class="filter-select">
+                            <option value="active">active</option>
+                            <option value="completed">completed</option>
+                            <option value="cancelled">cancelled</option>
+                        </select>
+                        <button type="button" class="btn-primary" id="savePlanStatusBtn">Save status</button>
+                    </div>
+                    <p class="layby-detail-hint">Completed requires zero balance. Cancel only from active. Reactivate only from cancelled.</p>
+                </section>
+
+                <section class="table-card layby-installments-section">
+                    <h2 class="layby-detail-section-title">Installments</h2>
+                    <div class="table-container">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Amount</th>
+                                    <th>Due</th>
+                                    <th>Status</th>
+                                    <th>Admin confirmed</th>
+                                    <th>Linked payment</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="installmentsBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/admin/auth-utils.js"></script>
+    <script src="/js/admin/sidebar.js"></script>
+    <script src="/js/admin/orders-badge.js"></script>
+    <script src="/js/admin/admin-layby.api.js"></script>
+    <script src="/js/admin/layby-detail.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+<nav class="account-subnav" aria-label="Account sections">
+    <a href="/account" class="account-subnav-link <%= typeof accountSection !== 'undefined' && accountSection === 'dashboard' ? 'is-active' : '' %>">Dashboard</a>
+    <a href="/account/orders" class="account-subnav-link <%= typeof accountSection !== 'undefined' && accountSection === 'orders' ? 'is-active' : '' %>">Orders</a>
+    <a href="/account/layby" class="account-subnav-link <%= typeof accountSection !== 'undefined' && accountSection === 'layby' ? 'is-active' : '' %>">Layby</a>
+    <a href="/account/profile" class="account-subnav-link <%= typeof accountSection !== 'undefined' && accountSection === 'profile' ? 'is-active' : '' %>">Profile</a>
+    <form class="account-subnav-logout" method="post" action="/logout">
+        <input type="hidden" name="csrfToken" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <button type="submit" class="account-subnav-logout-btn">Sign out</button>
+    </form>
+</nav>

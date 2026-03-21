@@ -82,6 +82,10 @@ require('./FeaturedProduct.model');
 require('./ContactSubmission.model');
 require('./Settings.model');
 require('./Admin.model');
+require('./User.model');
+require('./PasswordResetToken.model');
+require('./LaybyPlan.model');
+require('./LaybyPayment.model');
 
 const Product = require('./Product.model');
 const Order = require('./Order.model');
@@ -91,8 +95,30 @@ const FeaturedProduct = require('./FeaturedProduct.model');
 const ContactSubmission = require('./ContactSubmission.model');
 const Settings = require('./Settings.model');
 const Admin = require('./Admin.model');
+const User = require('./User.model');
+const PasswordResetToken = require('./PasswordResetToken.model');
+const LaybyPlan = require('./LaybyPlan.model');
+const LaybyPayment = require('./LaybyPayment.model');
 
-[Product, Order, Payment, FlashSale, FeaturedProduct, ContactSubmission, Settings, Admin].forEach(addMongooseCompat);
+User.hasMany(Order, { foreignKey: 'userId', as: 'orders' });
+Order.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+User.hasMany(PasswordResetToken, { foreignKey: 'userId', as: 'passwordResetTokens' });
+PasswordResetToken.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+User.hasMany(LaybyPlan, { foreignKey: 'userId', as: 'laybyPlans' });
+LaybyPlan.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+Order.hasOne(LaybyPlan, { foreignKey: 'orderId', as: 'laybyPlan' });
+LaybyPlan.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
+
+LaybyPlan.hasMany(LaybyPayment, { foreignKey: 'laybyPlanId', as: 'laybyPayments' });
+LaybyPayment.belongsTo(LaybyPlan, { foreignKey: 'laybyPlanId', as: 'laybyPlan' });
+
+Payment.hasMany(LaybyPayment, { foreignKey: 'paymentId', as: 'laybyInstallments' });
+LaybyPayment.belongsTo(Payment, { foreignKey: 'paymentId', as: 'payment' });
+
+[Product, Order, Payment, FlashSale, FeaturedProduct, ContactSubmission, Settings, Admin, User, PasswordResetToken, LaybyPlan, LaybyPayment].forEach(addMongooseCompat);
 
 module.exports = {
     Product,
@@ -102,5 +128,9 @@ module.exports = {
     FeaturedProduct,
     ContactSubmission,
     Settings,
-    Admin
+    Admin,
+    User,
+    PasswordResetToken,
+    LaybyPlan,
+    LaybyPayment
 };

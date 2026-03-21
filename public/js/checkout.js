@@ -22,12 +22,37 @@ window.addEventListener('pageshow', (e) => {
 });
 
 // Initialize checkout page
+function setupLaybyCheckoutSection() {
+    const ctx = document.getElementById('checkout-auth-context');
+    const section = document.getElementById('laybyCheckoutSection');
+    const depositWrap = document.getElementById('laybyDepositWrap');
+    if (!section) return;
+
+    if (ctx && ctx.dataset.laybyEligible === 'true') {
+        section.classList.remove('layby-checkout-section--hidden');
+    }
+
+    const radios = document.querySelectorAll('input[name="checkoutMode"]');
+    function syncDepositVisibility() {
+        const layby = document.getElementById('checkoutModeLayby');
+        if (!depositWrap || !layby) return;
+        if (layby.checked) {
+            depositWrap.classList.remove('layby-deposit-wrap--hidden');
+        } else {
+            depositWrap.classList.add('layby-deposit-wrap--hidden');
+        }
+    }
+    radios.forEach((r) => r.addEventListener('change', syncDepositVisibility));
+    syncDepositVisibility();
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     await loadCartItems();
     setupEventListeners();
     calculateDeliveryFee();
     updateOrderSummary();
     setupPaymentMethodSelection();
+    setupLaybyCheckoutSection();
 
     // Resume polling for a payment that was pending when the user navigated away
     const pendingTxId = sessionStorage.getItem(PENDING_TRANSACTION_KEY);
@@ -822,6 +847,9 @@ async function handleFormSubmit(e) {
         };
 
         // Prepare order data with server-validated prices
+        const checkoutModeRadio = document.querySelector('input[name="checkoutMode"]:checked');
+        const checkoutMode = checkoutModeRadio ? checkoutModeRadio.value : 'standard';
+
         const orderData = {
             customer: {
                 name: formData.get('fullName'),
@@ -838,8 +866,14 @@ async function handleFormSubmit(e) {
             },
             paymentMethod: ({ mobile: 'mobile_money', bank: 'bank_transfer' })[paymentMethod] || paymentMethod,
             items: validatedItems, // Use server-validated items
-            totals: validatedTotals // Use server-validated totals
+            totals: validatedTotals, // Use server-validated totals
+            checkoutMode
         };
+
+        if (checkoutMode === 'layby') {
+            const dep = document.getElementById('laybyDepositPercent');
+            orderData.laybyDepositPercent = dep ? dep.value : '30';
+        }
 
         // Debug: Log order data to verify structure
         console.log('[Checkout] Order data being sent:', {
@@ -929,6 +963,10 @@ async function processOrderWithLenco(orderData, formData) {
             customerInfo: orderData.customer,
             orderData: orderData // Include full order data for Lenco
         };
+
+        if (orderResult.laybyPaymentId) {
+            paymentData.laybyPaymentId = orderResult.laybyPaymentId;
+        }
 
         // Add payment method specific data
         if (paymentMethod === 'mobile_money') {

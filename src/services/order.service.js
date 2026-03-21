@@ -40,7 +40,7 @@ async function getOrdersForExport(filters = {}) {
                 const orderObj = order.toJSON();
                 
                 // Get payment status from Payment model
-                const payment = await Payment.findByOrderNumber(orderObj.orderNumber);
+                const payment = await Payment.findLatestPaymentByOrderNumber(orderObj.orderNumber);
                 if (payment) {
                     orderObj.paymentStatus = payment.status;
                     orderObj.paymentTransactionId = payment.transactionId || payment.lencoTransactionId;

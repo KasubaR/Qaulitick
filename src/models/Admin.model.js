@@ -60,7 +60,8 @@ const Admin = sequelize.define('Admin', {
 });
 
 Admin.prototype.comparePassword = async function(candidatePassword) {
-    const admin = await Admin.scope('withPassword').findByPk(this.id);
+    const admin = await Admin.unscoped().findByPk(this.id, { attributes: ['password'] });
+    if (!admin || !admin.password) return false;
     return bcrypt.compare(candidatePassword, admin.password);
 };
 
