@@ -16,6 +16,17 @@ if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'developme
 const sessionStore = new SequelizeStore({ db: sequelizeInstance });
 sessionStore.sync(); // creates Sessions table if it doesn't exist
 
+/**
+ * Secure cookies: browsers only send them over HTTPS. In production, secure defaults to true.
+ * On cPanel (or any host) where you still use http://, set SESSION_COOKIE_SECURE=false until SSL is enabled.
+ * SESSION_COOKIE_SECURE=true forces secure cookies.
+ */
+function sessionCookieSecure() {
+    if (process.env.SESSION_COOKIE_SECURE === 'false') return false;
+    if (process.env.SESSION_COOKIE_SECURE === 'true') return true;
+    return process.env.NODE_ENV === 'production';
+}
+
 module.exports = session({
     store: sessionStore,
     secret: process.env.SESSION_SECRET || 'dev-secret-not-for-production-use',
@@ -24,7 +35,7 @@ module.exports = session({
     name: sessionCookieName,
     cookie: {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: sessionCookieSecure(),
         sameSite: 'strict',
         maxAge: parseInt(process.env.SESSION_MAX_AGE || '28800000', 10) // 8 hours
     },
