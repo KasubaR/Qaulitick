@@ -37,8 +37,7 @@ class AdminService {
                 adminData.name = name;
             }
 
-            const admin = new Admin(adminData);
-            await admin.save();
+            const admin = await Admin.create(adminData);
 
             // Return admin without password
             const adminObj = admin.toJSON();

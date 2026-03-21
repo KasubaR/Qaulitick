@@ -111,8 +111,9 @@ exports.handleLogin = async (req, res) => {
             });
         }
         
-        // Valid credentials - create admin session
-        req.session.adminId = admin._id.toString();
+        // Valid credentials - create admin session (Sequelize uses `id`; plain object may omit `_id`)
+        const adminPk = admin.id != null ? admin.id : admin._id;
+        req.session.adminId = String(adminPk);
         req.session.adminEmail = admin.email;
         req.session.adminName = admin.name || admin.email;
         
@@ -121,7 +122,7 @@ exports.handleLogin = async (req, res) => {
         
         // Update last login timestamp
         try {
-            await adminService.updateLastLogin(admin._id);
+            await adminService.updateLastLogin(adminPk);
         } catch (updateError) {
             // Log error but don't fail login if last login update fails
             console.error('[Auth Controller] Error updating last login:', updateError);
