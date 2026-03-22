@@ -445,7 +445,7 @@ async function initiateMobileMoneyPayment(orderData, customerPhone, provider, am
     const chargeAmount =
         amountOverride != null && !Number.isNaN(Number(amountOverride))
             ? Number(amountOverride)
-            : orderData.totals.total;
+            : Number(orderData.totals.total);
     
     log('info', 'Initiating mobile money payment', {
         orderNumber: orderData.orderNumber,
