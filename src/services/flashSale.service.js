@@ -129,6 +129,42 @@ class FlashSaleService {
     }
 
     /**
+     * Remove a product from all flash sales that reference it.
+     * Any sale that becomes empty as a result is ended immediately.
+     * Called after a product is deleted.
+     * @param {number} productId
+     * @returns {Promise<void>}
+     */
+    async removeDeletedProduct(productId) {
+        try {
+            const numId = toId(productId);
+            const sales = await FlashSale.findAll({
+                where: { status: ['active', 'scheduled'] }
+            });
+
+            for (const sale of sales) {
+                const raw = sale.productIds;
+                const ids = Array.isArray(raw)
+                    ? raw
+                    : (typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []);
+
+                if (!ids.map(toId).includes(numId)) continue;
+
+                const updated = ids.map(toId).filter(id => id !== numId);
+                if (updated.length === 0) {
+                    // No products left — end the sale so it stops showing
+                    await sale.update({ productIds: [], status: 'ended' });
+                } else {
+                    await sale.update({ productIds: updated });
+                }
+            }
+        } catch (error) {
+            console.error('[Flash Sale Service] Error removing deleted product from flash sales:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Get flash sales by status
      * @param {String} status - Status to filter by
      * @returns {Promise<Array>}

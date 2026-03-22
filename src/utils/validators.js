@@ -3,20 +3,14 @@
 const validator = require('validator');
 
 /**
- * Sanitize string input to prevent XSS attacks
- * @param {string} input - Input string to sanitize
- * @returns {string} - Sanitized string
+ * Normalize string input: type-check, trim, and cap length.
+ * NOT a security/XSS function — XSS prevention is at render/output time via EJS <%= %> escaping.
+ * @param {string} input
+ * @returns {string}
  */
 function sanitizeString(input) {
-    if (typeof input !== 'string') {
-        return String(input);
-    }
-    
-    return input
-        .replace(/[<>]/g, '') // Remove < and >
-        .replace(/javascript:/gi, '') // Remove javascript: protocol
-        .replace(/on\w+=/gi, '') // Remove event handlers (onclick, onerror, etc.)
-        .trim();
+    if (typeof input !== 'string') return '';
+    return input.trim().slice(0, 1000);
 }
 
 /**

@@ -28,9 +28,9 @@ const createTransporter = () => {
     
     // Allow insecure certificates in development (set via environment variable)
     // WARNING: Only use this in development. In production, fix SSL certificate issues properly.
-    if (process.env.NODE_ENV === 'development' || process.env.ALLOW_INSECURE_EMAIL === 'true') {
+    if (process.env.NODE_ENV !== 'production' && process.env.ALLOW_INSECURE_EMAIL === 'true') {
         tlsOptions.rejectUnauthorized = false;
-        logger.warn('WARNING: SSL certificate validation is disabled. This should only be used in development.');
+        logger.warn('SSL cert validation disabled. Development only.');
     }
 
     // Use explicit Gmail SMTP configuration for better reliability
@@ -42,19 +42,42 @@ const createTransporter = () => {
             user: gmailUser,
             pass: gmailPassword
         },
+        pool: true,
+        maxConnections: 5,
+        rateDelta: 1000,
+        rateLimit: 5,
         tls: Object.keys(tlsOptions).length > 0 ? tlsOptions : undefined
     });
 };
 
 // Lazy transporter: created on first use so env vars loaded after this module is
 // first imported (e.g. via dotenv in a different require order) are always visible.
+// A new transporter is created each time credentials are missing or after a
+// send failure so a stale/broken connection does not persist across restarts.
 let _transporter;
-let _transporterInitialized = false;
+
+function resetTransporter() {
+    if (_transporter) {
+        try { _transporter.close(); } catch (_) { /* ignore */ }
+    }
+    _transporter = null;
+}
 
 function getTransporter() {
-    if (!_transporterInitialized) {
-        _transporter = createTransporter();
-        _transporterInitialized = true;
+    if (!_transporter) {
+        const raw = createTransporter();
+        if (!raw) return null;
+        // Wrap sendMail so any transport-level error clears the cached instance,
+        // forcing a fresh connection on the next attempt.
+        _transporter = Object.create(raw);
+        _transporter.sendMail = async function(...args) {
+            try {
+                return await raw.sendMail.apply(raw, args);
+            } catch (err) {
+                resetTransporter();
+                throw err;
+            }
+        };
     }
     return _transporter;
 }
@@ -939,7 +962,7 @@ async function sendCustomerEmailVerification({ to, name, verifyUrl }) {
         <body style="font-family: Arial, sans-serif; line-height: 1.5; color: #222;">
             <p>Hi ${safeName},</p>
             <p>Thanks for creating an account with Qualitick Collections. Please verify your email to unlock layby at checkout (when logged in).</p>
-            <p><a href="${safeUrl}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:4px;">Verify email</a></p>
+            <p><a href="${verifyUrl}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:4px;">Verify email</a></p>
             <p>Or copy this link into your browser:<br><span style="word-break:break-all;">${safeUrl}</span></p>
             <p>If you did not create an account, you can ignore this message.</p>
         </body>
@@ -982,7 +1005,7 @@ async function sendCustomerPasswordResetEmail({ to, name, resetUrl }) {
         <body style="font-family: Arial, sans-serif; line-height: 1.5; color: #222;">
             <p>Hi ${safeName},</p>
             <p>We received a request to reset your Qualitick Collections account password.</p>
-            <p><a href="${safeUrl}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:4px;">Reset password</a></p>
+            <p><a href="${resetUrl}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:4px;">Reset password</a></p>
             <p>Or copy this link into your browser:<br><span style="word-break:break-all;">${safeUrl}</span></p>
             <p>${esc(expiryNote)}</p>
             <p>If you did not request this, you can ignore this email. Your password will not change.</p>

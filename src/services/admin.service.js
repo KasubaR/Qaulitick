@@ -1,4 +1,9 @@
+const bcrypt = require('bcrypt');
 const Admin = require('../models/Admin.model');
+
+// Pre-computed dummy hash used to keep response time constant when no admin
+// is found for the submitted email, preventing email enumeration via timing.
+const DUMMY_HASH = '$2b$10$invalidhashfortimingsafetynormXXXXXXXXXXXXXXXXXXXX';
 
 /**
  * Admin Service
@@ -39,10 +44,7 @@ class AdminService {
 
             const admin = await Admin.create(adminData);
 
-            // Return admin without password
-            const adminObj = admin.toJSON();
-            delete adminObj.password;
-            return adminObj;
+            return admin.toJSON();
         } catch (error) {
             console.error('[Admin Service] Error creating admin:', error);
             throw error;
@@ -77,26 +79,20 @@ class AdminService {
      */
     async validateAdminCredentials(email, password) {
         try {
-            // Find admin by email
             const admin = await this.findAdminByEmail(email);
-            
-            if (!admin) {
-                // Admin not found or inactive
+
+            // Always run bcrypt regardless of whether the admin exists.
+            // Returning early on a missing email leaks its existence via response
+            // timing (~0ms vs ~100ms for a real bcrypt comparison).
+            const isPasswordValid = admin
+                ? await admin.comparePassword(password)
+                : await bcrypt.compare(password, DUMMY_HASH);
+
+            if (!admin || !isPasswordValid) {
                 return null;
             }
 
-            // Compare password using the model's comparePassword method
-            const isPasswordValid = await admin.comparePassword(password);
-            
-            if (!isPasswordValid) {
-                // Password doesn't match
-                return null;
-            }
-
-            // Credentials are valid, return admin (password excluded)
-            const adminObj = admin.toJSON();
-            delete adminObj.password;
-            return adminObj;
+            return admin.toJSON();
         } catch (error) {
             console.error('[Admin Service] Error validating admin credentials:', error);
             throw error;
@@ -133,10 +129,7 @@ class AdminService {
                 return null;
             }
             
-            // Return admin without password
-            const adminObj = admin.toJSON();
-            delete adminObj.password;
-            return adminObj;
+            return admin.toJSON();
         } catch (error) {
             console.error('[Admin Service] Error getting admin by ID:', error);
             throw error;

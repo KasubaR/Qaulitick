@@ -1,5 +1,44 @@
 // Admin layby plan detail
 
+/**
+ * Show an in-page confirmation modal instead of window.confirm().
+ * Returns a Promise that resolves true (confirmed) or false (cancelled).
+ */
+function showConfirmModal(message) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirmModal');
+        const body  = document.getElementById('confirmModalBody');
+        const okBtn = document.getElementById('confirmModalOk');
+        const cancelBtn = document.getElementById('confirmModalCancel');
+        if (!modal || !body || !okBtn || !cancelBtn) {
+            // Fallback if markup is missing (should never happen)
+            resolve(false);
+            return;
+        }
+
+        body.textContent = message;
+        modal.style.display = 'flex';
+        okBtn.focus();
+
+        function cleanup(result) {
+            modal.style.display = 'none';
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+            modal.removeEventListener('keydown', onKey);
+            resolve(result);
+        }
+        function onOk()     { cleanup(true);  }
+        function onCancel() { cleanup(false); }
+        function onKey(e) {
+            if (e.key === 'Escape') cleanup(false);
+        }
+
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        modal.addEventListener('keydown', onKey);
+    });
+}
+
 function setupSidebar() {
     const currentPath = window.location.pathname;
     document.querySelectorAll('.nav-item').forEach((item) => {
@@ -89,17 +128,22 @@ function renderInstallments(rows, planStatus) {
     });
 }
 
+function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+}
+
 function fillSummary(plan) {
     const order = plan.order || {};
     const user = plan.user || {};
-    document.getElementById('detailPlanIdLabel').textContent = String(plan.id);
-    document.getElementById('summaryOrderNumber').textContent = order.orderNumber || '—';
-    document.getElementById('summaryCheckout').textContent = order.checkoutMode || '—';
+    setText('detailPlanIdLabel', String(plan.id));
+    setText('summaryOrderNumber', order.orderNumber || '—');
+    setText('summaryCheckout', order.checkoutMode || '—');
     const cust = [user.name, user.email].filter(Boolean).join(' · ');
-    document.getElementById('summaryCustomer').textContent = cust || '—';
-    document.getElementById('summaryPlanStatus').textContent = plan.status || '—';
-    document.getElementById('summaryBalance').textContent = `${plan.balanceRemaining} / ${plan.orderTotal} ${plan.currency || 'ZMW'}`;
-    document.getElementById('summaryNextDue').textContent = formatDate(plan.nextDueAt);
+    setText('summaryCustomer', cust || '—');
+    setText('summaryPlanStatus', plan.status || '—');
+    setText('summaryBalance', `${plan.balanceRemaining} / ${plan.orderTotal} ${plan.currency || 'ZMW'}`);
+    setText('summaryNextDue', formatDate(plan.nextDueAt));
 
     const sel = document.getElementById('planStatusSelect');
     if (sel && plan.status) {
@@ -158,7 +202,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!btn) return;
         const iid = parseInt(btn.getAttribute('data-installment-id'), 10);
         if (Number.isNaN(iid)) return;
-        const sure = window.confirm(
+        const sure = await showConfirmModal(
             'Record this installment as paid offline (cash / bank / in-store)? This cannot be undone.'
         );
         if (!sure) return;

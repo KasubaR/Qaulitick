@@ -18,7 +18,12 @@
             }
         });
 
-        const data = await response.json().catch(() => ({}));
+        let data = {};
+        let rawText = '';
+        try {
+            rawText = await response.text();
+            data = JSON.parse(rawText);
+        } catch (_) { /* non-JSON response — data stays {} */ }
 
         if (response.status === 429 && retries > 0) {
             const retryAfter = response.headers.get('Retry-After');
@@ -28,7 +33,7 @@
         }
 
         if (!response.ok || data.success === false) {
-            const message = data.message || 'Layby API request failed';
+            const message = data.message || `Server error ${response.status}: ${rawText.slice(0, 100)}`;
             const err = new Error(message);
             err.status = response.status;
             err.data = data;

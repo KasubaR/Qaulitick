@@ -39,7 +39,8 @@ exports.listPlans = async (req, res) => {
         const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
         const offset = (page - 1) * limit;
         const status = req.query.status;
-        const search = (req.query.search || '').trim();
+        // Cap length and escape LIKE metacharacters to prevent wildcard DoS
+        const search = (req.query.search || '').trim().slice(0, 50).replace(/[%_\\]/g, '\\$&');
 
         const where = {};
         if (status && ['active', 'completed', 'cancelled'].includes(status)) {
@@ -156,7 +157,7 @@ exports.updatePlanStatus = async (req, res) => {
             const cur = plan.status;
 
             if (status === 'completed') {
-                if (Number(plan.balanceRemaining) > 0) {
+                if (parseFloat(plan.balanceRemaining) > 0.001) {
                     return { http: 400, message: 'Cannot mark completed while balance remains' };
                 }
             }
@@ -195,11 +196,13 @@ exports.confirmInstallmentOffline = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid installment id' });
         }
 
-        const admin = req.admin || {};
-        const adminId = admin.id != null ? admin.id : admin._id;
+        if (!req.admin) {
+            return res.status(401).json({ success: false, message: 'Admin not authenticated' });
+        }
+        const adminId = req.admin.id ?? req.admin._id;
         const out = await laybyService.confirmInstallmentOffline(installmentId, {
             adminId,
-            adminEmail: admin.email
+            adminEmail: req.admin.email
         });
 
         if (out.error === 'NOT_FOUND') {

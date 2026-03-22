@@ -115,7 +115,7 @@ exports.getActiveFlashSales = async (req, res) => {
 
         res.json({
             success: true,
-            flashSales: flashSalesWithProducts
+            flashSales: flashSalesWithProducts.filter(s => s.products.length > 0)
         });
     } catch (error) {
         console.error('[Marketing Controller] Error fetching flash sales:', error);

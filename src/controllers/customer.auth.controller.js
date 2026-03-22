@@ -3,9 +3,12 @@
  * Do not log raw registration/forgot/reset bodies, passwords, or email/reset tokens — use structured
  * logs ({ err, op }) only so PII and secrets never appear in log streams.
  */
+const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 const userService = require('../services/user.service');
 const emailService = require('../services/email.service');
 const {
+    sanitizeString,
     sanitizeObject,
     validateRegister,
     validateLogin,
@@ -19,6 +22,9 @@ const REMEMBER_MAX_AGE_MS = parseInt(
     process.env.SESSION_REMEMBER_MAX_AGE || String(30 * 24 * 60 * 60 * 1000),
     10
 );
+
+// Used to normalise bcrypt timing when no user is found, preventing email enumeration via response time.
+const DUMMY_HASH = '$2b$10$invalidhashfortimingnormalizationXXXXXXXXXXXXXXXXX';
 
 function parseRememberMe(body) {
     const v = body.remember;
@@ -128,9 +134,9 @@ exports.renderLoginPage = (req, res) => {
         title: 'Sign in | Qualitick Collections',
         page: 'account',
         accountSection: 'login',
-        error: req.query.error || null,
-        message: req.query.message || null,
-        returnUrl: req.query.returnUrl || '/account',
+        error: req.query.error ? sanitizeString(req.query.error) : null,
+        message: req.query.message ? sanitizeString(req.query.message) : null,
+        returnUrl: typeof req.query.returnUrl === 'string' && req.query.returnUrl.startsWith('/') && !req.query.returnUrl.startsWith('//') ? req.query.returnUrl : '/account',
         csrfToken: res.locals.csrfToken || ''
     });
 };
@@ -156,7 +162,10 @@ exports.handleLogin = async (req, res) => {
         }
 
         const user = await userService.findByEmailForLogin(body.email);
-        if (!user || !(await user.comparePassword(body.password))) {
+        const passwordMatch = user
+            ? await user.comparePassword(body.password)
+            : await bcrypt.compare(body.password, DUMMY_HASH);
+        if (!user || !passwordMatch) {
             return res.status(401).render('account/login', {
                 title: 'Sign in | Qualitick Collections',
                 page: 'account',
@@ -193,6 +202,7 @@ exports.handleLogin = async (req, res) => {
             }
 
             req.session.userId = user.id;
+            req.session.csrfToken = crypto.randomBytes(32).toString('hex');
             req.session.cookie.maxAge = remember ? REMEMBER_MAX_AGE_MS : null;
 
             req.session.save((saveErr) => {
@@ -229,6 +239,15 @@ exports.handleLogout = (req, res) => {
     req.session.destroy((err) => {
         if (err) {
             logger.error({ err }, 'customer session destroy failed');
+            return res.status(500).render('account/login', {
+                title: 'Sign in | Qualitick Collections',
+                page: 'account',
+                accountSection: 'login',
+                error: 'Could not sign you out. Please try again.',
+                message: null,
+                returnUrl: '/account',
+                csrfToken: ''
+            });
         }
         res.clearCookie(sessionCookieName, {
             httpOnly: true,
@@ -372,13 +391,12 @@ exports.handleResetPassword = async (req, res) => {
         const validation = validateResetPassword(body);
         if (!validation.valid) {
             const token = typeof body.token === 'string' ? body.token.trim() : '';
-            const row = token ? await userService.findValidPasswordResetToken(token) : null;
             return res.status(400).render('account/reset-password', {
                 title: 'Reset password | Qualitick Collections',
                 page: 'account',
                 accountSection: 'reset',
-                invalid: !row,
-                token: row ? token : null,
+                invalid: false,
+                token: token || null,
                 error: validation.errors.join(' '),
                 csrfToken: res.locals.csrfToken || ''
             });
@@ -426,28 +444,39 @@ exports.handleResetPassword = async (req, res) => {
 };
 
 exports.verifyEmail = async (req, res) => {
-    const token = typeof req.query.token === 'string' ? req.query.token.trim() : '';
-    const result = await userService.verifyEmailByToken(token);
+    try {
+        const token = typeof req.query.token === 'string' ? req.query.token.trim() : '';
+        const result = await userService.verifyEmailByToken(token);
 
-    if (!result.ok) {
-        const msg =
-            result.reason === 'expired'
-                ? 'This verification link has expired. Sign in and contact support if you need help.'
-                : 'Invalid or expired verification link.';
-        return res.status(400).render('account/verify-email-result', {
+        if (!result.ok) {
+            const msg =
+                result.reason === 'expired'
+                    ? 'This verification link has expired. Sign in and contact support if you need help.'
+                    : 'Invalid or expired verification link.';
+            return res.status(400).render('account/verify-email-result', {
+                title: 'Email verification | Qualitick Collections',
+                page: 'account',
+                accountSection: 'verify',
+                success: false,
+                message: msg
+            });
+        }
+
+        res.render('account/verify-email-result', {
+            title: 'Email verified | Qualitick Collections',
+            page: 'account',
+            accountSection: 'verify',
+            success: true,
+            message: 'Your email is verified. You can use layby at checkout when logged in.'
+        });
+    } catch (error) {
+        logger.error({ err: error, op: 'verifyEmail' }, 'verifyEmail failed');
+        return res.status(500).render('account/verify-email-result', {
             title: 'Email verification | Qualitick Collections',
             page: 'account',
             accountSection: 'verify',
             success: false,
-            message: msg
+            message: 'Something went wrong. Please try again later.'
         });
     }
-
-    res.render('account/verify-email-result', {
-        title: 'Email verified | Qualitick Collections',
-        page: 'account',
-        accountSection: 'verify',
-        success: true,
-        message: 'Your email is verified. You can use layby at checkout when logged in.'
-    });
 };

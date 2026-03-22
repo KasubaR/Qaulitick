@@ -115,7 +115,13 @@ async function loadPlans() {
         renderPlans(plans);
     } catch (e) {
         if (body) {
-            body.innerHTML = `<tr><td colspan="8" class="empty-state">${e.message || 'Failed to load'}</td></tr>`;
+            const tr = document.createElement('tr');
+            const td = document.createElement('td');
+            td.colSpan = 8;
+            td.className = 'empty-state';
+            td.textContent = e.message || 'Failed to load';
+            tr.appendChild(td);
+            body.replaceChildren(tr);
         }
         notify(e.message || 'Failed to load layby plans', 'error');
     }

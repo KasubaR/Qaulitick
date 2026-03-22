@@ -2,13 +2,17 @@ const crypto = require('crypto');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/mysql');
 const { User, PasswordResetToken } = require('../models');
+const logger = require('../utils/logger').child({ module: 'UserService' });
 
 const EMAIL_VERIFICATION_HOURS = parseInt(process.env.CUSTOMER_EMAIL_VERIFICATION_EXPIRY_HOURS || '48', 10);
 const PASSWORD_RESET_EXPIRY_MINUTES = parseInt(process.env.PASSWORD_RESET_EXPIRY_MINUTES || '60', 10);
 
-function hashPasswordResetToken(rawToken) {
+function hashToken(rawToken) {
     return crypto.createHash('sha256').update(String(rawToken), 'utf8').digest('hex');
 }
+
+// Keep the old name as an alias so call-sites in this file remain readable.
+const hashPasswordResetToken = hashToken;
 
 function normalizeEmail(email) {
     if (!email || typeof email !== 'string') return '';
@@ -29,14 +33,15 @@ async function createUser(data) {
 
     const passwordHash = await User.hashPassword(data.password);
     const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationTokenHash = hashToken(verificationToken);
     const verificationExpires = new Date(Date.now() + EMAIL_VERIFICATION_HOURS * 60 * 60 * 1000);
 
     const user = await User.create({
         name: data.name.trim(),
         email,
-        phone: (data.phone || '').trim() || null,
+        phone: data.phone.trim(),
         passwordHash,
-        emailVerificationToken: verificationToken,
+        emailVerificationToken: verificationTokenHash,
         emailVerificationExpires: verificationExpires,
         emailVerifiedAt: null
     });
@@ -77,8 +82,9 @@ async function verifyEmailByToken(token) {
         return { ok: false, reason: 'invalid' };
     }
 
+    const tokenHash = hashToken(token);
     const user = await User.findOne({
-        where: { emailVerificationToken: token }
+        where: { emailVerificationToken: tokenHash }
     });
 
     if (!user) {
@@ -122,7 +128,7 @@ async function createPasswordResetRequest(email) {
     }
 
     await PasswordResetToken.destroy({
-        where: { userId: user.id, usedAt: { [Op.is]: null } }
+        where: { userId: user.id }
     });
 
     const rawToken = crypto.randomBytes(32).toString('hex');
@@ -183,6 +189,7 @@ async function completePasswordReset(rawToken, newPassword) {
         });
         return { ok: true };
     } catch (e) {
+        logger.error({ err: e, op: 'completePasswordReset' }, 'Transaction failed during password reset');
         return { ok: false, reason: 'failed' };
     }
 }

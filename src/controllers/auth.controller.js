@@ -3,8 +3,23 @@
 
 const adminService = require('../services/admin.service');
 const { validateSecretToken } = require('../middlewares/auth.middleware');
-const { sanitizeObject } = require('../utils/validators');
+const { sanitizeObject, sanitizeString } = require('../utils/validators');
 const { cookieName: sessionCookieName } = require('../config/session.constants');
+const logger = require('../utils/logger').child({ module: 'AuthController' });
+
+/**
+ * Validate and sanitize a return URL to prevent open redirect.
+ * Decodes percent-encoding first so path-traversal tricks like
+ * /admin%2F..%2F%2Fevil.com are caught before the prefix check.
+ */
+function safeAdminReturnUrl(raw) {
+    try {
+        const decoded = decodeURIComponent(typeof raw === 'string' ? raw : '');
+        return /^\/admin(\/|$)/.test(decoded) && !decoded.startsWith('//') ? decoded : '/admin/dashboard';
+    } catch {
+        return '/admin/dashboard';
+    }
+}
 
 /**
  * Render login page (validates secret URL first)
@@ -26,24 +41,21 @@ exports.renderLoginPage = async (req, res) => {
             });
         }
         
-        // Valid secret - store in session temporarily for login form submission
-        // This allows the POST /admin/login to validate the secret even if it's not in the URL
-        req.session.secretToken = secret;
-        
         // Get return URL if provided (for redirect after login)
-        const returnUrl = req.query.returnUrl || '/admin/dashboard';
-        
-        // Render login page (pass csrfToken so form can submit)
+        const returnUrl = safeAdminReturnUrl(req.query.returnUrl);
+
+        // Render login page (pass csrfToken and secretToken as hidden form fields)
         res.render('admin/login', {
             title: 'Admin Login | Qualitick Collections',
             page: 'admin',
             returnUrl: returnUrl,
-            error: req.query.error || null,
-            message: req.query.message || null,
+            secretToken: secret,
+            error: sanitizeString(req.query.error || ''),
+            message: sanitizeString(req.query.message || ''),
             csrfToken: req.session.csrfToken || res.locals.csrfToken || ''
         });
     } catch (error) {
-        console.error('[Auth Controller] Error rendering login page:', error);
+        logger.error({ op: 'renderLoginPage', err: error }, 'Error rendering login page');
         res.status(500).render('admin/access-denied', {
             title: 'Error | Admin Login',
             page: 'admin',
@@ -63,8 +75,8 @@ exports.handleLogin = async (req, res) => {
         const sanitizedBody = sanitizeObject(req.body);
         const { email, password, returnUrl } = sanitizedBody;
         
-        // Validate secret token (from session or query parameter)
-        const secret = req.query.secret || req.session.secretToken;
+        // Validate secret token (from hidden form field or query parameter)
+        const secret = sanitizedBody.secretToken || req.query.secret;
         if (!secret || !validateSecretToken(secret)) {
             return res.status(403).render('admin/access-denied', {
                 title: 'Access Denied | Admin Login',
@@ -111,33 +123,53 @@ exports.handleLogin = async (req, res) => {
             });
         }
         
-        // Valid credentials - create admin session (Sequelize uses `id`; plain object may omit `_id`)
+        // Valid credentials - regenerate session ID before writing auth data (prevents session fixation)
         const adminPk = admin.id != null ? admin.id : admin._id;
-        req.session.adminId = String(adminPk);
-        req.session.adminEmail = admin.email;
-        req.session.adminName = admin.name || admin.email;
-        
-        // Clear temporary secret token from session (no longer needed)
-        delete req.session.secretToken;
-        
-        // Update last login timestamp
+
+        // Update last login timestamp (do before regenerate so errors don't block login)
         try {
             await adminService.updateLastLogin(adminPk);
         } catch (updateError) {
-            // Log error but don't fail login if last login update fails
-            console.error('[Auth Controller] Error updating last login:', updateError);
+            logger.error({ op: 'updateLastLogin', err: updateError }, 'Error updating last login');
         }
-        
-        console.log(`[Auth Controller] Admin logged in: ${admin.email}`);
-        
-        // Redirect to intended page or dashboard
-        const redirectUrl = returnUrl && returnUrl.startsWith('/admin') 
-            ? returnUrl 
-            : '/admin/dashboard';
-        
-        res.redirect(redirectUrl);
+
+        logger.info({ op: 'adminLogin' }, 'Admin authenticated');
+
+        const redirectUrl = safeAdminReturnUrl(returnUrl);
+
+        req.session.regenerate((regenErr) => {
+            if (regenErr) {
+                logger.error({ op: 'sessionRegenerate', err: regenErr }, 'Session regeneration failed');
+                return res.status(500).render('admin/login', {
+                    title: 'Admin Login | Qualitick Collections',
+                    page: 'admin',
+                    error: 'Could not establish a secure session. Please try again.',
+                    returnUrl: redirectUrl,
+                    email: ''
+                });
+            }
+
+            req.session.adminId = String(adminPk);
+            req.session.adminEmail = admin.email;
+            req.session.adminName = admin.name || admin.email;
+            req.session.csrfToken = require('crypto').randomBytes(32).toString('hex');
+
+            req.session.save((saveErr) => {
+                if (saveErr) {
+                    logger.error({ op: 'sessionSave', err: saveErr }, 'Session save failed');
+                    return res.status(500).render('admin/login', {
+                        title: 'Admin Login | Qualitick Collections',
+                        page: 'admin',
+                        error: 'Could not save session. Please try again.',
+                        returnUrl: redirectUrl,
+                        email: ''
+                    });
+                }
+                res.redirect(redirectUrl);
+            });
+        });
     } catch (error) {
-        console.error('[Auth Controller] Error handling login:', error);
+        logger.error({ op: 'handleLogin', err: error }, 'Error handling login');
         res.status(500).render('admin/login', {
             title: 'Admin Login | Qualitick Collections',
             page: 'admin',
@@ -154,17 +186,20 @@ exports.handleLogin = async (req, res) => {
  */
 exports.handleLogout = async (req, res) => {
     try {
-        const adminEmail = req.session?.adminEmail || 'unknown';
-        
         // Destroy session
         req.session.destroy((err) => {
             if (err) {
-                console.error('[Auth Controller] Error destroying session:', err);
-                // Continue with redirect even if session destroy fails
-            } else {
-                console.log(`[Auth Controller] Admin logged out: ${adminEmail}`);
+                logger.error({ op: 'sessionDestroy', err }, 'Error destroying session');
+                return res.status(500).render('admin/access-denied', {
+                    title: 'Logout Error | Admin',
+                    page: 'admin',
+                    error: 'Could not log out. Please try again.',
+                    showLoginLink: false
+                });
             }
-            
+
+            logger.info({ op: 'adminLogout' }, 'Admin logged out');
+
             // Clear session cookie
             res.clearCookie(sessionCookieName, {
                 httpOnly: true,
@@ -172,12 +207,11 @@ exports.handleLogout = async (req, res) => {
                 sameSite: 'strict',
                 path: '/'
             });
-            
-            // Redirect to home page
+
             res.redirect('/');
         });
     } catch (error) {
-        console.error('[Auth Controller] Error handling logout:', error);
+        logger.error({ op: 'handleLogout', err: error }, 'Error handling logout');
         // Clear cookie and redirect even on error
         res.clearCookie(sessionCookieName, { path: '/' });
         res.redirect('/');

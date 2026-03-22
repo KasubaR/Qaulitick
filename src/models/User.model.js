@@ -20,7 +20,7 @@ const User = sequelize.define('User', {
     },
     phone: {
         type: DataTypes.STRING(40),
-        allowNull: true
+        allowNull: false
     },
     passwordHash: {
         type: DataTypes.STRING(255),
@@ -55,9 +55,10 @@ User.hashPassword = async function(plain) {
 };
 
 User.prototype.comparePassword = async function(candidatePassword) {
-    const row = await User.scope('withPasswordHash').findByPk(this.id);
-    if (!row) return false;
-    return bcrypt.compare(candidatePassword, row.passwordHash);
+    if (!this.passwordHash) {
+        throw new Error('comparePassword called on instance without passwordHash — use scope withPasswordHash');
+    }
+    return bcrypt.compare(candidatePassword, this.passwordHash);
 };
 
 module.exports = User;

@@ -1,6 +1,7 @@
 // Authentication Middleware
 // Handles admin authentication and authorization
 
+const crypto = require('crypto');
 const adminService = require('../services/admin.service');
 
 /**
@@ -10,18 +11,25 @@ const adminService = require('../services/admin.service');
  */
 function validateSecretToken(secret) {
     const adminSecretToken = process.env.ADMIN_SECRET_TOKEN;
-    
+
     if (!adminSecretToken) {
         console.warn('[Auth Middleware] ADMIN_SECRET_TOKEN not configured in environment variables');
         return false;
     }
-    
-    // Compare secrets (constant-time comparison to prevent timing attacks)
-    if (!secret || secret !== adminSecretToken) {
+
+    if (!secret) return false;
+
+    try {
+        const a = Buffer.from(String(adminSecretToken), 'utf8');
+        const b = Buffer.from(String(secret), 'utf8');
+        // Lengths must match — timingSafeEqual requires equal-length buffers.
+        // Returning false here does leak that the length is wrong, but secret
+        // length is not a meaningful oracle since the token is never user-chosen.
+        if (a.length !== b.length) return false;
+        return crypto.timingSafeEqual(a, b);
+    } catch {
         return false;
     }
-    
-    return true;
 }
 
 /**
@@ -30,27 +38,24 @@ function validateSecretToken(secret) {
  * @returns {Promise<Object|null>} - Admin object if authenticated, null otherwise
  */
 async function getAuthenticatedAdmin(req) {
+    if (!req.session?.adminId) return null;
+
     try {
-        // Check if session has admin data
-        if (!req.session || !req.session.adminId) {
-            return null;
-        }
-        
-        // Get admin from database to ensure they still exist and are active
         const admin = await adminService.getAdminById(req.session.adminId);
-        
+
         if (!admin) {
-            // Admin no longer exists or is inactive, clear session
-            if (req.session) {
-                req.session.adminId = null;
-                req.session.adminEmail = null;
-            }
+            // Admin record confirmed deleted — clear the stale session data
+            req.session.adminId = null;
+            req.session.adminEmail = null;
             return null;
         }
-        
+
         return admin;
     } catch (error) {
-        console.error('[Auth Middleware] Error getting authenticated admin:', error);
+        // DB error (timeout, connection failure, etc.) — do NOT clear the session.
+        // Treating a transient DB blip the same as a deleted admin would log the
+        // admin out under load, and the session data is still valid.
+        console.error('[Auth Middleware] DB error fetching admin:', error);
         return null;
     }
 }
@@ -103,7 +108,7 @@ async function requireAdminAuth(req, res, next) {
         if (!admin) {
             // Not authenticated - redirect to login
             // Store intended destination for redirect after login
-            const returnUrl = req.originalUrl || req.url;
+            const returnUrl = req.path; // path only — strips query strings that may contain sensitive params
             return res.redirect(`/admin/login?returnUrl=${encodeURIComponent(returnUrl)}`);
         }
         

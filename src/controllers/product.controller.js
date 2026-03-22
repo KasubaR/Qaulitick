@@ -494,8 +494,17 @@ exports.deleteProduct = async (req, res) => {
             // Log error but don't fail the deletion
             console.error('[Product Controller] Error cleaning up featured products after deletion:', error);
         }
-        
+
+        // Remove the deleted product from any flash sales; end sales that become empty
+        try {
+            const flashSaleService = require('../services/flashSale.service');
+            await flashSaleService.removeDeletedProduct(Number(productId));
+        } catch (error) {
+            console.error('[Product Controller] Error cleaning up flash sales after product deletion:', error);
+        }
+
         clearCache('/api/products');
+        clearCache('/api/marketing/flash-sales');
         res.json({
             success: true,
             message: 'Product deleted successfully'

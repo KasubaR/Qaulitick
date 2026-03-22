@@ -56,10 +56,11 @@ function addMongooseCompat(Model) {
     }
     if (!Model.findByIdAndUpdate) {
         Model.findByIdAndUpdate = async function(id, update, opts = {}) {
-            const doc = await Model.findById(id);
-            if (!doc) return null;
-            await doc.update(update, opts);
-            return opts.new !== false ? Model.findByPk(doc.id) : doc;
+            const pk = parseInt(String(id), 10);
+            if (Number.isNaN(pk)) return null;
+            const [count] = await Model.update(update, { where: { id: pk } });
+            if (count === 0) return null;
+            return opts.new !== false ? Model.findByPk(pk) : { id: pk };
         };
     }
     if (!Model.findByIdAndDelete) {
@@ -73,19 +74,6 @@ function addMongooseCompat(Model) {
         Model.find = function(where) { return findChain(Model, where || {}); };
     }
 }
-
-require('./Product.model');
-require('./Order.model');
-require('./Payment.model');
-require('./FlashSale.model');
-require('./FeaturedProduct.model');
-require('./ContactSubmission.model');
-require('./Settings.model');
-require('./Admin.model');
-require('./User.model');
-require('./PasswordResetToken.model');
-require('./LaybyPlan.model');
-require('./LaybyPayment.model');
 
 const Product = require('./Product.model');
 const Order = require('./Order.model');
