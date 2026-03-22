@@ -11,8 +11,16 @@ let selectedStrap = null;
 let quantity = 1;
 let reviewRating = 0;
 
-// Get product data from EJS
-const product = window.productData || {};
+// Get product data from EJS — fall back to DOM attributes if JSON parse failed
+const product = window.productData || (() => {
+    const btn = document.getElementById('addToCartBtn');
+    if (!btn) return {};
+    return {
+        _id: btn.dataset.productId,
+        id: btn.dataset.productId,
+        stock: parseInt(btn.dataset.productStock || '0', 10)
+    };
+})();
 
 // ====================================
 // INITIALIZATION
@@ -31,7 +39,6 @@ function initProductPage() {
     window.addEventListener('cartUpdated', (e) => {
         // Force reload from storage to ensure we have latest data
         // Clear any cached cart data and reload
-        console.log('[Product Details] Cart updated event received', e.detail);
         updateAddToCartButton();
         updateCartCount();
     });
@@ -326,7 +333,7 @@ async function handleAddToCart() {
                 'X-CSRF-Token': typeof window.getCSRFToken === 'function' ? window.getCSRFToken() : ''
             },
             body: JSON.stringify({
-                productId: product._id,
+                productId: product._id || product.id || document.getElementById('addToCartBtn')?.dataset.productId,
                 quantity: quantity
             })
         });

@@ -433,44 +433,63 @@ async function generateSKUFromBrandModel(brand, model) {
 const _colorPendingFiles = new Map();
 let _colorKeyCounter = 0;
 
-// Add color input
-function addColorInput() {
-    const container = document.getElementById('colorsContainer');
-    if (!container) return;
-
+// Build a color-input-group element. color = { name, image, hex } (all optional)
+function _buildColorGroup(color) {
     const key = String(++_colorKeyCounter);
-    const colorGroup = document.createElement('div');
-    colorGroup.className = 'color-input-group';
-    colorGroup.dataset.colorKey = key;
-    colorGroup.innerHTML = `
+    const name = (color && color.name) || '';
+    const imageUrl = (color && color.image) || '';
+    const hex = (color && color.hex) || '';
+
+    const group = document.createElement('div');
+    group.className = 'color-input-group';
+    group.dataset.colorKey = key;
+    if (imageUrl) group.dataset.colorImage = imageUrl;
+    if (hex) group.dataset.colorHex = hex;
+
+    let previewHtml;
+    if (imageUrl) {
+        previewHtml = `<img class="color-image-preview" src="${imageUrl}" alt="">`;
+    } else if (hex) {
+        previewHtml = `<span class="color-upload-placeholder color-hex-swatch" style="background:${hex};display:block;width:100%;height:100%;border-radius:inherit;" title="Click to replace with image"></span><img class="color-image-preview" src="" alt="" style="display:none;">`;
+    } else {
+        previewHtml = `<span class="color-upload-placeholder"><i class="fas fa-camera"></i></span><img class="color-image-preview" src="" alt="" style="display:none;">`;
+    }
+
+    group.innerHTML = `
         <div class="color-image-upload" onclick="this.querySelector('.color-file-input').click()" title="Click to upload color image">
-            <span class="color-upload-placeholder"><i class="fas fa-camera"></i></span>
-            <img class="color-image-preview" src="" alt="" style="display:none;">
+            ${previewHtml}
             <input type="file" class="color-file-input" accept="image/jpeg,image/jpg,image/png,image/webp" style="display:none;">
         </div>
-        <input type="text" class="color-name-input" placeholder="Color name (e.g. Black)">
+        <input type="text" class="color-name-input" placeholder="Color name (e.g. Black)" value="${name}">
         <button type="button" class="remove-color-btn" onclick="removeColor(this)">
             <i class="fas fa-times"></i>
         </button>
     `;
 
-    const fileInput = colorGroup.querySelector('.color-file-input');
-    fileInput.addEventListener('change', function () {
+    group.querySelector('.color-file-input').addEventListener('change', function () {
         const file = this.files[0];
         if (!file) return;
         _colorPendingFiles.set(key, file);
         const reader = new FileReader();
         reader.onload = (e) => {
-            const preview = colorGroup.querySelector('.color-image-preview');
-            const placeholder = colorGroup.querySelector('.color-upload-placeholder');
+            const preview = group.querySelector('.color-image-preview');
+            const placeholder = group.querySelector('.color-upload-placeholder');
             preview.src = e.target.result;
             preview.style.display = 'block';
-            placeholder.style.display = 'none';
+            if (placeholder) placeholder.style.display = 'none';
+            group.dataset.colorImage = '';
         };
         reader.readAsDataURL(file);
     });
 
-    container.appendChild(colorGroup);
+    return group;
+}
+
+// Add a blank color input row
+function addColorInput() {
+    const container = document.getElementById('colorsContainer');
+    if (!container) return;
+    container.appendChild(_buildColorGroup(null));
 }
 
 // Remove color
@@ -482,7 +501,7 @@ function removeColor(btn) {
     group.remove();
 }
 
-// Collect colors from form — returns { name, image (url or null), _pendingKey } per entry
+// Collect colors from form — returns { name, image, hex, _pendingKey } per entry
 function collectColors() {
     const colorsContainer = document.getElementById('colorsContainer');
     if (!colorsContainer) return [];
@@ -491,9 +510,12 @@ function collectColors() {
     colorsContainer.querySelectorAll('.color-input-group').forEach(group => {
         const name = (group.querySelector('.color-name-input')?.value || '').trim();
         if (!name) return;
-        const existingUrl = group.dataset.colorImage || null;
-        const pendingKey = group.dataset.colorKey || null;
-        colors.push({ name, image: existingUrl, _pendingKey: pendingKey });
+        colors.push({
+            name,
+            image: group.dataset.colorImage || null,
+            hex: group.dataset.colorHex || null,
+            _pendingKey: group.dataset.colorKey || null
+        });
     });
     return colors;
 }
@@ -506,13 +528,19 @@ async function uploadColorImages(colors) {
         if (file) {
             try {
                 const urls = await window.uploadImages([file]);
-                resolved.push({ name: color.name, image: urls[0] || null });
+                const entry = { name: color.name, image: urls[0] || null };
+                if (color.hex) entry.hex = color.hex;
+                resolved.push(entry);
                 _colorPendingFiles.delete(color._pendingKey);
             } catch {
-                resolved.push({ name: color.name, image: color.image || null });
+                resolved.push({ name: color.name, image: color.image || null, ...(color.hex ? { hex: color.hex } : {}) });
             }
         } else {
-            resolved.push({ name: color.name, image: color.image || null });
+            // No new file — preserve existing image or fallback to hex
+            const entry = { name: color.name };
+            if (color.image) entry.image = color.image;
+            if (color.hex) entry.hex = color.hex;
+            resolved.push(entry);
         }
     }
     return resolved;
@@ -809,50 +837,7 @@ async function loadProductData(productId) {
             }
 
             colorsContainer.innerHTML = '';
-
-            productColors.forEach(color => {
-                const nameValue = color && color.name ? color.name : '';
-                const imageUrl = color && color.image ? color.image : '';
-                const key = String(++_colorKeyCounter);
-
-                const colorGroup = document.createElement('div');
-                colorGroup.className = 'color-input-group';
-                colorGroup.dataset.colorKey = key;
-                if (imageUrl) colorGroup.dataset.colorImage = imageUrl;
-
-                colorGroup.innerHTML = `
-                    <div class="color-image-upload" onclick="this.querySelector('.color-file-input').click()" title="Click to change color image">
-                        ${imageUrl
-                            ? `<img class="color-image-preview" src="${imageUrl}" alt="">`
-                            : `<span class="color-upload-placeholder"><i class="fas fa-camera"></i></span><img class="color-image-preview" src="" alt="" style="display:none;">`
-                        }
-                        <input type="file" class="color-file-input" accept="image/jpeg,image/jpg,image/png,image/webp" style="display:none;">
-                    </div>
-                    <input type="text" class="color-name-input" placeholder="Color name (e.g. Black)" value="${nameValue}">
-                    <button type="button" class="remove-color-btn" onclick="removeColor(this)">
-                        <i class="fas fa-times"></i>
-                    </button>
-                `;
-
-                const fileInput = colorGroup.querySelector('.color-file-input');
-                fileInput.addEventListener('change', function () {
-                    const file = this.files[0];
-                    if (!file) return;
-                    _colorPendingFiles.set(key, file);
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        const preview = colorGroup.querySelector('.color-image-preview');
-                        const placeholder = colorGroup.querySelector('.color-upload-placeholder');
-                        preview.src = e.target.result;
-                        preview.style.display = 'block';
-                        if (placeholder) placeholder.style.display = 'none';
-                        colorGroup.dataset.colorImage = '';
-                    };
-                    reader.readAsDataURL(file);
-                });
-
-                colorsContainer.appendChild(colorGroup);
-            });
+            productColors.forEach(color => colorsContainer.appendChild(_buildColorGroup(color)));
         }
         
         // Reset to first tab
@@ -1739,49 +1724,7 @@ async function duplicateProduct(productId) {
         if (colorsContainer) {
             colorsContainer.innerHTML = '';
             if (productCopy.colors && productCopy.colors.length > 0) {
-                productCopy.colors.forEach(color => {
-                    const nameValue = color.name || '';
-                    const imageUrl = color.image || '';
-                    const key = String(++_colorKeyCounter);
-
-                    const colorGroup = document.createElement('div');
-                    colorGroup.className = 'color-input-group';
-                    colorGroup.dataset.colorKey = key;
-                    if (imageUrl) colorGroup.dataset.colorImage = imageUrl;
-
-                    colorGroup.innerHTML = `
-                        <div class="color-image-upload" onclick="this.querySelector('.color-file-input').click()" title="Click to change color image">
-                            ${imageUrl
-                                ? `<img class="color-image-preview" src="${imageUrl}" alt="">`
-                                : `<span class="color-upload-placeholder"><i class="fas fa-camera"></i></span><img class="color-image-preview" src="" alt="" style="display:none;">`
-                            }
-                            <input type="file" class="color-file-input" accept="image/jpeg,image/jpg,image/png,image/webp" style="display:none;">
-                        </div>
-                        <input type="text" class="color-name-input" placeholder="Color name (e.g. Black)" value="${nameValue}">
-                        <button type="button" class="remove-color-btn" onclick="removeColor(this)">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    `;
-
-                    const fileInput = colorGroup.querySelector('.color-file-input');
-                    fileInput.addEventListener('change', function () {
-                        const file = this.files[0];
-                        if (!file) return;
-                        _colorPendingFiles.set(key, file);
-                        const reader = new FileReader();
-                        reader.onload = (e) => {
-                            const preview = colorGroup.querySelector('.color-image-preview');
-                            const placeholder = colorGroup.querySelector('.color-upload-placeholder');
-                            preview.src = e.target.result;
-                            preview.style.display = 'block';
-                            if (placeholder) placeholder.style.display = 'none';
-                            colorGroup.dataset.colorImage = '';
-                        };
-                        reader.readAsDataURL(file);
-                    });
-
-                    colorsContainer.appendChild(colorGroup);
-                });
+                productCopy.colors.forEach(color => colorsContainer.appendChild(_buildColorGroup(color)));
             }
         }
         

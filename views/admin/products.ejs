@@ -418,7 +418,7 @@
     <!-- Pass products data to JavaScript -->
     <% if (typeof products !== 'undefined' && products) { %>
     <script>
-        // JSON is HTML-encoded to prevent </script> injection (stored XSS).
+        // JSON is HTML-encoded to prevent script-injection (stored XSS).
         // The three replacements cover every character that can break out of a
         // script block; JSON.parse on the client reverses the encoding safely.
         window.initialProducts = JSON.parse(<%- JSON.stringify(JSON.stringify(products))

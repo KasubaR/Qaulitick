@@ -144,7 +144,6 @@ function setCartItems(items) {
                     
                     if (cookieSuccess) {
                         savedToCookie = true;
-                        console.log('[Cart] Saved to cookies');
                     }
                 } catch (cookieError) {
                     console.warn('[Cart] Failed to save to cookie:', cookieError);
@@ -156,7 +155,6 @@ function setCartItems(items) {
         try {
             localStorage.setItem('cart', cartJson);
             savedToLocalStorage = true;
-            console.log('[Cart] Saved to localStorage');
         } catch (localStorageError) {
             console.error('[Cart] Failed to save to localStorage:', localStorageError);
             

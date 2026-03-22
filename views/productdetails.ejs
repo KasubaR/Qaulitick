@@ -192,11 +192,11 @@ if (!Array.isArray(product.images)) product.images = [];
 
                 <!-- ACTION BUTTONS -->
                 <div class="action-buttons">
-                    <button class="btn-primary" id="addToCartBtn" <%= product.stock === 0 ? 'disabled' : '' %>>
+                    <button class="btn-primary" id="addToCartBtn" data-product-id="<%= product.id || product._id %>" data-product-stock="<%= product.stock %>" <%= product.stock === 0 ? 'disabled' : '' %>>
                         <i class="fas fa-shopping-cart"></i>
                         <%= product.stock === 0 ? 'Out of Stock' : 'Add to Cart' %>
                     </button>
-                    <button class="btn-secondary" id="buyNowBtn" <%= product.stock === 0 ? 'disabled' : '' %>>
+                    <button class="btn-secondary" id="buyNowBtn" data-product-id="<%= product.id || product._id %>" <%= product.stock === 0 ? 'disabled' : '' %>>
                         <i class="fas fa-bolt"></i>
                         Buy Now
                     </button>
@@ -426,10 +426,18 @@ if (!Array.isArray(product.images)) product.images = [];
 
     <!-- Pass product data to JavaScript -->
     <script>
-        window.productData = JSON.parse(<%- JSON.stringify(JSON.stringify(product))
-            .replace(/&/g, '\\u0026')
-            .replace(/</g, '\\u003c')
-            .replace(/>/g, '\\u003e') %>);
+        try {
+            window.productData = JSON.parse('<%- JSON.stringify(product)
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'")
+                .replace(/&/g, '\\u0026')
+                .replace(/</g, '\\u003c')
+                .replace(/>/g, '\\u003e')
+                .replace(/\n/g, '\\n')
+                .replace(/\r/g, '\\r') %>');
+        } catch(e) {
+            window.productData = null;
+        }
     </script>
 
     <!-- Schema.org Product Structured Data (JSON-LD) -->
