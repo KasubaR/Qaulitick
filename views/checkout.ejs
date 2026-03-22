@@ -73,15 +73,8 @@
                             </div>
 
                             <% if (!loggedIn) { %>
-                            <div class="form-group checkbox-group">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="createAccount" name="createAccount">
-                                    <span>Create an account for faster checkout next time</span>
-                                </label>
-                            </div>
-
-                            <div class="login-prompt login-prompt--hidden" id="loginPrompt">
-                                <p>Already have an account? <a href="/login?returnUrl=/checkout" id="loginLink">Log in</a></p>
+                            <div class="login-prompt">
+                                <p><a href="/login?returnUrl=/checkout">Sign in</a> or <a href="/register?returnUrl=/checkout">create an account</a> for faster checkout next time.</p>
                             </div>
                             <% } %>
                         </div>
