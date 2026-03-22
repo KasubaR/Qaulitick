@@ -104,7 +104,7 @@
 
         // Token is available from meta tag - no need to store in cookie
         // The server stores it in the session (HttpOnly, secure)
-        console.log('[Session] CSRF token loaded from server-generated meta tag');
+
 
         return csrfToken;
     }
@@ -285,7 +285,7 @@
             }
         });
 
-        console.log('[Session] Session management initialized');
+
     }
 
     /**

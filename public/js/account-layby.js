@@ -180,7 +180,7 @@
                         return;
                     }
 
-                    const { laybyPaymentId, orderNumber } = startData;
+                    const { laybyPaymentId, orderNumber, allowPartialPay } = startData;
                     if (!orderNumber) {
                         if (statusEl) statusEl.textContent = 'Order not found for this plan.';
                         return;
@@ -198,6 +198,17 @@
                         provider,
                         customerPhone
                     };
+
+                    if (allowPartialPay && block.classList.contains('layby-plan-block--flexible')) {
+                        const amtInput = block.querySelector('.account-layby-amount-input');
+                        const rawAmt = amtInput && amtInput.value ? String(amtInput.value).trim() : '';
+                        if (rawAmt !== '') {
+                            const n = parseFloat(rawAmt);
+                            if (!Number.isNaN(n) && n > 0) {
+                                paymentPayload.laybyPayAmount = rawAmt;
+                            }
+                        }
+                    }
 
                     const payRes = await fetch('/api/payments/process', {
                         method: 'POST',

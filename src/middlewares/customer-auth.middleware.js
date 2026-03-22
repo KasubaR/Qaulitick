@@ -37,7 +37,10 @@ async function optionalCustomer(req, res, next) {
             name: plain.name,
             email: plain.email,
             phone: plain.phone,
-            emailVerifiedAt: plain.emailVerifiedAt
+            emailVerifiedAt: plain.emailVerifiedAt,
+            deliveryAddress: plain.deliveryAddress || '',
+            city: plain.city || '',
+            province: plain.province || ''
         };
     } catch (err) {
         logger.error({ err }, 'optionalCustomer failed');

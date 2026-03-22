@@ -106,10 +106,9 @@ class AdminService {
      */
     async updateLastLogin(adminId) {
         try {
-            await Admin.findByIdAndUpdate(
-                adminId,
+            await Admin.update(
                 { lastLogin: new Date() },
-                { new: true, runValidators: false }
+                { where: { id: adminId } }
             );
         } catch (error) {
             console.error('[Admin Service] Error updating last login:', error);

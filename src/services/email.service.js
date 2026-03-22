@@ -10,38 +10,50 @@ const logger = require('../utils/logger').child({ module: 'EmailService' });
  * Integrates with notification settings to respect user preferences
  */
 
-// Gmail SMTP Configuration
+// SMTP Configuration — prefers cPanel SMTP_* vars, falls back to Gmail
 const createTransporter = () => {
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
     const gmailUser = process.env.GMAIL_USER;
     const gmailPassword = process.env.GMAIL_APP_PASSWORD;
-    const adminEmail = process.env.CONTACT_ADMIN_EMAIL || process.env.GMAIL_USER;
 
-    if (!gmailUser || !gmailPassword) {
-        logger.warn('Gmail credentials not configured. Email functionality will be disabled.');
+    const useCpanel = smtpHost && smtpUser && smtpPass;
+    const useGmail = gmailUser && gmailPassword;
+
+    if (!useCpanel && !useGmail) {
+        logger.warn('No SMTP credentials configured. Email functionality will be disabled.');
         return null;
     }
 
-    // TLS options to handle SSL certificate issues
-    // In development, you may need to set NODE_TLS_REJECT_UNAUTHORIZED=0 or use rejectUnauthorized: false
-    // For production, ensure proper SSL certificates are configured
+    if (useCpanel) {
+        const port = parseInt(process.env.SMTP_PORT || '465', 10);
+        const secure = process.env.SMTP_SECURE !== 'false'; // default true for port 465
+        logger.info({ host: smtpHost, port, secure }, 'Using cPanel SMTP');
+        return nodemailer.createTransport({
+            host: smtpHost,
+            port,
+            secure,
+            auth: { user: smtpUser, pass: smtpPass },
+            pool: true,
+            maxConnections: 5,
+            rateDelta: 1000,
+            rateLimit: 5
+        });
+    }
+
+    // Fallback: Gmail
     const tlsOptions = {};
-    
-    // Allow insecure certificates in development (set via environment variable)
-    // WARNING: Only use this in development. In production, fix SSL certificate issues properly.
     if (process.env.NODE_ENV !== 'production' && process.env.ALLOW_INSECURE_EMAIL === 'true') {
         tlsOptions.rejectUnauthorized = false;
         logger.warn('SSL cert validation disabled. Development only.');
     }
-
-    // Use explicit Gmail SMTP configuration for better reliability
     return nodemailer.createTransport({
         host: 'smtp.gmail.com',
         port: 587,
-        secure: false, // true for 465, false for other ports
-        auth: {
-            user: gmailUser,
-            pass: gmailPassword
-        },
+        secure: false,
+        auth: { user: gmailUser, pass: gmailPassword },
         pool: true,
         maxConnections: 5,
         rateDelta: 1000,
@@ -91,14 +103,18 @@ function getTransporter() {
 async function verifyTransporter() {
     const t = getTransporter();
     if (!t) {
-        throw new Error('Email service not configured: GMAIL_USER or GMAIL_APP_PASSWORD missing');
+        throw new Error('Email service not configured: set SMTP_HOST/SMTP_USER/SMTP_PASS or GMAIL_USER/GMAIL_APP_PASSWORD');
     }
     await t.verify();
     logger.info('Email transporter verified successfully');
 }
 
 // Fallback admin email (will be overridden by settings)
-const fallbackAdminEmail = process.env.CONTACT_ADMIN_EMAIL || process.env.GMAIL_USER || 'support@qualitick-collections.com';
+const fallbackAdminEmail = process.env.CONTACT_ADMIN_EMAIL || process.env.SMTP_USER || process.env.GMAIL_USER || 'support@qualitickzm.com';
+
+// The address that appears in the From header of every outgoing email
+const MAIL_FROM_ADDRESS = process.env.SMTP_FROM || process.env.SMTP_USER || process.env.GMAIL_USER || 'support@qualitickzm.com';
+const MAIL_FROM = `"Qualitick Collections" <${MAIL_FROM_ADDRESS}>`;
 
 /**
  * Escape user-supplied strings before interpolating into HTML.
@@ -222,7 +238,7 @@ async function sendContactNotificationToAdmin(submission) {
         `;
 
         const mailOptions = {
-            from: `"Qualitick Collections" <${process.env.GMAIL_USER}>`,
+            from: MAIL_FROM,
             to: notificationEmail,
             subject: `New Contact Form Submission - ${subjectLabel}`,
             html: htmlContent,
@@ -313,7 +329,7 @@ async function sendContactConfirmationToUser(submission) {
         `;
 
         const mailOptions = {
-            from: `"Qualitick Collections" <${process.env.GMAIL_USER}>`,
+            from: MAIL_FROM,
             to: submission.email,
             subject: 'Thank You for Contacting Qualitick Collections',
             html: htmlContent
@@ -467,7 +483,7 @@ async function sendInvoiceEmail(order, pdfBuffer, options = {}) {
         `;
 
         const mailOptions = {
-            from: `"Qualitick Collections" <${process.env.GMAIL_USER}>`,
+            from: MAIL_FROM,
             to: order.customer.email,
             cc: options.cc || undefined,
             bcc: options.bcc || undefined,
@@ -674,7 +690,7 @@ async function sendOrderNotificationToAdmin(order) {
         `;
 
         const mailOptions = {
-            from: `"Qualitick Collections" <${process.env.GMAIL_USER}>`,
+            from: MAIL_FROM,
             to: notificationEmail,
             subject: `New Order #${order.orderNumber} - K${formatCurrency(order.totals.total || 0)}`,
             html: htmlContent
@@ -789,7 +805,7 @@ async function sendLowStockNotificationToAdmin(product) {
         `;
 
         const mailOptions = {
-            from: `"Qualitick Collections" <${process.env.GMAIL_USER}>`,
+            from: MAIL_FROM,
             to: notificationEmail,
             subject: `${isCritical ? 'Out of Stock' : 'Low Stock'} Alert: ${product.brand} ${product.model} (${product.sku})`,
             html: htmlContent
@@ -926,7 +942,7 @@ async function sendPaymentNotificationToAdmin(payment, order = null) {
         `;
 
         const mailOptions = {
-            from: `"Qualitick Collections" <${process.env.GMAIL_USER}>`,
+            from: MAIL_FROM,
             to: notificationEmail,
             subject: `Payment ${isCompleted ? 'Completed' : isFailed ? 'Failed' : 'Update'} - Order #${payment.orderNumber} - K${formatCurrency(payment.amount || 0)}`,
             html: htmlContent
@@ -971,7 +987,7 @@ async function sendCustomerEmailVerification({ to, name, verifyUrl }) {
 
     try {
         const info = await transporter.sendMail({
-            from: `"Qualitick Collections" <${process.env.GMAIL_USER}>`,
+            from: MAIL_FROM,
             to,
             subject: 'Verify your email — Qualitick Collections',
             html
@@ -1015,7 +1031,7 @@ async function sendCustomerPasswordResetEmail({ to, name, resetUrl }) {
 
     try {
         const info = await transporter.sendMail({
-            from: `"Qualitick Collections" <${process.env.GMAIL_USER}>`,
+            from: MAIL_FROM,
             to,
             subject: 'Reset your password — Qualitick Collections',
             html

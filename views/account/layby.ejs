@@ -10,7 +10,7 @@
 <div class="account-page-wrap">
     <div class="account-hero">
         <h1>Layby plans</h1>
-        <p>Track deposits, installments, and balances.</p>
+        <p>Track deposits, pay down your balance in one or more payments within your plan period, and see what is left to pay.</p>
     </div>
 
     <%- include('./_subnav') %>
@@ -24,7 +24,8 @@
     <% } else { %>
         <% plans.forEach(function(plan) { %>
             <% var ot = Number(plan.orderTotal); var br = Number(plan.balanceRemaining); var paid = ot > 0 ? Math.max(0, ot - br) : 0; %>
-            <div class="layby-plan-block" data-plan-id="<%= plan.id %>">
+            <% var laybySched = plan.installmentSchedule; if (typeof laybySched === 'string') { try { laybySched = JSON.parse(laybySched); } catch (e) { laybySched = null; } } var laybyFlexible = laybySched && laybySched.policy === 'flexible_within_period'; %>
+            <div class="layby-plan-block<%= laybyFlexible ? ' layby-plan-block--flexible' : '' %>" data-plan-id="<%= plan.id %>">
                 <h3>Order <%= plan.order && plan.order.orderNumber ? plan.order.orderNumber : ('#' + plan.orderId) %></h3>
                 <div class="layby-plan-meta">
                     Status: <strong><%= plan.status %></strong>
@@ -69,6 +70,11 @@
                         <div class="form-group">
                             <label for="layby-phone-<%= plan.id %>">Number to charge</label>
                             <input type="tel" id="layby-phone-<%= plan.id %>" class="account-layby-phone" inputmode="tel" autocomplete="tel" value="<%= typeof payCustomerInfo !== 'undefined' && payCustomerInfo.phone ? payCustomerInfo.phone : '' %>">
+                        </div>
+                        <div class="form-group account-layby-amount-field">
+                            <label for="layby-amount-<%= plan.id %>">Amount (ZMW)</label>
+                            <input type="number" id="layby-amount-<%= plan.id %>" class="account-layby-amount-input" min="0.01" step="0.01" autocomplete="off" placeholder="Full balance due">
+                            <p class="account-layby-amount-hint">Optional for flexible plans: enter an amount to pay part of the balance. Leave blank to pay the full amount currently due.</p>
                         </div>
                         <button type="button" class="account-btn-secondary account-layby-pay-btn">Pay next installment</button>
                         <p class="account-layby-pay-status" aria-live="polite"></p>

@@ -31,7 +31,6 @@ function getCartItems() {
             if (cookieData) {
                 try {
                     cartData = JSON.parse(cookieData);
-                    console.log('[Cart] Loaded from cookies');
                 } catch (e) {
                     console.warn('[Cart] Failed to parse cookie data, trying localStorage');
                 }
@@ -226,7 +225,7 @@ function initGlobal() {
         // Just verify it's working
         const sessionInfo = window.SessionManager.getSessionInfo();
         if (sessionInfo.sessionId) {
-            console.log('[Main] Session management active');
+
         }
     }
 }

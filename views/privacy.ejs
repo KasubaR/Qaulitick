@@ -8,28 +8,21 @@
     ogType: 'website'
 }) %>
 
-    <!-- PRIVACY POLICY PAGE CONTENT -->
-    <div class="about-container">
-        <!-- Breadcrumb -->
-        <div class="breadcrumb">
-            <a href="/">Home</a> <span class="separator"><i class="fas fa-chevron-right"></i></span>
-            <span class="current">Privacy Policy</span>
-        </div>
+<!-- Privacy hero — same structure as Contact -->
+<section class="contact-hero">
+    <div class="contact-hero-inner">
+        <span class="contact-eyebrow">Trust · Transparency</span>
+        <h1 class="contact-hero-title">Privacy<br><em>Policy</em></h1>
+        <p class="contact-hero-sub">
+            Last updated <%= new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %>.
+            We are committed to protecting your privacy and explaining clearly how we handle your information when you shop or browse with us.
+        </p>
+    </div>
+    <img src="/images/icons/watermark.svg" alt="" class="contact-watermark" aria-hidden="true">
+</section>
 
-        <!-- Hero Section -->
-        <section class="about-hero">
-            <div class="about-hero-content">
-                <h1 class="gradient-text gradient-flow">Privacy Policy</h1>
-                <p class="about-hero-subtitle">Last Updated: <%= new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %></p>
-                <p class="about-hero-description">
-                    At Qualitick Collections, we are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website or make a purchase.
-                </p>
-            </div>
-        </section>
-
-        <!-- Privacy Content -->
-        <section class="terms-content">
-            <div class="terms-content-wrapper">
+<div class="contact-container privacy-policy-page">
+    <div class="privacy-policy-content">
                 
                 <!-- Information We Collect -->
                 <div class="terms-category">
@@ -147,7 +140,7 @@
                 </div>
 
                 <!-- Cookies and Tracking -->
-                <div class="terms-category" id="cookies">
+                <div class="terms-category cookie-policy-section" id="cookies">
                     <h2 class="section-title">
                         <i class="fas fa-cookie"></i> Cookies and Tracking Technologies
                     </h2>
@@ -329,7 +322,7 @@
                                     <li>Delete existing cookies</li>
                                     <li>Set your browser to notify you when cookies are set</li>
                                 </ul>
-                                <p style="margin-top: 8px; font-size: 14px;">
+                                <p class="cookie-manage-nested-note">
                                     <strong>Note:</strong> Disabling cookies may limit your ability to use certain features of our website. Essential cookies cannot be disabled as they are required for the website to function.
                                 </p>
                             </li>
@@ -343,8 +336,8 @@
                         </ul>
                     </div>
 
-                    <p style="margin-top: 25px; color: #ddd;">
-                        For more information about how we use cookies or to update your preferences, please <a href="/contact" style="color: var(--gold-light); text-decoration: underline;">contact us</a>.
+                    <p class="cookie-policy-footnote">
+                        For more information about how we use cookies or to update your preferences, please <a href="/contact" class="cookie-policy-footnote-link">contact us</a>.
                     </p>
                 </div>
 
@@ -419,20 +412,27 @@
                     </p>
                 </div>
 
-            </div>
-        </section>
-
-        <!-- CTA Section -->
-        <section class="cta-section">
-            <div class="cta-content">
-                <h2 class="gradient-text">Have Questions About Your Privacy?</h2>
-                <p>We're here to help. Contact us if you have any concerns about how we handle your personal information.</p>
-                <a href="/contact" class="btn gradient-flow">
-                    <i class="fas fa-envelope"></i> Contact Us
-                </a>
-            </div>
-        </section>
     </div>
+</div>
 
-    <%- include('partials/footer') %>
+<!-- CTA — full-width band, same as About page -->
+<section class="about-cta">
+    <img src="/images/icons/watermark.svg" alt="" class="about-cta-watermark" aria-hidden="true">
+    <div class="about-cta-inner">
+        <h2 class="about-cta-title">Questions About<br><em>Your Privacy?</em></h2>
+        <p>We are here to help. Reach out if you want to understand our practices or exercise your data rights.</p>
+        <div class="about-cta-btns">
+            <a href="/contact" class="btn-hero-primary">
+                Contact Us
+                <img src="/images/icons/Arrow-Icon.svg" alt="">
+            </a>
+            <a href="/shop" class="btn-hero-secondary">
+                Shop Collection
+                <img src="/images/icons/arrow-Icon-2.svg" alt="">
+            </a>
+        </div>
+    </div>
+</section>
+
+<%- include('partials/footer') %>
 

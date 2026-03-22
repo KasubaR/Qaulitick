@@ -270,6 +270,9 @@ function validateRegister(body) {
     if (!validatePasswordStrength(body.password)) {
         errors.push('Password must be at least 8 characters and include at least one letter and one number.');
     }
+    if (body.password !== body.confirmPassword) {
+        errors.push('Passwords do not match.');
+    }
     return { valid: errors.length === 0, errors };
 }
 
@@ -381,11 +384,12 @@ function validateOrder(orderData) {
         errors.push('Invalid checkout mode');
     }
     if (checkoutMode === 'layby') {
+        const { MIN_PCT, MAX_PCT } = require('../config/layby');
         const p = orderData.laybyDepositPercent;
         if (p !== undefined && p !== null && p !== '') {
             const num = parseFloat(String(p));
-            if (Number.isNaN(num) || num < 1 || num > 100) {
-                errors.push('Layby deposit percent must be a number between 1 and 100');
+            if (Number.isNaN(num) || num < MIN_PCT || num > MAX_PCT) {
+                errors.push(`Layby deposit percent must be between ${MIN_PCT} and ${MAX_PCT}`);
             }
         }
     }

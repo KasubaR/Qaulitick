@@ -195,10 +195,16 @@
         <!-- Terms Page Stylesheet -->
         <link rel="stylesheet" href="/css/terms.css">
     <% } %>
+
+    <% if (typeof page !=='undefined' && page==='shipping' ) { %>
+        <!-- Shipping Policy — same layout as Terms -->
+        <link rel="stylesheet" href="/css/terms.css">
+    <% } %>
     
     <% if (typeof page !=='undefined' && page==='privacy' ) { %>
-        <!-- Privacy Policy Page Stylesheet -->
+        <!-- Privacy Policy: shared layout styles (about CTA, cards) + contact hero/container -->
         <link rel="stylesheet" href="/css/about.css">
+        <link rel="stylesheet" href="/css/contact.css">
     <% } %>
 
     <% if (typeof page !=='undefined' && page==='layby' ) { %>

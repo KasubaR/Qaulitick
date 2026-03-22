@@ -1,0 +1,129 @@
+<%- include('partials/header', {
+    title: typeof title !== 'undefined' ? title : 'Shipping Policy | Qualitick Collections',
+    page: 'shipping',
+    description: 'Shipping Policy for Qualitick Collections — delivery areas, timeframes, fees, and how we get your order to you.',
+    keywords: 'shipping policy, delivery, Zambia, qualitick collections, watch shipping',
+    canonicalUrl: typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com/shipping',
+    url: typeof url !== 'undefined' ? url : '/shipping',
+    ogType: 'website'
+}) %>
+
+<!-- SHIPPING POLICY PAGE -->
+
+<section class="tc-hero">
+    <div class="tc-hero-inner">
+        <span class="tc-eyebrow">Customer care</span>
+        <h1 class="tc-hero-title">Shipping Policy</h1>
+        <p class="tc-hero-sub">Last updated: <%= new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %></p>
+        <p class="tc-hero-desc">How we process, dispatch, and deliver orders across Zambia. Fees shown at checkout apply to your order.</p>
+    </div>
+    <img src="/images/icons/watermark.svg" alt="" class="tc-hero-watermark" aria-hidden="true">
+</section>
+
+<div class="tc-breadcrumb">
+    <div class="tc-breadcrumb-inner">
+        <a href="/">Home</a>
+        <i class="fas fa-chevron-right"></i>
+        <span>Shipping Policy</span>
+    </div>
+</div>
+
+<div class="tc-body">
+    <div class="tc-body-inner">
+
+        <div class="tc-section">
+            <div class="tc-section-header">
+                <div class="tc-section-icon"><i class="fas fa-map-marked-alt"></i></div>
+                <h2>Coverage &amp; service area</h2>
+            </div>
+            <div class="tc-section-body">
+                <p>Qualitick Collections ships within <strong>Zambia</strong>. We deliver to the address you provide at checkout. If you need delivery to a remote area, we will confirm feasibility and any extra lead time before dispatch.</p>
+            </div>
+        </div>
+
+        <div class="tc-section">
+            <div class="tc-section-header">
+                <div class="tc-section-icon"><i class="fas fa-box"></i></div>
+                <h2>Order processing</h2>
+            </div>
+            <div class="tc-section-body">
+                <p>After your payment is confirmed, we prepare your order for dispatch. Processing time can vary by product availability and verification steps. You will receive updates by email or SMS where applicable.</p>
+                <ul class="tc-list">
+                    <li><i class="fas fa-check"></i><span>Orders are packed securely to protect your timepiece in transit.</span></li>
+                    <li><i class="fas fa-check"></i><span>If an item is temporarily unavailable, we will contact you with options before shipping.</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="tc-section">
+            <div class="tc-section-header">
+                <div class="tc-section-icon"><i class="fas fa-truck"></i></div>
+                <h2>Delivery timeframes</h2>
+            </div>
+            <div class="tc-section-body">
+                <p>Estimated delivery times are shown during checkout and depend on your location and courier schedules. These are estimates, not guarantees — weather, public holidays, and carrier capacity can affect arrival dates.</p>
+                <ul class="tc-list">
+                    <li><i class="fas fa-check"></i><span><strong>Major centres:</strong> typically within a few business days after dispatch.</span></li>
+                    <li><i class="fas fa-check"></i><span><strong>Other areas:</strong> may require additional transit time.</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="tc-section">
+            <div class="tc-section-header">
+                <div class="tc-section-icon"><i class="fas fa-receipt"></i></div>
+                <h2>Shipping fees</h2>
+            </div>
+            <div class="tc-section-body">
+                <p>Delivery fees (if any) are calculated at <strong>checkout</strong> based on your order and shipping details — for example, pickup options may have no delivery charge. The amount you see before you pay is what applies to that order.</p>
+            </div>
+        </div>
+
+        <div class="tc-section">
+            <div class="tc-section-header">
+                <div class="tc-section-icon"><i class="fas fa-search-location"></i></div>
+                <h2>Tracking &amp; updates</h2>
+            </div>
+            <div class="tc-section-body">
+                <p>When your order ships, we share tracking or reference details where our courier or process allows. If you have questions about status, <a href="/contact" class="tc-link">contact us</a> with your order number.</p>
+            </div>
+        </div>
+
+        <div class="tc-section">
+            <div class="tc-section-header">
+                <div class="tc-section-icon"><i class="fas fa-home"></i></div>
+                <h2>Delivery address &amp; receipt</h2>
+            </div>
+            <div class="tc-section-body">
+                <p>You are responsible for providing a complete, accurate delivery address and a reachable phone number. Please inspect your package when possible and report obvious damage to the carrier and to us promptly.</p>
+                <p>If delivery cannot be completed (wrong address, unreachable recipient, or refused parcel), additional fees or return handling may apply as agreed with you.</p>
+            </div>
+        </div>
+
+        <div class="tc-section">
+            <div class="tc-section-header">
+                <div class="tc-section-icon"><i class="fas fa-clock"></i></div>
+                <h2>Delays outside our control</h2>
+            </div>
+            <div class="tc-section-body">
+                <p>We are not liable for delays caused by couriers, customs (if ever applicable), weather, strikes, or other events beyond our reasonable control. We will do our best to keep you informed and find a fair solution.</p>
+            </div>
+        </div>
+
+        <div class="tc-section tc-section-contact">
+            <div class="tc-section-header">
+                <div class="tc-section-icon"><i class="fas fa-envelope"></i></div>
+                <h2>Questions about shipping?</h2>
+            </div>
+            <div class="tc-section-body">
+                <p>Reach us through our <a href="/contact" class="tc-link">contact page</a> — include your order number if your question relates to an existing purchase.</p>
+                <div class="tc-contact-btns">
+                    <a href="/contact" class="btn-hero-primary">Contact Us <img src="/images/icons/Arrow-Icon.svg" alt=""></a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<%- include('partials/footer') %>

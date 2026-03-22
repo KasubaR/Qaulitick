@@ -208,6 +208,10 @@ router.get('/privacy', (req, res) => {
     res.render('privacy', { title: 'Privacy Policy | Qualitick Collections', page: 'privacy' });
 });
 
+router.get('/shipping', (req, res) => {
+    res.render('shipping', { title: 'Shipping Policy | Qualitick Collections', page: 'shipping' });
+});
+
 router.get('/layby', (req, res) => {
     res.render('layby', { title: 'How Layby Works | Qualitick Collections', page: 'layby' });
 });
@@ -240,7 +244,15 @@ router.get('/checkout', (req, res) => {
         title: 'Checkout | Qualitick Collections',
         page: 'checkout',
         loggedIn: !!u,
-        laybyEligible: !!(u && u.emailVerifiedAt)
+        laybyEligible: !!(u && u.emailVerifiedAt),
+        prefill: u ? {
+            name: u.name || '',
+            email: u.email || '',
+            phone: u.phone || '',
+            deliveryAddress: u.deliveryAddress || '',
+            city: u.city || '',
+            province: u.province || ''
+        } : null
     });
 });
 
@@ -278,6 +290,11 @@ router.post('/logout',
     customerAuthController.handleLogout
 );
 router.get('/verify-email', customerAuthController.verifyEmail);
+router.post('/resend-verification',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 5 }),
+    csrfTokenValidator(),
+    customerAuthController.handleResendVerification
+);
 
 router.get('/forgot-password',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 30 }),
@@ -304,6 +321,8 @@ router.post('/reset-password',
 router.get('/account', requireCustomerAuth, customerAccountController.renderDashboard);
 router.get('/account/profile', requireCustomerAuth, customerAccountController.renderProfile);
 router.post('/account/profile', requireCustomerAuth, csrfTokenValidator(), customerAccountController.updateProfile);
+router.get('/account/address', requireCustomerAuth, customerAccountController.renderAddress);
+router.post('/account/address', requireCustomerAuth, csrfTokenValidator(), customerAccountController.updateAddress);
 router.get('/account/orders', requireCustomerAuth, customerAccountController.renderOrders);
 router.get('/account/layby', requireCustomerAuth, customerAccountController.renderLayby);
 router.post('/account/layby/:id/pay', requireCustomerAuth, csrfTokenValidator(), customerAccountController.startLaybyPayment);

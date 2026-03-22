@@ -1,0 +1,71 @@
+<%- include('../partials/header', {
+    title: typeof title !== 'undefined' ? title : 'Saved address | Qualitick Collections',
+    page: 'account',
+    canonicalUrl: typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com/account/address',
+    url: '/account/address'
+}) %>
+
+<div class="account-page-wrap">
+    <div class="account-hero">
+        <h1>Saved address</h1>
+        <p>Your saved delivery address will be pre-filled at checkout.</p>
+    </div>
+
+    <%- include('./_subnav') %>
+
+    <% if (typeof error !== 'undefined' && error) { %>
+        <div class="account-alert account-alert--error" role="alert"><%= error %></div>
+    <% } %>
+    <% if (typeof message !== 'undefined' && message) { %>
+        <div class="account-alert account-alert--success" role="status"><%= message %></div>
+    <% } %>
+
+    <div class="account-card account-form">
+        <form method="post" action="/account/address" novalidate>
+            <input type="hidden" name="csrfToken" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+
+            <div class="form-group">
+                <label for="addressLine">Delivery Address</label>
+                <input
+                    type="text"
+                    id="addressLine"
+                    name="deliveryAddress"
+                    autocomplete="street-address"
+                    placeholder="Street address, house number"
+                    maxlength="255"
+                    value="<%= typeof customer !== 'undefined' && customer.deliveryAddress ? customer.deliveryAddress : '' %>"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="addressProvince">Province</label>
+                <select id="addressProvince" name="province" autocomplete="address-level1">
+                    <option value="">Select Province</option>
+                    <% const savedProvince = typeof customer !== 'undefined' ? (customer.province || '') : ''; %>
+                    <% ['Central','Copperbelt','Eastern','Luapula','Lusaka','Muchinga','Northern','North-Western','Southern','Western'].forEach(function(p) { %>
+                        <option value="<%= p %>" <%= savedProvince === p ? 'selected' : '' %>><%= p %> Province</option>
+                    <% }); %>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="addressCity">City / Town</label>
+                <input
+                    type="text"
+                    id="addressCity"
+                    name="city"
+                    autocomplete="address-level2"
+                    placeholder="Lusaka"
+                    maxlength="100"
+                    value="<%= typeof customer !== 'undefined' && customer.city ? customer.city : '' %>"
+                >
+            </div>
+
+            <div class="account-actions">
+                <button type="submit" class="account-btn-primary">Save address</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

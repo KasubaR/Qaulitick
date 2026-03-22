@@ -37,6 +37,18 @@ const User = sequelize.define('User', {
     emailVerificationExpires: {
         type: DataTypes.DATE,
         allowNull: true
+    },
+    deliveryAddress: {
+        type: DataTypes.STRING(255),
+        allowNull: true
+    },
+    city: {
+        type: DataTypes.STRING(100),
+        allowNull: true
+    },
+    province: {
+        type: DataTypes.STRING(100),
+        allowNull: true
     }
 }, {
     tableName: 'users',

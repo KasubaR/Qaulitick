@@ -429,54 +429,93 @@ async function generateSKUFromBrandModel(brand, model) {
     }
 }
 
+// Pending color image files: colorGroupId -> File
+const _colorPendingFiles = new Map();
+let _colorKeyCounter = 0;
+
 // Add color input
 function addColorInput() {
     const container = document.getElementById('colorsContainer');
     if (!container) return;
-    
+
+    const key = String(++_colorKeyCounter);
     const colorGroup = document.createElement('div');
     colorGroup.className = 'color-input-group';
+    colorGroup.dataset.colorKey = key;
     colorGroup.innerHTML = `
-        <input type="color" class="color-picker" value="#ffffff">
-        <input type="text" class="color-name-input" placeholder="Color name">
+        <div class="color-image-upload" onclick="this.querySelector('.color-file-input').click()" title="Click to upload color image">
+            <span class="color-upload-placeholder"><i class="fas fa-camera"></i></span>
+            <img class="color-image-preview" src="" alt="" style="display:none;">
+            <input type="file" class="color-file-input" accept="image/jpeg,image/jpg,image/png,image/webp" style="display:none;">
+        </div>
+        <input type="text" class="color-name-input" placeholder="Color name (e.g. Black)">
         <button type="button" class="remove-color-btn" onclick="removeColor(this)">
             <i class="fas fa-times"></i>
         </button>
     `;
+
+    const fileInput = colorGroup.querySelector('.color-file-input');
+    fileInput.addEventListener('change', function () {
+        const file = this.files[0];
+        if (!file) return;
+        _colorPendingFiles.set(key, file);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const preview = colorGroup.querySelector('.color-image-preview');
+            const placeholder = colorGroup.querySelector('.color-upload-placeholder');
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+            placeholder.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    });
+
     container.appendChild(colorGroup);
 }
 
 // Remove color
 function removeColor(btn) {
-    btn.closest('.color-input-group').remove();
+    const group = btn.closest('.color-input-group');
+    if (group && group.dataset.colorKey) {
+        _colorPendingFiles.delete(group.dataset.colorKey);
+    }
+    group.remove();
 }
 
-// Collect colors from form
+// Collect colors from form — returns { name, image (url or null), _pendingKey } per entry
 function collectColors() {
     const colorsContainer = document.getElementById('colorsContainer');
     if (!colorsContainer) return [];
-    
-    const colorGroups = colorsContainer.querySelectorAll('.color-input-group');
+
     const colors = [];
-    
-    colorGroups.forEach(group => {
-        const colorPicker = group.querySelector('.color-picker');
-        const colorNameInput = group.querySelector('.color-name-input');
-        
-        if (colorPicker && colorNameInput) {
-            const hex = colorPicker.value;
-            const name = colorNameInput.value.trim();
-            
-            if (hex || name) {
-                colors.push({
-                    hex: hex || '#ffffff',
-                    name: name || ''
-                });
-            }
-        }
+    colorsContainer.querySelectorAll('.color-input-group').forEach(group => {
+        const name = (group.querySelector('.color-name-input')?.value || '').trim();
+        if (!name) return;
+        const existingUrl = group.dataset.colorImage || null;
+        const pendingKey = group.dataset.colorKey || null;
+        colors.push({ name, image: existingUrl, _pendingKey: pendingKey });
     });
-    
     return colors;
+}
+
+// Upload any pending color images and return colors array with resolved URLs
+async function uploadColorImages(colors) {
+    const resolved = [];
+    for (const color of colors) {
+        const file = color._pendingKey ? _colorPendingFiles.get(color._pendingKey) : null;
+        if (file) {
+            try {
+                const urls = await window.uploadImages([file]);
+                resolved.push({ name: color.name, image: urls[0] || null });
+                _colorPendingFiles.delete(color._pendingKey);
+            } catch {
+                resolved.push({ name: color.name, image: color.image || null });
+            }
+        } else {
+            resolved.push({ name: color.name, image: color.image || null });
+        }
+    }
+    return resolved;
 }
 
 // Setup tabs
@@ -772,18 +811,46 @@ async function loadProductData(productId) {
             colorsContainer.innerHTML = '';
 
             productColors.forEach(color => {
-                const hexValue = color && (color.hex || color.hexCode) ? (color.hex || color.hexCode) : '#ffffff';
                 const nameValue = color && color.name ? color.name : '';
+                const imageUrl = color && color.image ? color.image : '';
+                const key = String(++_colorKeyCounter);
 
                 const colorGroup = document.createElement('div');
                 colorGroup.className = 'color-input-group';
+                colorGroup.dataset.colorKey = key;
+                if (imageUrl) colorGroup.dataset.colorImage = imageUrl;
+
                 colorGroup.innerHTML = `
-                    <input type="color" class="color-picker" value="${hexValue}">
-                    <input type="text" class="color-name-input" placeholder="Color name" value="${nameValue}">
+                    <div class="color-image-upload" onclick="this.querySelector('.color-file-input').click()" title="Click to change color image">
+                        ${imageUrl
+                            ? `<img class="color-image-preview" src="${imageUrl}" alt="">`
+                            : `<span class="color-upload-placeholder"><i class="fas fa-camera"></i></span><img class="color-image-preview" src="" alt="" style="display:none;">`
+                        }
+                        <input type="file" class="color-file-input" accept="image/jpeg,image/jpg,image/png,image/webp" style="display:none;">
+                    </div>
+                    <input type="text" class="color-name-input" placeholder="Color name (e.g. Black)" value="${nameValue}">
                     <button type="button" class="remove-color-btn" onclick="removeColor(this)">
                         <i class="fas fa-times"></i>
                     </button>
                 `;
+
+                const fileInput = colorGroup.querySelector('.color-file-input');
+                fileInput.addEventListener('change', function () {
+                    const file = this.files[0];
+                    if (!file) return;
+                    _colorPendingFiles.set(key, file);
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const preview = colorGroup.querySelector('.color-image-preview');
+                        const placeholder = colorGroup.querySelector('.color-upload-placeholder');
+                        preview.src = e.target.result;
+                        preview.style.display = 'block';
+                        if (placeholder) placeholder.style.display = 'none';
+                        colorGroup.dataset.colorImage = '';
+                    };
+                    reader.readAsDataURL(file);
+                });
+
                 colorsContainer.appendChild(colorGroup);
             });
         }
@@ -1120,12 +1187,12 @@ async function handleFormSubmit(e) {
         return; // Prevent form submission
     }
     
-    // Collect colors from form
-    const colors = collectColors();
-    if (colors.length > 0) {
-        productData.colors = colors;
+    // Collect colors and upload any pending color images
+    const rawColors = collectColors();
+    if (rawColors.length > 0) {
+        productData.colors = await uploadColorImages(rawColors);
     }
-    
+
     // Collect new File objects from the image module's pending map
     const newFiles = window.getNewFiles ? window.getNewFiles() : [];
     
@@ -1673,17 +1740,46 @@ async function duplicateProduct(productId) {
             colorsContainer.innerHTML = '';
             if (productCopy.colors && productCopy.colors.length > 0) {
                 productCopy.colors.forEach(color => {
+                    const nameValue = color.name || '';
+                    const imageUrl = color.image || '';
+                    const key = String(++_colorKeyCounter);
+
                     const colorGroup = document.createElement('div');
                     colorGroup.className = 'color-input-group';
-                    // Note: The color object might have 'hex' or 'hexCode' property
-                    const hexValue = color.hex || color.hexCode || '#ffffff';
+                    colorGroup.dataset.colorKey = key;
+                    if (imageUrl) colorGroup.dataset.colorImage = imageUrl;
+
                     colorGroup.innerHTML = `
-                        <input type="color" class="color-picker" value="${hexValue}">
-                        <input type="text" class="color-name-input" placeholder="Color name" value="${color.name || ''}">
+                        <div class="color-image-upload" onclick="this.querySelector('.color-file-input').click()" title="Click to change color image">
+                            ${imageUrl
+                                ? `<img class="color-image-preview" src="${imageUrl}" alt="">`
+                                : `<span class="color-upload-placeholder"><i class="fas fa-camera"></i></span><img class="color-image-preview" src="" alt="" style="display:none;">`
+                            }
+                            <input type="file" class="color-file-input" accept="image/jpeg,image/jpg,image/png,image/webp" style="display:none;">
+                        </div>
+                        <input type="text" class="color-name-input" placeholder="Color name (e.g. Black)" value="${nameValue}">
                         <button type="button" class="remove-color-btn" onclick="removeColor(this)">
                             <i class="fas fa-times"></i>
                         </button>
                     `;
+
+                    const fileInput = colorGroup.querySelector('.color-file-input');
+                    fileInput.addEventListener('change', function () {
+                        const file = this.files[0];
+                        if (!file) return;
+                        _colorPendingFiles.set(key, file);
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const preview = colorGroup.querySelector('.color-image-preview');
+                            const placeholder = colorGroup.querySelector('.color-upload-placeholder');
+                            preview.src = e.target.result;
+                            preview.style.display = 'block';
+                            if (placeholder) placeholder.style.display = 'none';
+                            colorGroup.dataset.colorImage = '';
+                        };
+                        reader.readAsDataURL(file);
+                    });
+
                     colorsContainer.appendChild(colorGroup);
                 });
             }

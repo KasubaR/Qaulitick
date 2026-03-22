@@ -10,6 +10,10 @@ const LaybyPlan = require('../models/LaybyPlan.model');
 const { getAuthenticatedAdmin } = require('../middlewares/auth.middleware');
 const logger = require('../utils/logger').child({ module: 'PaymentController' });
 
+function roundMoney2(x) {
+    return Math.round(Number(x) * 100) / 100;
+}
+
 /**
  * Layby payments: only the plan owner (or an admin) may poll verify — transaction IDs are not public secrets.
  * @returns {Promise<{ status: number, body: object }|null>} Error response to send, or null if allowed
@@ -51,7 +55,8 @@ const ENABLE_BANK_TRANSFER = process.env.ENABLE_BANK_TRANSFER === 'true' || proc
  * Process Payment
  * Handles payment initiation for Lenco payment methods (mobile money and bank transfer).
  *
- * Amount is always fetched from the database — do not send it from the client.
+ * Amount is taken from the database for standard checkout and scheduled layby installments.
+ * Flexible layby balance payments may optionally send laybyPayAmount (validated and capped server-side).
  * The orderNumber is the sole key; the server derives every financial value from
  * the persisted order record to prevent client-side price manipulation.
  */
@@ -62,6 +67,7 @@ exports.processPayment = async (req, res) => {
             paymentMethod,
             customerInfo,
             laybyPaymentId: rawLaybyPaymentId,
+            laybyPayAmount: rawLaybyPayAmount,
             // Lenco-specific fields
             provider, // For mobile money: 'airtel', 'mtn'
             customerPhone, // For mobile money: phone number
@@ -132,7 +138,43 @@ exports.processPayment = async (req, res) => {
                     message: 'This installment is not awaiting payment.'
                 });
             }
-            authoritativeAmount = Number(installment.amount);
+            const balanceCap = roundMoney2(Number(plan.balanceRemaining));
+            const rowAmount = roundMoney2(Number(installment.amount));
+            const flex = laybyService.isFlexibleBalanceInstallment(plan, installment);
+
+            if (flex) {
+                const maxCharge = roundMoney2(Math.min(balanceCap, rowAmount));
+                if (rawLaybyPayAmount !== undefined && rawLaybyPayAmount !== null && rawLaybyPayAmount !== '') {
+                    const requested = roundMoney2(parseFloat(String(rawLaybyPayAmount)));
+                    if (Number.isNaN(requested) || requested <= 0) {
+                        return res.status(400).json({
+                            success: false,
+                            message: 'Layby payment amount must be a positive number.'
+                        });
+                    }
+                    if (requested > maxCharge) {
+                        return res.status(400).json({
+                            success: false,
+                            message: 'Layby payment amount cannot exceed the remaining balance.'
+                        });
+                    }
+                    authoritativeAmount = requested;
+                } else {
+                    authoritativeAmount = maxCharge;
+                }
+            } else {
+                if (
+                    rawLaybyPayAmount !== undefined &&
+                    rawLaybyPayAmount !== null &&
+                    rawLaybyPayAmount !== ''
+                ) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Custom layby amount is only allowed for flexible balance payments.'
+                    });
+                }
+                authoritativeAmount = rowAmount;
+            }
             orderDataForLenco = {
                 ...order.toJSON(),
                 totals: { ...order.totals, total: authoritativeAmount }

@@ -135,13 +135,17 @@ if (!Array.isArray(product.images)) product.images = [];
                 <!-- COLOR VARIANTS -->
                 <% if (product.colors && product.colors.length > 0) { %>
                     <div class="variant-section">
-                        <label class="variant-label">Color:</label>
+                        <span class="variant-label">Color:</span>
                         <div class="color-options">
                             <% product.colors.forEach((color, index) => { %>
-                                <div class="color-option <%= index === 0 ? 'selected' : '' %>" 
+                                <div class="color-option <%= index === 0 ? 'selected' : '' %>"
                                      data-color="<%= color.name %>"
-                                     style="background-color: <%= color.hex %>;"
                                      title="<%= color.name %>">
+                                    <% if (color.image) { %>
+                                        <img src="<%= color.image %>" alt="<%= color.name %>">
+                                    <% } else if (color.hex) { %>
+                                        <span style="display:block;width:100%;height:100%;background-color:<%= color.hex %>;border-radius:inherit;"></span>
+                                    <% } %>
                                 </div>
                             <% }) %>
                         </div>
@@ -151,7 +155,7 @@ if (!Array.isArray(product.images)) product.images = [];
                 <!-- STRAP TYPE -->
                 <% if (product.strapOptions && product.strapOptions.length > 0) { %>
                     <div class="variant-section">
-                        <label class="variant-label">Strap Type:</label>
+                        <span class="variant-label">Strap Type:</span>
                         <div class="strap-options">
                             <% product.strapOptions.forEach((strap, index) => { %>
                                 <button class="strap-option <%= index === 0 ? 'selected' : '' %>" 
@@ -165,18 +169,19 @@ if (!Array.isArray(product.images)) product.images = [];
 
                 <!-- QUANTITY SELECTOR -->
                 <div class="quantity-section">
-                    <label class="variant-label">Quantity:</label>
+                    <label class="variant-label" for="quantityInput">Quantity:</label>
                     <div class="quantity-controls">
                         <button class="quantity-btn" id="decreaseQty" aria-label="Decrease quantity">
                             <i class="fas fa-minus"></i>
                         </button>
-                        <input 
-                            type="number" 
-                            id="quantityInput" 
-                            class="quantity-input" 
-                            value="1" 
-                            min="1" 
+                        <input
+                            type="number"
+                            id="quantityInput"
+                            class="quantity-input"
+                            value="1"
+                            min="1"
                             max="<%= product.stock %>"
+                            autocomplete="off"
                             readonly
                         >
                         <button class="quantity-btn" id="increaseQty" aria-label="Increase quantity">
@@ -395,23 +400,23 @@ if (!Array.isArray(product.images)) product.images = [];
                         <i class="far fa-star" data-rating="4"></i>
                         <i class="far fa-star" data-rating="5"></i>
                     </div>
-                    <input type="hidden" name="rating" id="reviewRating" required>
+                    <input type="hidden" name="rating" id="reviewRating" autocomplete="off" required>
                 </div>
                 <div class="form-group">
                     <label for="reviewTitle">Review Title *</label>
-                    <input type="text" id="reviewTitle" name="title" required placeholder="Sum up your experience" maxlength="100">
+                    <input type="text" id="reviewTitle" name="title" autocomplete="off" required placeholder="Sum up your experience" maxlength="100">
                 </div>
                 <div class="form-group">
                     <label for="reviewComment">Your Review *</label>
-                    <textarea id="reviewComment" name="comment" rows="5" required placeholder="Share your thoughts about this product" maxlength="1000"></textarea>
+                    <textarea id="reviewComment" name="comment" rows="5" autocomplete="off" required placeholder="Share your thoughts about this product" maxlength="1000"></textarea>
                 </div>
                 <div class="form-group">
                     <label for="reviewName">Your Name *</label>
-                    <input type="text" id="reviewName" name="name" required maxlength="100">
+                    <input type="text" id="reviewName" name="name" autocomplete="name" required maxlength="100">
                 </div>
                 <div class="form-group">
                     <label for="reviewEmail">Your Email *</label>
-                    <input type="email" id="reviewEmail" name="email" required placeholder="Use the email from your order">
+                    <input type="email" id="reviewEmail" name="email" autocomplete="email" required placeholder="Use the email from your order">
                     <small style="color: #666; font-size: 12px;">We'll verify your purchase using this email</small>
                 </div>
                 <button type="submit" class="btn-primary">Submit Review</button>
@@ -421,7 +426,7 @@ if (!Array.isArray(product.images)) product.images = [];
 
     <!-- Pass product data to JavaScript -->
     <script>
-        window.productData = JSON.parse(<%= JSON.stringify(JSON.stringify(product))
+        window.productData = JSON.parse(<%- JSON.stringify(JSON.stringify(product))
             .replace(/&/g, '\\u0026')
             .replace(/</g, '\\u003c')
             .replace(/>/g, '\\u003e') %>);

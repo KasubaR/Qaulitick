@@ -421,7 +421,7 @@
         // JSON is HTML-encoded to prevent </script> injection (stored XSS).
         // The three replacements cover every character that can break out of a
         // script block; JSON.parse on the client reverses the encoding safely.
-        window.initialProducts = JSON.parse(<%= JSON.stringify(JSON.stringify(products))
+        window.initialProducts = JSON.parse(<%- JSON.stringify(JSON.stringify(products))
             .replace(/&/g, '\\u0026')
             .replace(/</g, '\\u003c')
             .replace(/>/g, '\\u003e') %>);

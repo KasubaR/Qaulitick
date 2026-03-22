@@ -12,6 +12,17 @@
     </div>
 
     <div class="account-card account-form">
+        <% if (typeof unverifiedEmail !== 'undefined' && unverifiedEmail) { %>
+            <div class="account-alert account-alert--error" role="alert">
+                Please verify your email before signing in. Check your inbox for the verification link.
+            </div>
+            <form method="post" action="/resend-verification" novalidate style="margin-top:1rem;">
+                <input type="hidden" name="csrfToken" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                <input type="hidden" name="email" value="<%= unverifiedEmail %>">
+                <button type="submit" class="account-btn-secondary">Resend verification email</button>
+            </form>
+            <hr style="margin:1.5rem 0;">
+        <% } %>
         <% if (typeof error !== 'undefined' && error) { %>
             <div class="account-alert account-alert--error" role="alert"><%= error %></div>
         <% } %>

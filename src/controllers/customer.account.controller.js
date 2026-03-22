@@ -84,6 +84,72 @@ exports.updateProfile = async (req, res) => {
     }
 };
 
+exports.renderAddress = (req, res) => {
+    const u = req.customerUser.toJSON();
+    res.render('account/address', {
+        title: 'Saved address | Qualitick Collections',
+        page: 'account',
+        accountSection: 'address',
+        customer: u,
+        error: null,
+        message: null,
+        csrfToken: res.locals.csrfToken || ''
+    });
+};
+
+const VALID_PROVINCES = [
+    'Central', 'Copperbelt', 'Eastern', 'Luapula',
+    'Lusaka', 'Muchinga', 'Northern', 'North-Western', 'Southern', 'Western'
+];
+
+exports.updateAddress = async (req, res) => {
+    const renderWith = (status, error, message) => {
+        return res.status(status).render('account/address', {
+            title: 'Saved address | Qualitick Collections',
+            page: 'account',
+            accountSection: 'address',
+            customer: req.customerUser.toJSON(),
+            error,
+            message,
+            csrfToken: res.locals.csrfToken || ''
+        });
+    };
+
+    try {
+        const body = sanitizeObject(req.body);
+        const deliveryAddress = body.deliveryAddress ? String(body.deliveryAddress).trim() : '';
+        const city = body.city ? String(body.city).trim() : '';
+        const province = body.province ? String(body.province).trim() : '';
+
+        if (deliveryAddress && deliveryAddress.length > 255) {
+            return renderWith(400, 'Delivery address is too long.', null);
+        }
+        if (city && city.length > 100) {
+            return renderWith(400, 'City name is too long.', null);
+        }
+        if (province && !VALID_PROVINCES.includes(province)) {
+            return renderWith(400, 'Please select a valid province.', null);
+        }
+
+        await userService.updateAddress(req.customerUser.id, { deliveryAddress, city, province });
+        const refreshed = await userService.findById(req.customerUser.id);
+        req.customerUser = refreshed;
+
+        return res.render('account/address', {
+            title: 'Saved address | Qualitick Collections',
+            page: 'account',
+            accountSection: 'address',
+            customer: refreshed.toJSON(),
+            error: null,
+            message: 'Address saved.',
+            csrfToken: res.locals.csrfToken || ''
+        });
+    } catch (error) {
+        logger.error({ err: error }, 'updateAddress failed');
+        return renderWith(500, 'Could not save address. Try again later.', null);
+    }
+};
+
 exports.renderOrders = async (req, res) => {
     try {
         const orders = await Order.findAll({
@@ -191,12 +257,28 @@ exports.startLaybyPayment = async (req, res) => {
         }
 
         const orderRow = plan.order;
+        let sched = plan.installmentSchedule;
+        if (typeof sched === 'string') {
+            try {
+                sched = JSON.parse(sched);
+            } catch {
+                sched = null;
+            }
+        }
+        const flexible =
+            sched &&
+            typeof sched === 'object' &&
+            sched.policy === 'flexible_within_period' &&
+            nextPayment.sequence >= 2;
+
         return res.json({
             success: true,
             laybyPaymentId: nextPayment.id,
             orderNumber: orderRow ? orderRow.orderNumber : null,
             amount: Number(nextPayment.amount),
-            currency: plan.currency
+            balanceRemaining: Number(plan.balanceRemaining),
+            currency: plan.currency,
+            allowPartialPay: !!flexible
         });
     } catch (error) {
         logger.error({ err: error }, 'startLaybyPayment failed');

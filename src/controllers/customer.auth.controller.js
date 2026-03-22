@@ -111,7 +111,7 @@ exports.handleRegister = async (req, res) => {
         }
 
         return res.redirect('/login?message=' + encodeURIComponent(
-            'Account created. Check your email to verify your address before using layby at checkout.'
+            'Account created. Please check your email and verify your address before signing in.'
         ));
     } catch (error) {
         logger.error({ err: error, op: 'handleRegister' }, 'handleRegister failed');
@@ -172,6 +172,21 @@ exports.handleLogin = async (req, res) => {
                 accountSection: 'login',
                 error: 'Invalid email or password.',
                 message: null,
+                returnUrl: body.returnUrl || '/account',
+                csrfToken: res.locals.csrfToken || ''
+            });
+        }
+
+        // Block login until email is verified (respects the CUSTOMER_EMAIL_VERIFICATION flag)
+        const verificationEnabled = process.env.CUSTOMER_EMAIL_VERIFICATION !== 'false';
+        if (verificationEnabled && !user.emailVerifiedAt) {
+            return res.status(403).render('account/login', {
+                title: 'Sign in | Qualitick Collections',
+                page: 'account',
+                accountSection: 'login',
+                error: null,
+                message: null,
+                unverifiedEmail: userService.normalizeEmail(body.email),
                 returnUrl: body.returnUrl || '/account',
                 csrfToken: res.locals.csrfToken || ''
             });
@@ -440,6 +455,37 @@ exports.handleResetPassword = async (req, res) => {
             error: 'Something went wrong. Please try again.',
             csrfToken: res.locals.csrfToken || ''
         });
+    }
+};
+
+exports.handleResendVerification = async (req, res) => {
+    try {
+        const body = sanitizeObject(req.body);
+        const email = body.email || '';
+
+        // Always redirect with the same message to avoid revealing whether the email exists
+        const successMsg = encodeURIComponent('If your email is registered and unverified, a new link has been sent.');
+        const redirectBack = `/login?message=${successMsg}`;
+
+        const result = await userService.createNewVerificationToken(email);
+        if (result) {
+            const baseUrl = userService.getPublicSiteUrl();
+            const verifyUrl = `${baseUrl}/verify-email?token=${encodeURIComponent(result.verificationToken)}`;
+            try {
+                await emailService.sendCustomerEmailVerification({
+                    to: userService.normalizeEmail(email),
+                    name: result.user.name || result.user.email,
+                    verifyUrl
+                });
+            } catch (mailErr) {
+                logger.warn({ err: mailErr }, 'Resend verification email failed');
+            }
+        }
+
+        return res.redirect(redirectBack);
+    } catch (error) {
+        logger.error({ err: error, op: 'handleResendVerification' }, 'handleResendVerification failed');
+        return res.redirect('/login?error=' + encodeURIComponent('Something went wrong. Please try again.'));
     }
 };
 

@@ -30,13 +30,14 @@
                             
                             <div class="form-group">
                                 <label for="fullName">Full Name <span class="required">*</span></label>
-                                <input 
-                                    type="text" 
-                                    id="fullName" 
-                                    name="fullName" 
-                                    class="form-input" 
+                                <input
+                                    type="text"
+                                    id="fullName"
+                                    name="fullName"
+                                    class="form-input"
                                     required
                                     placeholder="Enter your full name"
+                                    value="<%= typeof prefill !== 'undefined' && prefill ? prefill.name : '' %>"
                                 >
                                 <span class="error-message" id="fullNameError"></span>
                             </div>
@@ -44,31 +45,34 @@
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="phone">Phone Number <span class="required">*</span></label>
-                                    <input 
-                                        type="tel" 
-                                        id="phone" 
-                                        name="phone" 
-                                        class="form-input" 
+                                    <input
+                                        type="tel"
+                                        id="phone"
+                                        name="phone"
+                                        class="form-input"
                                         required
                                         placeholder="+260 9XX XXX XXX"
+                                        value="<%= typeof prefill !== 'undefined' && prefill ? prefill.phone : '' %>"
                                     >
                                     <span class="error-message" id="phoneError"></span>
                                 </div>
 
                                 <div class="form-group">
                                     <label for="email">Email Address <span class="required">*</span></label>
-                                    <input 
-                                        type="email" 
-                                        id="email" 
-                                        name="email" 
-                                        class="form-input" 
+                                    <input
+                                        type="email"
+                                        id="email"
+                                        name="email"
+                                        class="form-input"
                                         required
                                         placeholder="your.email@example.com"
+                                        value="<%= typeof prefill !== 'undefined' && prefill ? prefill.email : '' %>"
                                     >
                                     <span class="error-message" id="emailError"></span>
                                 </div>
                             </div>
 
+                            <% if (!loggedIn) { %>
                             <div class="form-group checkbox-group">
                                 <label class="checkbox-label">
                                     <input type="checkbox" id="createAccount" name="createAccount">
@@ -79,6 +83,7 @@
                             <div class="login-prompt login-prompt--hidden" id="loginPrompt">
                                 <p>Already have an account? <a href="/login?returnUrl=/checkout" id="loginLink">Log in</a></p>
                             </div>
+                            <% } %>
                         </div>
 
                         <!-- Delivery / Shipping Information -->
@@ -89,13 +94,14 @@
 
                             <div class="form-group">
                                 <label for="deliveryAddress">Delivery Address <span class="required">*</span></label>
-                                <input 
-                                    type="text" 
-                                    id="deliveryAddress" 
-                                    name="deliveryAddress" 
-                                    class="form-input" 
+                                <input
+                                    type="text"
+                                    id="deliveryAddress"
+                                    name="deliveryAddress"
+                                    class="form-input"
                                     required
                                     placeholder="Street address, house number"
+                                    value="<%= typeof prefill !== 'undefined' && prefill ? prefill.deliveryAddress : '' %>"
                                 >
                                 <span class="error-message" id="deliveryAddressError"></span>
                             </div>
@@ -105,29 +111,24 @@
                                     <label for="province">Province <span class="required">*</span></label>
                                     <select id="province" name="province" class="form-input" required>
                                         <option value="">Select Province</option>
-                                        <option value="Central">Central Province</option>
-                                        <option value="Copperbelt">Copperbelt Province</option>
-                                        <option value="Eastern">Eastern Province</option>
-                                        <option value="Luapula">Luapula Province</option>
-                                        <option value="Lusaka">Lusaka Province</option>
-                                        <option value="Muchinga">Muchinga Province</option>
-                                        <option value="Northern">Northern Province</option>
-                                        <option value="North-Western">North-Western Province</option>
-                                        <option value="Southern">Southern Province</option>
-                                        <option value="Western">Western Province</option>
+                                        <% const savedProvince = typeof prefill !== 'undefined' && prefill ? prefill.province : ''; %>
+                                        <% ['Central','Copperbelt','Eastern','Luapula','Lusaka','Muchinga','Northern','North-Western','Southern','Western'].forEach(p => { %>
+                                            <option value="<%= p %>" <%= savedProvince === p ? 'selected' : '' %>><%= p %> Province</option>
+                                        <% }) %>
                                     </select>
                                     <span class="error-message" id="provinceError"></span>
                                 </div>
 
                                 <div class="form-group">
                                     <label for="city">City / Town <span class="required">*</span></label>
-                                    <input 
-                                        type="text" 
-                                        id="city" 
-                                        name="city" 
-                                        class="form-input" 
+                                    <input
+                                        type="text"
+                                        id="city"
+                                        name="city"
+                                        class="form-input"
                                         required
                                         placeholder="Lusaka"
+                                        value="<%= typeof prefill !== 'undefined' && prefill ? prefill.city : '' %>"
                                     >
                                     <span class="error-message" id="cityError"></span>
                                 </div>
@@ -161,7 +162,7 @@
                             <h2 class="section-title">
                                 <i class="fas fa-calendar-alt"></i> Payment schedule
                             </h2>
-                            <p class="layby-checkout-intro">Pay a deposit now and the rest in weekly installments. Deposit percentage is chosen below; amounts are calculated on the server.</p>
+                            <p class="layby-checkout-intro">Pay a deposit now and clear the rest in as many payments as you like within up to 90 days. Choose your deposit percentage below; amounts are calculated on the server.</p>
                             <div class="form-group layby-mode-options">
                                 <label class="checkbox-label layby-radio-label">
                                     <input type="radio" name="checkoutMode" value="standard" id="checkoutModeStandard" checked>
@@ -175,13 +176,21 @@
                             <div id="laybyDepositWrap" class="form-group layby-deposit-wrap layby-deposit-wrap--hidden">
                                 <label for="laybyDepositPercent">Deposit (%)</label>
                                 <select id="laybyDepositPercent" name="laybyDepositPercent" class="form-input">
-                                    <option value="20">20%</option>
-                                    <option value="25">25%</option>
                                     <option value="30" selected>30%</option>
                                     <option value="35">35%</option>
                                     <option value="40">40%</option>
                                     <option value="45">45%</option>
                                     <option value="50">50%</option>
+                                    <option value="55">55%</option>
+                                    <option value="60">60%</option>
+                                    <option value="65">65%</option>
+                                    <option value="70">70%</option>
+                                    <option value="75">75%</option>
+                                    <option value="80">80%</option>
+                                    <option value="85">85%</option>
+                                    <option value="90">90%</option>
+                                    <option value="95">95%</option>
+                                    <option value="100">100%</option>
                                 </select>
                             </div>
                         </div>

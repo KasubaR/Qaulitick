@@ -60,6 +60,22 @@ async function findById(id) {
 
 /**
  * @param {number} userId
+ * @param {{ deliveryAddress?: string, city?: string, province?: string }} data
+ */
+async function updateAddress(userId, data) {
+    const user = await User.findByPk(userId);
+    if (!user) return null;
+    const updates = {};
+    if (data.deliveryAddress !== undefined) updates.deliveryAddress = (data.deliveryAddress && String(data.deliveryAddress).trim()) || null;
+    if (data.city !== undefined) updates.city = (data.city && String(data.city).trim()) || null;
+    if (data.province !== undefined) updates.province = (data.province && String(data.province).trim()) || null;
+    if (Object.keys(updates).length === 0) return user;
+    await user.update(updates);
+    return user.reload();
+}
+
+/**
+ * @param {number} userId
  * @param {{ name?: string, phone?: string }} data
  */
 async function updateProfile(userId, data) {
@@ -71,6 +87,29 @@ async function updateProfile(userId, data) {
     if (Object.keys(updates).length === 0) return user;
     await user.update(updates);
     return user.reload();
+}
+
+/**
+ * Issue a fresh email verification token for an unverified account.
+ * Returns null if the user is not found or already verified.
+ * @param {string} email
+ * @returns {Promise<{ verificationToken: string, user: import('sequelize').Model }|null>}
+ */
+async function createNewVerificationToken(email) {
+    const normalized = normalizeEmail(email);
+    const user = await User.findOne({ where: { email: normalized } });
+    if (!user || user.emailVerifiedAt) return null;
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationTokenHash = hashToken(verificationToken);
+    const verificationExpires = new Date(Date.now() + EMAIL_VERIFICATION_HOURS * 60 * 60 * 1000);
+
+    await user.update({
+        emailVerificationToken: verificationTokenHash,
+        emailVerificationExpires: verificationExpires
+    });
+
+    return { verificationToken, user };
 }
 
 /**
@@ -200,7 +239,9 @@ module.exports = {
     findByEmailForLogin,
     findById,
     updateProfile,
+    updateAddress,
     verifyEmailByToken,
+    createNewVerificationToken,
     getPublicSiteUrl,
     EMAIL_VERIFICATION_HOURS,
     createPasswordResetRequest,

@@ -988,6 +988,252 @@ body {
     color: var(--gold-light);
 }
 
+/* --- Privacy policy page — content column (Contact-style container + About-style cards) --- */
+.contact-container.privacy-policy-page .privacy-policy-content {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.privacy-policy-page .terms-category > h2.section-title {
+    text-align: left;
+    margin-bottom: 28px;
+}
+
+.privacy-policy-page .terms-category {
+    background: #fff;
+    border: 1px solid rgba(175, 144, 68, 0.12);
+    border-radius: 18px;
+    box-shadow: none;
+}
+
+.privacy-policy-page .terms-category:hover {
+    transform: none;
+    border-color: rgba(175, 144, 68, 0.3);
+    box-shadow: 0 12px 40px rgba(175, 144, 68, 0.09);
+}
+
+.privacy-policy-page .terms-category > h2.section-title {
+    background: none;
+    -webkit-background-clip: initial;
+    background-clip: initial;
+    color: #070707;
+}
+
+.privacy-policy-page .terms-category > h2.section-title i {
+    background: rgba(175, 144, 68, 0.12);
+    -webkit-background-clip: initial;
+    background-clip: initial;
+    color: var(--gold);
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+}
+
+.privacy-policy-page .terms-category p {
+    color: #5a5040;
+}
+
+.privacy-policy-page .terms-category p strong {
+    color: #2c2618;
+}
+
+.privacy-policy-page .terms-category ul li {
+    color: #5a5040;
+    border-bottom-color: rgba(175, 144, 68, 0.1);
+}
+
+.privacy-policy-page .terms-category ul li i {
+    color: var(--gold);
+}
+
+.privacy-policy-page .terms-category ul li strong {
+    color: #2c2618;
+}
+
+.privacy-policy-page .terms-category a {
+    color: var(--gold);
+    text-decoration-color: rgba(175, 144, 68, 0.4);
+}
+
+.privacy-policy-page .terms-category a:hover {
+    color: #2c2618;
+    text-decoration-color: rgba(44, 38, 24, 0.5);
+}
+
+/* Cookie policy subsection — inner components only (outer card uses .privacy-policy-page .terms-category) */
+.terms-category.cookie-policy-section .cookie-overview {
+    background: #f9f7f2;
+    border: 1px solid rgba(175, 144, 68, 0.15);
+}
+
+.terms-category.cookie-policy-section .cookie-overview-item {
+    background: #fff;
+    border: 1px solid rgba(175, 144, 68, 0.1);
+}
+
+.terms-category.cookie-policy-section .cookie-overview-item:hover {
+    background: #fffefb;
+    border-color: rgba(175, 144, 68, 0.22);
+}
+
+.terms-category.cookie-policy-section .cookie-overview-content h4 {
+    color: #2c2618;
+}
+
+.terms-category.cookie-policy-section .cookie-overview-content p {
+    color: #7a6f5c;
+}
+
+.terms-category.cookie-policy-section .cookie-status.always-active {
+    background: rgba(46, 125, 50, 0.1);
+    color: #2e7d32;
+    border-color: rgba(46, 125, 50, 0.25);
+}
+
+.terms-category.cookie-policy-section .cookie-status.requires-consent {
+    background: rgba(183, 137, 0, 0.12);
+    color: #8a6d00;
+    border-color: rgba(183, 137, 0, 0.28);
+}
+
+.terms-category.cookie-policy-section .cookie-section-title {
+    color: #070707;
+}
+
+.terms-category.cookie-policy-section .cookie-section-title::before,
+.terms-category.cookie-policy-section .cookie-section-title::after {
+    background: linear-gradient(to right, transparent, rgba(175, 144, 68, 0.2));
+}
+
+.terms-category.cookie-policy-section .cookie-section-title::after {
+    background: linear-gradient(to left, transparent, rgba(175, 144, 68, 0.2));
+}
+
+.terms-category.cookie-policy-section .cookie-info-section {
+    background: #fffcf7;
+    border: 1px solid rgba(175, 144, 68, 0.12);
+    border-left-width: 4px;
+    border-radius: 14px;
+}
+
+.terms-category.cookie-policy-section .cookie-info-section:hover {
+    background: #fffefb;
+    box-shadow: 0 8px 28px rgba(175, 144, 68, 0.08);
+}
+
+.terms-category.cookie-policy-section .cookie-info-section.cookie-essential {
+    border-left-color: rgba(46, 125, 50, 0.45);
+}
+
+.terms-category.cookie-policy-section .cookie-info-section.cookie-analytics,
+.terms-category.cookie-policy-section .cookie-info-section.cookie-preferences {
+    border-left-color: rgba(175, 144, 68, 0.55);
+}
+
+.terms-category.cookie-policy-section .cookie-info-section h4 {
+    color: #070707;
+}
+
+.terms-category.cookie-policy-section .cookie-info-section h4 i {
+    background: rgba(175, 144, 68, 0.14);
+    color: var(--gold);
+}
+
+.terms-category.cookie-policy-section .cookie-badge.essential-badge {
+    background: rgba(46, 125, 50, 0.1);
+    color: #2e7d32;
+    border-color: rgba(46, 125, 50, 0.28);
+}
+
+.terms-category.cookie-policy-section .cookie-badge.consent-badge {
+    background: rgba(183, 137, 0, 0.12);
+    color: #8a6d00;
+    border-color: rgba(183, 137, 0, 0.28);
+}
+
+.terms-category.cookie-policy-section .cookie-info-section p {
+    color: #5a5040;
+}
+
+.terms-category.cookie-policy-section .cookie-table thead tr {
+    border-bottom-color: rgba(175, 144, 68, 0.2);
+}
+
+.terms-category.cookie-policy-section .cookie-table th {
+    color: #2c2618;
+}
+
+.terms-category.cookie-policy-section .cookie-table tbody tr {
+    border-bottom-color: rgba(175, 144, 68, 0.1);
+}
+
+.terms-category.cookie-policy-section .cookie-table td {
+    color: #5a5040;
+}
+
+.terms-category.cookie-policy-section .cookie-table code {
+    background: rgba(175, 144, 68, 0.1);
+    color: #4a3f2a;
+}
+
+.terms-category.cookie-policy-section .cookie-note {
+    color: #6b6152;
+}
+
+.terms-category.cookie-policy-section .cookie-note strong {
+    color: #2c2618;
+}
+
+.terms-category.cookie-policy-section .cookie-manage-section {
+    background: #f9f7f2;
+    border: 1px solid rgba(175, 144, 68, 0.15);
+}
+
+.terms-category.cookie-policy-section .cookie-manage-section h3 {
+    color: #070707;
+}
+
+.terms-category.cookie-policy-section .cookie-manage-section ul,
+.terms-category.cookie-policy-section .cookie-manage-section ul li {
+    color: #5a5040;
+}
+
+.terms-category.cookie-policy-section .cookie-manage-nested-note {
+    margin-top: 8px;
+    font-size: 14px;
+    color: #6b6152;
+    line-height: 1.65;
+}
+
+.terms-category.cookie-policy-section .cookie-manage-nested-note strong {
+    color: #2c2618;
+}
+
+.terms-category.cookie-policy-section .cookie-policy-footnote {
+    margin-top: 25px;
+    color: #5a5040;
+    font-size: 16px;
+    line-height: 1.75;
+}
+
+.terms-category.cookie-policy-section .cookie-policy-footnote-link {
+    color: var(--gold);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.terms-category.cookie-policy-section .cookie-policy-footnote-link:hover {
+    color: #2c2618;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .terms-section {

@@ -1,26 +1,51 @@
 /**
- * Layby (installment) plans: schedule math and payment completion side effects.
+ * Layby plans: schedule creation and payment completion side effects.
  *
- * Env (documented defaults):
- * - LAYBY_MIN_DEPOSIT_PERCENT (default 20) — server clamps client input to [min, max]
- * - LAYBY_MAX_DEPOSIT_PERCENT (default 50)
- * - LAYBY_INSTALLMENT_COUNT (default 4) — equal weekly slices of (orderTotal - deposit)
- * - LAYBY_INSTALLMENT_INTERVAL_DAYS (default 7) — days between due dates after deposit
+ * Default: flexible balance — deposit (seq 1) plus one open balance line (seq 2) due by
+ * LAYBY_PLAN_PERIOD_DAYS; customers may pay any positive amount up to the remaining balance
+ * any number of times until cleared.
  *
- * Order totals are always computed server-side before calling createLaybyPlanAndPayments.
+ * Legacy: set LAYBY_SCHEDULED_INSTALLMENTS=true for fixed installment rows (count + spacing).
+ *
+ * @see ../config/layby.js for env variables.
  */
 
 const { sequelize } = require('../config/mysql');
+const {
+    MIN_PCT,
+    MAX_PCT,
+    PLAN_PERIOD_DAYS,
+    USE_SCHEDULED_INSTALLMENTS,
+    INSTALLMENT_COUNT,
+    USE_FIXED_INSTALLMENT_INTERVAL,
+    FIXED_INTERVAL_DAYS
+} = require('../config/layby');
 const { LaybyPlan, LaybyPayment, Order } = require('../models');
 const logger = require('../utils/logger').child({ module: 'LaybyService' });
 
-const MIN_PCT = parseFloat(process.env.LAYBY_MIN_DEPOSIT_PERCENT || '20', 10);
-const MAX_PCT = parseFloat(process.env.LAYBY_MAX_DEPOSIT_PERCENT || '50', 10);
-const INSTALLMENT_COUNT = Math.max(1, parseInt(process.env.LAYBY_INSTALLMENT_COUNT || '4', 10));
-const INTERVAL_DAYS = Math.max(1, parseInt(process.env.LAYBY_INSTALLMENT_INTERVAL_DAYS || '7', 10));
-
 function roundMoney2(x) {
     return Math.round(Number(x) * 100) / 100;
+}
+
+function parseInstallmentSchedule(raw) {
+    if (!raw) return null;
+    if (typeof raw === 'string') {
+        try {
+            return JSON.parse(raw);
+        } catch {
+            return null;
+        }
+    }
+    return raw;
+}
+
+/**
+ * @param {import('../models/LaybyPlan.model')|{ installmentSchedule?: * }} plan
+ * @param {{ sequence: number }} installment
+ */
+function isFlexibleBalanceInstallment(plan, installment) {
+    const sched = parseInstallmentSchedule(plan.installmentSchedule);
+    return !!(sched && sched.policy === 'flexible_within_period' && installment.sequence >= 2);
 }
 
 /**
@@ -56,8 +81,59 @@ async function createLaybyPlanAndPayments({ order, userId, depositPercentInput, 
     const deposit = roundMoney2(total * (pct / 100));
     const balanceAfterDeposit = roundMoney2(total - deposit);
     const balanceCents = Math.round(balanceAfterDeposit * 100);
-    const sliceCents = splitCents(balanceCents, INSTALLMENT_COUNT);
 
+    const now = new Date();
+    const rows = [];
+
+    if (!USE_SCHEDULED_INSTALLMENTS) {
+        const balanceDueAt = new Date(now.getTime() + PLAN_PERIOD_DAYS * 86400000);
+        const plan = await LaybyPlan.create(
+            {
+                orderId: order.id,
+                userId,
+                currency: 'ZMW',
+                orderTotal: total,
+                depositPercent: pct,
+                depositAmount: deposit,
+                balanceRemaining: total,
+                installmentCount: 1,
+                installmentSchedule: {
+                    policy: 'flexible_within_period',
+                    planPeriodDays: PLAN_PERIOD_DAYS,
+                    depositPercentClamped: pct
+                },
+                status: 'active',
+                nextDueAt: now
+            },
+            { transaction }
+        );
+
+        rows.push({
+            laybyPlanId: plan.id,
+            sequence: 1,
+            dueAt: now,
+            amount: deposit,
+            status: 'pending'
+        });
+        rows.push({
+            laybyPlanId: plan.id,
+            sequence: 2,
+            dueAt: balanceDueAt,
+            amount: balanceAfterDeposit,
+            status: 'pending'
+        });
+
+        await LaybyPayment.bulkCreate(rows, { transaction });
+        await plan.update({ nextDueAt: now }, { transaction });
+
+        logger.info(
+            { orderId: order.id, planId: plan.id, total, deposit, mode: 'flexible' },
+            'Layby plan created'
+        );
+        return plan;
+    }
+
+    const sliceCents = splitCents(balanceCents, INSTALLMENT_COUNT);
     const plan = await LaybyPlan.create(
         {
             orderId: order.id,
@@ -68,19 +144,22 @@ async function createLaybyPlanAndPayments({ order, userId, depositPercentInput, 
             depositAmount: deposit,
             balanceRemaining: total,
             installmentCount: INSTALLMENT_COUNT,
-            installmentSchedule: {
-                policy: 'equal_weekly_after_deposit',
-                intervalDays: INTERVAL_DAYS,
-                depositPercentClamped: pct
-            },
+            installmentSchedule: USE_FIXED_INSTALLMENT_INTERVAL
+                ? {
+                      policy: 'equal_interval_after_deposit',
+                      intervalDays: FIXED_INTERVAL_DAYS,
+                      depositPercentClamped: pct
+                  }
+                : {
+                      policy: 'equal_slices_within_period',
+                      planPeriodDays: PLAN_PERIOD_DAYS,
+                      depositPercentClamped: pct
+                  },
             status: 'active',
-            nextDueAt: new Date()
+            nextDueAt: now
         },
         { transaction }
     );
-
-    const rows = [];
-    const now = new Date();
 
     rows.push({
         laybyPlanId: plan.id,
@@ -92,7 +171,10 @@ async function createLaybyPlanAndPayments({ order, userId, depositPercentInput, 
 
     for (let i = 0; i < sliceCents.length; i++) {
         const amt = roundMoney2(sliceCents[i] / 100);
-        const due = new Date(now.getTime() + (i + 1) * INTERVAL_DAYS * 86400000);
+        const offsetDays = USE_FIXED_INSTALLMENT_INTERVAL
+            ? (i + 1) * FIXED_INTERVAL_DAYS
+            : Math.round(((i + 1) * PLAN_PERIOD_DAYS) / INSTALLMENT_COUNT);
+        const due = new Date(now.getTime() + offsetDays * 86400000);
         rows.push({
             laybyPlanId: plan.id,
             sequence: i + 2,
@@ -103,11 +185,10 @@ async function createLaybyPlanAndPayments({ order, userId, depositPercentInput, 
     }
 
     await LaybyPayment.bulkCreate(rows, { transaction });
-
     await plan.update({ nextDueAt: now }, { transaction });
 
     logger.info(
-        { orderId: order.id, planId: plan.id, total, deposit, installments: INSTALLMENT_COUNT },
+        { orderId: order.id, planId: plan.id, total, deposit, installments: INSTALLMENT_COUNT, mode: 'scheduled' },
         'Layby plan created'
     );
 
@@ -147,9 +228,45 @@ async function recordLaybyInstallmentPaid(payment) {
     const order = await Order.findByPk(plan.orderId);
     if (!order) return null;
 
-    const paidAmt = roundMoney2(payment.amount);
-    let newBal = roundMoney2(Number(plan.balanceRemaining) - paidAmt);
+    const paidRaw = roundMoney2(payment.amount);
+    const balBefore = roundMoney2(Number(plan.balanceRemaining));
+    const applied = roundMoney2(Math.min(paidRaw, balBefore));
+    let newBal = roundMoney2(balBefore - applied);
     if (newBal < 0) newBal = 0;
+
+    const flexBalance = isFlexibleBalanceInstallment(plan, installment);
+
+    if (flexBalance && newBal > 0) {
+        installment.amount = newBal;
+        await installment.save();
+
+        plan.balanceRemaining = newBal;
+        plan.nextDueAt = installment.dueAt;
+        await plan.save();
+
+        order.paymentStatus = 'processing';
+        order.status = 'payment_pending';
+        if (payment.lencoTransactionId || payment.transactionId) {
+            order.transactionId = payment.lencoTransactionId || payment.transactionId;
+        }
+        order.history = order.history || [];
+        order.history.push({
+            status: order.status,
+            paymentStatus: order.paymentStatus,
+            notes: `Layby payment received (${applied} ZMW); balance remaining ${newBal}`,
+            updatedBy: 'system',
+            updatedAt: new Date().toISOString(),
+            source: 'layby_payment'
+        });
+        await order.save();
+
+        logger.info(
+            { orderNumber: order.orderNumber, planId: plan.id, newBal, partial: true },
+            'Layby partial payment recorded'
+        );
+
+        return { order, plan, fullyPaid: false };
+    }
 
     installment.status = 'paid';
     installment.paidAt = new Date();
@@ -181,7 +298,7 @@ async function recordLaybyInstallmentPaid(payment) {
         paymentStatus: order.paymentStatus,
         notes: fullyPaid
             ? 'Layby completed — full balance received'
-            : `Layby installment received (${paidAmt} ZMW); balance remaining ${newBal}`,
+            : `Layby installment received (${applied} ZMW); balance remaining ${newBal}`,
         updatedBy: 'system',
         updatedAt: new Date().toISOString(),
         source: 'layby_payment'
@@ -244,13 +361,53 @@ async function confirmInstallmentOffline(laybyPaymentId, admin) {
                 return { error: 'ORDER_NOT_FOUND' };
             }
 
-            const paidAmt = roundMoney2(installment.amount);
-            let newBal = roundMoney2(Number(plan.balanceRemaining) - paidAmt);
+            const balBefore = roundMoney2(Number(plan.balanceRemaining));
+            const installmentCap = roundMoney2(Number(installment.amount));
+            const paidAmt = roundMoney2(Math.min(installmentCap, balBefore));
+            let newBal = roundMoney2(balBefore - paidAmt);
             if (newBal < 0) {
                 newBal = 0;
             }
 
             const now = new Date();
+            const flexBalance = isFlexibleBalanceInstallment(plan, installment);
+
+            if (flexBalance && newBal > 0) {
+                installment.amount = newBal;
+                await installment.save({ transaction: t });
+
+                plan.balanceRemaining = newBal;
+                plan.nextDueAt = installment.dueAt;
+                await plan.save({ transaction: t });
+
+                const actor =
+                    admin && admin.adminEmail
+                        ? String(admin.adminEmail)
+                        : admin && admin.adminId
+                          ? `admin:${admin.adminId}`
+                          : 'admin';
+
+                order.paymentStatus = 'processing';
+                order.status = 'payment_pending';
+                order.history = order.history || [];
+                order.history.push({
+                    status: order.status,
+                    paymentStatus: order.paymentStatus,
+                    notes: `Layby installment confirmed offline (${paidAmt} ZMW); balance remaining ${newBal}`,
+                    updatedBy: actor,
+                    updatedAt: new Date().toISOString(),
+                    source: 'layby_admin_offline'
+                });
+                await order.save({ transaction: t });
+
+                logger.info(
+                    { laybyPaymentId: id, planId: plan.id, orderNumber: order.orderNumber, newBal, partial: true, actor },
+                    'Layby partial offline installment recorded'
+                );
+
+                return { plan, order, fullyPaid: false };
+            }
+
             installment.status = 'paid';
             installment.paidAt = now;
             installment.adminConfirmedAt = now;
@@ -307,8 +464,10 @@ module.exports = {
     recordLaybyInstallmentPaid,
     confirmInstallmentOffline,
     clampDepositPercent,
+    isFlexibleBalanceInstallment,
     MIN_PCT,
     MAX_PCT,
     INSTALLMENT_COUNT,
-    INTERVAL_DAYS
+    PLAN_PERIOD_DAYS,
+    USE_SCHEDULED_INSTALLMENTS
 };
