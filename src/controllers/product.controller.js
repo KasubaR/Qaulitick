@@ -357,6 +357,8 @@ exports.createProduct = async (req, res) => {
         
         // Sanitize input
         const sanitizedData = sanitizeObject(req.body);
+        const { normalizeProductStockFromColors } = require('../utils/productStock.utils');
+        normalizeProductStockFromColors(sanitizedData);
         
         // Debug log for image URLs validation issues
         if (sanitizedData && sanitizedData.images) {
@@ -431,6 +433,8 @@ exports.updateProduct = async (req, res) => {
         }
         
         const sanitizedData = sanitizeObject(req.body);
+        const { normalizeProductStockFromColors } = require('../utils/productStock.utils');
+        normalizeProductStockFromColors(sanitizedData);
 
         const validation = validateProduct(sanitizedData, { partial: true });
         if (!validation.valid) {

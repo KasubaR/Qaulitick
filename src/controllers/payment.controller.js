@@ -63,6 +63,7 @@ async function tryClaimPaymentAdminNotification(paymentId) {
     return count > 0;
 }
 
+
 // Payment retry limit (configurable via environment variable)
 const MAX_PAYMENT_RETRIES = parseInt(process.env.MAX_PAYMENT_RETRIES || '3', 10);
 
@@ -538,10 +539,13 @@ exports.verifyPayment = async (req, res) => {
         // For pending payments, verify with Lenco
         if (payment.isLencoPayment) {
             try {
-                // Use lencoReference (recommended) or lencoTransactionId
+                // Merchant reference = payments.transactionId (QC-... we sent to Lenco).
+                // /collections/status/:ref expects that value — not lencoReference (LNC-xxx).
+                const merchantReference =
+                    (payment.transactionId && String(payment.transactionId).trim()) || null;
                 const lencoResult = await lencoService.verifyPayment(
                     payment.lencoTransactionId,
-                    payment.lencoReference
+                    merchantReference
                 );
                 
                 logger.debug(
@@ -559,11 +563,11 @@ exports.verifyPayment = async (req, res) => {
                     lencoResponse: lencoResult.rawResponse || lencoResult
                 };
 
-                if (lencoResult.status === 'successful' || lencoResult.status === 'completed') {
+                if (newStatus === 'completed') {
                     updatePayload.completedAt = lencoResult.completedAt
                         ? new Date(lencoResult.completedAt)
                         : new Date();
-                } else if (lencoResult.status === 'failed') {
+                } else if (newStatus === 'failed') {
                     updatePayload.failedAt = lencoResult.failedAt
                         ? new Date(lencoResult.failedAt)
                         : new Date();
@@ -573,7 +577,7 @@ exports.verifyPayment = async (req, res) => {
                 await Payment.update(updatePayload, { where: { id: payment.id } });
                 payment = await Payment.findByPk(payment.id);
 
-                if (lencoResult.status === 'successful' || lencoResult.status === 'completed') {
+                if (newStatus === 'completed') {
                     if (payment.laybyPaymentId) {
                         try {
                             await laybyService.recordLaybyInstallmentPaid(payment);
@@ -593,7 +597,7 @@ exports.verifyPayment = async (req, res) => {
                             console.error('[Payment Controller] Error updating order status:', orderError);
                         }
                     }
-                } else if (lencoResult.status === 'failed' && !payment.laybyPaymentId) {
+                } else if (newStatus === 'failed' && !payment.laybyPaymentId) {
                     try {
                         await orderService.updateOrderStatusFromPayment(
                             payment.orderNumber,

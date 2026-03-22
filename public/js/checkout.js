@@ -448,14 +448,6 @@ function setupEventListeners() {
         });
     }
 
-    // "I've completed payment" button
-    const completedPaymentBtn = document.getElementById('completedPaymentBtn');
-    if (completedPaymentBtn) {
-        completedPaymentBtn.addEventListener('click', () => {
-            handleCompletedPaymentClick();
-        });
-    }
-
     // Real-time validation
     setupFormValidation();
 }
@@ -1132,80 +1124,124 @@ function showPaymentInstructionsModal(paymentData) {
     // Show modal
     modal.style.display = 'flex';
 
-    // Update payment status indicator
+    // Form + payment modal: pending (polling handles the rest)
     updatePaymentStatusIndicator('pending', 'Waiting for payment confirmation...');
+    syncPaymentInstructionModal(
+        'pending',
+        'Complete the payment on your phone if prompted. This screen updates automatically—you don’t need to refresh or tap anything else.'
+    );
 }
 
-// Handle "I've completed payment" button click
-function handleCompletedPaymentClick() {
-    if (!currentTransactionId) {
-        console.error('No transaction ID available');
+function normalizePaymentVisualStatus(status) {
+    if (status === undefined || status === null || status === '') return 'hidden';
+    const n = String(status).toLowerCase();
+    if (['completed', 'successful', 'success', 'paid', 'succeeded'].includes(n)) return 'completed';
+    if (n === 'failed') return 'failed';
+    if (n === 'cancelled' || n === 'canceled') return 'hidden';
+    return 'pending';
+}
+
+function syncPaymentInstructionModal(visual, message) {
+    const wrap = document.getElementById('paymentModalAutoConfirm');
+    if (!wrap) return;
+
+    if (visual === 'hidden') {
+        wrap.style.display = 'none';
+        wrap.classList.remove(
+            'payment-modal-auto-confirm--pending',
+            'payment-modal-auto-confirm--success',
+            'payment-modal-auto-confirm--failed'
+        );
         return;
     }
 
-    // Manually trigger payment verification
-    console.log('[Checkout] User clicked "I\'ve completed payment", verifying payment status...');
-    pollPaymentStatus(currentTransactionId);
+    wrap.style.display = 'flex';
+    wrap.classList.remove(
+        'payment-modal-auto-confirm--pending',
+        'payment-modal-auto-confirm--success',
+        'payment-modal-auto-confirm--failed'
+    );
 
-    // Show loading state
-    const completedBtn = document.getElementById('completedPaymentBtn');
-    if (completedBtn) {
-        completedBtn.disabled = true;
-        completedBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+    const iconSlot = document.querySelector('#paymentModalStatusIcon i');
+    const titleEl = document.getElementById('paymentModalStatusTitle');
+    const detailEl = document.getElementById('paymentModalStatusDetail');
+    if (!titleEl || !detailEl || !iconSlot) return;
+
+    if (visual === 'completed') {
+        wrap.classList.add('payment-modal-auto-confirm--success');
+        iconSlot.className = 'fas fa-check-circle';
+        titleEl.textContent = 'Payment confirmed';
+        detailEl.textContent = message || 'Redirecting…';
+    } else if (visual === 'failed') {
+        wrap.classList.add('payment-modal-auto-confirm--failed');
+        iconSlot.className = 'fas fa-times-circle';
+        titleEl.textContent = 'Payment not completed';
+        detailEl.textContent = message || 'Please try again or contact support.';
+    } else {
+        wrap.classList.add('payment-modal-auto-confirm--pending');
+        iconSlot.className = 'fas fa-circle-notch fa-spin';
+        titleEl.textContent = 'Confirming your payment';
+        detailEl.textContent =
+            message ||
+            'Complete the payment on your phone if prompted. This screen updates automatically—you don’t need to refresh or tap anything else.';
     }
-
-    // Re-enable after a short delay
-    setTimeout(() => {
-        if (completedBtn) {
-            completedBtn.disabled = false;
-            completedBtn.innerHTML = '<i class="fas fa-check-circle"></i> I\'ve Completed Payment';
-        }
-    }, 3000);
 }
 
-// Update payment status indicator
+// Update payment status indicator (checkout form) and mirror state in the payment-instructions modal
 function updatePaymentStatusIndicator(status, message) {
+    const visual = normalizePaymentVisualStatus(status);
     const indicator = document.getElementById('paymentStatusIndicator');
     const statusText = document.getElementById('paymentStatusText');
+    const resolvedMsg =
+        message ||
+        (visual === 'pending'
+            ? getStatusMessage(String(status || 'pending').toLowerCase())
+            : visual === 'completed'
+              ? 'Payment confirmed!'
+              : visual === 'failed'
+                ? 'Payment failed'
+                : '');
 
-    if (!indicator || !statusText) return;
+    if (indicator && statusText) {
+        if (visual === 'hidden') {
+            indicator.style.display = 'none';
+        } else if (visual === 'pending') {
+            indicator.style.display = 'block';
+            indicator.style.background = 'rgba(59, 130, 246, 0.1)';
+            indicator.style.borderLeftColor = '#3b82f6';
+            statusText.textContent = resolvedMsg;
 
-    if (status === 'pending' || status === 'processing') {
-        indicator.style.display = 'block';
-        indicator.style.background = 'rgba(59, 130, 246, 0.1)';
-        indicator.style.borderLeftColor = '#3b82f6';
-        statusText.textContent = message || 'Waiting for payment confirmation...';
+            const icon = indicator.querySelector('i');
+            if (icon) {
+                icon.className = 'fas fa-spinner fa-spin';
+                icon.style.color = '#3b82f6';
+            }
+        } else if (visual === 'completed') {
+            indicator.style.display = 'block';
+            indicator.style.background = 'rgba(16, 185, 129, 0.1)';
+            indicator.style.borderLeftColor = '#10b981';
+            statusText.textContent = resolvedMsg;
 
-        const icon = indicator.querySelector('i');
-        if (icon) {
-            icon.className = 'fas fa-spinner fa-spin';
-            icon.style.color = '#3b82f6';
+            const icon = indicator.querySelector('i');
+            if (icon) {
+                icon.className = 'fas fa-check-circle';
+                icon.style.color = '#10b981';
+            }
+        } else if (visual === 'failed') {
+            indicator.style.display = 'block';
+            indicator.style.background = 'rgba(239, 68, 68, 0.1)';
+            indicator.style.borderLeftColor = '#ef4444';
+            statusText.textContent = resolvedMsg;
+
+            const icon = indicator.querySelector('i');
+            if (icon) {
+                icon.className = 'fas fa-times-circle';
+                icon.style.color = '#ef4444';
+            }
         }
-    } else if (status === 'completed') {
-        indicator.style.display = 'block';
-        indicator.style.background = 'rgba(16, 185, 129, 0.1)';
-        indicator.style.borderLeftColor = '#10b981';
-        statusText.textContent = message || 'Payment confirmed!';
-
-        const icon = indicator.querySelector('i');
-        if (icon) {
-            icon.className = 'fas fa-check-circle';
-            icon.style.color = '#10b981';
-        }
-    } else if (status === 'failed') {
-        indicator.style.display = 'block';
-        indicator.style.background = 'rgba(239, 68, 68, 0.1)';
-        indicator.style.borderLeftColor = '#ef4444';
-        statusText.textContent = message || 'Payment failed';
-
-        const icon = indicator.querySelector('i');
-        if (icon) {
-            icon.className = 'fas fa-times-circle';
-            icon.style.color = '#ef4444';
-        }
-    } else {
-        indicator.style.display = 'none';
     }
+
+    syncPaymentInstructionModal(visual, resolvedMsg);
 }
 
 // Close payment instructions modal and cancel the pending transaction
@@ -1341,16 +1377,25 @@ async function pollPaymentStatus(transactionId) {
         const data = await response.json();
 
         if (data.success) {
-            const status = data.status || data.lencoStatus;
+            const rawStatus = data.status || data.lencoStatus;
+            const statusNorm = String(rawStatus || '').toLowerCase();
+            const isPaid =
+                statusNorm === 'completed' ||
+                statusNorm === 'successful' ||
+                statusNorm === 'success' ||
+                statusNorm === 'paid' ||
+                statusNorm === 'succeeded';
 
-            console.log(`[Payment Polling] Status: ${status}`, {
+            console.log(`[Payment Polling] Status: ${rawStatus}`, {
                 processing: data.processing,
                 verified: data.verified,
                 message: data.message
             });
 
-            // Update payment status indicator
-            updatePaymentStatusIndicator(status, getStatusMessage(status));
+            const statusMessage = data.processing
+                ? 'Still syncing with the payment provider. Keep this page open—we’ll update automatically.'
+                : getStatusMessage(rawStatus);
+            updatePaymentStatusIndicator(rawStatus, statusMessage);
 
             // Handle processing state (collection not yet available in Lenco)
             if (data.processing) {
@@ -1359,40 +1404,54 @@ async function pollPaymentStatus(transactionId) {
                 return;
             }
 
-            if (status === 'completed') {
-                // Payment completed
+            if (isPaid || data.status === 'completed') {
+                // Payment completed (treat Lenco success variants as done)
                 console.log(`[Payment Polling] Payment completed!`);
                 stopPaymentPolling();
                 handlePaymentSuccess(data.orderNumber || 'N/A');
-            } else if (status === 'failed' || status === 'cancelled') {
+            } else if (statusNorm === 'failed' || statusNorm === 'cancelled' || statusNorm === 'canceled') {
                 // Payment failed
-                console.log(`[Payment Polling] Payment failed: ${status}`);
+                console.log(`[Payment Polling] Payment failed: ${rawStatus}`);
                 stopPaymentPolling();
                 showPaymentFailedError(data.failureReason || 'Payment failed');
             } else {
                 // Status is pending/processing - continue polling
-                console.log(`[Payment Polling] Payment ${status}, continuing to poll...`);
+                console.log(`[Payment Polling] Payment ${rawStatus}, continuing to poll...`);
             }
         } else {
             console.error('[Payment Polling] Error verifying payment:', data.message);
+            updatePaymentStatusIndicator(
+                'pending',
+                data.message || 'Checking payment status… We’ll keep trying automatically.'
+            );
             // Continue polling on error (might be temporary)
         }
     } catch (error) {
         console.error('[Payment Polling] Error:', error);
+        updatePaymentStatusIndicator(
+            'pending',
+            'Connection issue. Retrying payment status automatically…'
+        );
         // Continue polling on error (might be temporary)
     }
 }
 
 // Get status message for payment status
 function getStatusMessage(status) {
+    const key = String(status || '').toLowerCase();
     const messages = {
-        'pending': 'Waiting for payment confirmation...',
-        'processing': 'Payment is being processed...',
-        'completed': 'Payment confirmed!',
-        'failed': 'Payment failed',
-        'cancelled': 'Payment cancelled'
+        pending: 'Waiting for payment confirmation...',
+        processing: 'Payment is being processed...',
+        completed: 'Payment confirmed!',
+        successful: 'Payment confirmed!',
+        success: 'Payment confirmed!',
+        paid: 'Payment confirmed!',
+        succeeded: 'Payment confirmed!',
+        failed: 'Payment failed',
+        cancelled: 'Payment cancelled',
+        canceled: 'Payment cancelled'
     };
-    return messages[status] || 'Checking payment status...';
+    return messages[key] || 'Checking payment status...';
 }
 
 // Stop payment polling

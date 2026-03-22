@@ -203,10 +203,26 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
             // Release the reservation — stock returns to available.
             for (const item of items) {
                 const qty = parseInt(item.quantity) || 1;
+                const productId = parseInt(item.productId, 10);
+
+                // Release product-level reservation
                 await Product.update(
                     { reservedStock: sequelize.literal(`GREATEST(0, reservedStock - ${qty})`) },
-                    { where: { id: parseInt(item.productId, 10), reservedStock: { [Op.gt]: 0 } } }
+                    { where: { id: productId, reservedStock: { [Op.gt]: 0 } } }
                 );
+
+                // Restore color-specific stock that was decremented at order creation
+                if (item.selectedColor) {
+                    const product = await Product.findByPk(productId);
+                    if (product) {
+                        const updatedColors = (product.colors || []).map(c =>
+                            c.name === item.selectedColor
+                                ? { ...c, stock: (c.stock || 0) + qty }
+                                : c
+                        );
+                        await product.update({ colors: updatedColors });
+                    }
+                }
             }
             console.log(`[Order Service] Stock reservation released for order ${orderNumber}`);
         }

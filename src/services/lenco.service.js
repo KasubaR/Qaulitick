@@ -682,98 +682,144 @@ async function initiateBankTransfer(orderData, bankDetails) {
 }
 
 /**
+ * Normalize Lenco verify API response into a consistent result object.
+ */
+function parseVerifyCollectionResponse(response, fallbackCollectionId) {
+    validateApiResponse(response, ['id', 'status']);
+    const responseData = response.data;
+    const collectionData = responseData.data || responseData;
+
+    return {
+        success: true,
+        transactionId: collectionData.id || fallbackCollectionId,
+        reference: collectionData.reference,
+        lencoReference: collectionData.lencoReference,
+        status: collectionData.status,
+        amount: parseFloat(collectionData.amount),
+        currency: collectionData.currency || 'ZMW',
+        type: collectionData.type,
+        provider: collectionData.mobileMoneyDetails?.operator || collectionData.provider,
+        completedAt: collectionData.completedAt,
+        initiatedAt: collectionData.initiatedAt,
+        failedAt: collectionData.reasonForFailure ? new Date() : null,
+        failureReason: collectionData.reasonForFailure,
+        fee: collectionData.fee,
+        bearer: collectionData.bearer,
+        settlementStatus: collectionData.settlementStatus,
+        mobileMoneyDetails: collectionData.mobileMoneyDetails,
+        bankAccountDetails: collectionData.bankAccountDetails,
+        rawResponse: collectionData,
+        message: responseData.message
+    };
+}
+
+function isVerifyNotFoundError(error) {
+    return error.code === 404 || error.name === 'not_found_error';
+}
+
+/**
  * Verify Payment Status
- * @param {string} transactionId - Lenco collection ID (col_xxx) or reference
- * @param {string} reference - Optional: Payment reference (QC-ORD-xxx). If provided, uses Option A endpoint
+ * @param {string} collectionId - Lenco collection ID (e.g. col_xxx) from initiate response
+ * @param {string|null} merchantReference - Your reference sent in the collection payload (same as payments.transactionId).
+ *   Lenco GET /collections/status/:reference expects this value, NOT lencoReference (LNC-xxx).
  * @returns {Promise<object>} Payment status information
  */
-async function verifyPayment(transactionId, reference = null) {
+async function verifyPayment(collectionId, merchantReference = null) {
     if (!LENCO_CONFIG.apiSecretKey || LENCO_CONFIG.apiSecretKey === 'xxxxxxxxxxxxxxxxxxxxxxx') {
         log('error', 'API Secret Key not configured', { function: 'verifyPayment' });
         throw new Error('Lenco API Secret Key not configured');
     }
 
-    if (!transactionId && !reference) {
-        log('error', 'Transaction ID or reference required', { function: 'verifyPayment' });
+    const ref = merchantReference && String(merchantReference).trim() ? String(merchantReference).trim() : null;
+
+    if (!collectionId && !ref) {
+        log('error', 'Collection ID or merchant reference required', { function: 'verifyPayment' });
         throw new Error('Transaction ID or reference is required');
     }
 
-    // Option A (Recommended): Use reference if provided
-    // Option B: Use collection ID (transactionId)
-    const url = reference 
-        ? `/collections/status/${reference}`  // Option A: Verify by reference
-        : `/collections/${transactionId}`;     // Option B: Get by collection ID
-
     log('info', 'Verifying payment status', {
-        transactionId,
-        reference,
-        url,
+        collectionId,
+        merchantReference: ref,
         operation: 'verify_payment'
     });
 
-    try {
-        // Make API request with retry logic
+    const metadataBase = {
+        orderNumber: null,
+        transactionId: collectionId,
+        reference: ref,
+        operation: 'verify_payment'
+    };
+
+    const fetchByMerchantReference = async () => {
+        const enc = encodeURIComponent(ref);
         const response = await makeApiRequest({
             method: 'GET',
-            url: url,
-            metadata: {
-                orderNumber: null,
-                transactionId: transactionId,
-                reference: reference,
-                operation: 'verify_payment'
+            url: `/collections/status/${enc}`,
+            metadata: { ...metadataBase, verifyPath: 'status_by_merchant_ref' }
+        });
+        return parseVerifyCollectionResponse(response, collectionId);
+    };
+
+    const fetchByCollectionId = async () => {
+        const response = await makeApiRequest({
+            method: 'GET',
+            url: `/collections/${collectionId}`,
+            metadata: { ...metadataBase, verifyPath: 'by_collection_id' }
+        });
+        return parseVerifyCollectionResponse(response, collectionId);
+    };
+
+    try {
+        // Prefer merchant reference — matches the `reference` field sent to POST /collections/mobile-money
+        if (ref) {
+            try {
+                const result = await fetchByMerchantReference();
+                log('info', 'Payment status verified (by merchant reference)', {
+                    collectionId: result.transactionId,
+                    status: result.status
+                });
+                return result;
+            } catch (error) {
+                if (isVerifyNotFoundError(error) && collectionId) {
+                    log('warn', 'Status by merchant reference not found; retrying by collection id', {
+                        merchantReference: ref,
+                        collectionId
+                    });
+                    const result = await fetchByCollectionId();
+                    log('info', 'Payment status verified (by collection id)', {
+                        collectionId: result.transactionId,
+                        status: result.status
+                    });
+                    return result;
+                }
+                throw error;
             }
-        });
+        }
 
-        // Validate response (Lenco format: { status: boolean, message: string, data: object })
-        validateApiResponse(response, ['id', 'status']);
-        
-        // Extract data from response.data.data (Lenco wraps results in 'data' key)
-        const responseData = response.data;
-        const collectionData = responseData.data || responseData;
+        if (collectionId) {
+            const result = await fetchByCollectionId();
+            log('info', 'Payment status verified', {
+                collectionId: result.transactionId,
+                status: result.status,
+                amount: result.amount,
+                currency: result.currency
+            });
+            return result;
+        }
 
-        const result = {
-            success: true,
-            transactionId: collectionData.id || transactionId,  // Collection ID
-            reference: collectionData.reference,
-            lencoReference: collectionData.lencoReference,
-            status: collectionData.status,  // 'pay-offline', 'pending', 'completed', 'failed', etc.
-            amount: parseFloat(collectionData.amount),
-            currency: collectionData.currency || 'ZMW',
-            type: collectionData.type,  // 'mobile-money', 'bank-transfer', etc.
-            provider: collectionData.mobileMoneyDetails?.operator || collectionData.provider,
-            completedAt: collectionData.completedAt,
-            initiatedAt: collectionData.initiatedAt,
-            failedAt: collectionData.reasonForFailure ? new Date() : null,
-            failureReason: collectionData.reasonForFailure,
-            fee: collectionData.fee,
-            bearer: collectionData.bearer,
-            settlementStatus: collectionData.settlementStatus,
-            mobileMoneyDetails: collectionData.mobileMoneyDetails,
-            bankAccountDetails: collectionData.bankAccountDetails,
-            rawResponse: collectionData,
-            message: responseData.message
-        };
-
-        log('info', 'Payment status verified', {
-            transactionId,
-            status: result.status,
-            amount: result.amount,
-            currency: result.currency
-        });
-
-        return result;
+        throw new Error('Transaction ID or reference is required');
     } catch (error) {
-        // Handle 404 (transaction not found) - don't retry
-        if (error.code === 404 || error.name === 'not_found_error') {
-            log('warn', 'Transaction not found', {
-                transactionId,
+        if (isVerifyNotFoundError(error)) {
+            log('warn', 'Collection not found when verifying payment', {
+                collectionId,
+                merchantReference: ref,
                 error: error.message
             });
             throw new Error('Transaction not found');
         }
 
         log('error', 'Failed to verify payment', {
-            transactionId,
+            collectionId,
             error: {
                 message: error.message,
                 type: error.name,
@@ -781,7 +827,7 @@ async function verifyPayment(transactionId, reference = null) {
                 retryable: error.retryable
             }
         });
-        
+
         throw error;
     }
 }

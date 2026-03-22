@@ -134,16 +134,15 @@ const normalizedColors = (product.colors || []).map(function (c) {
 
                 <!-- COLOR VARIANTS -->
                 <% if (normalizedColors.length > 0) { %>
-                    <div class="variant-section">
-                        <span class="variant-label">Color: <span class="selected-color-label"><%= normalizedColors[0].name %></span></span>
-                        <div class="color-options">
-                            <% normalizedColors.forEach((color, index) => { %>
-                                <button class="color-option <%= index === 0 ? 'selected' : '' %>"
-                                        data-color="<%= color.name %>"
-                                        type="button">
-                                    <%= color.name %>
-                                </button>
-                            <% }) %>
+                    <div class="variant-section variant-section--color">
+                        <label class="variant-label" for="colorSelect">Color</label>
+                        <div class="color-select-wrap">
+                            <select id="colorSelect" class="color-select-input" name="color" autocomplete="off">
+                                <option value="">Select a color</option>
+                                <% normalizedColors.forEach((color) => { %>
+                                    <option value="<%= color.name %>"><%= color.name %></option>
+                                <% }) %>
+                            </select>
                         </div>
                     </div>
                     <script type="application/json" id="product-color-images-data"><%- JSON.stringify(normalizedColors.map(function (c) { return { name: c.name, image: c.image }; })).replace(/</g, '\\u003c') %></script>

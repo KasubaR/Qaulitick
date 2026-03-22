@@ -425,14 +425,15 @@
                     </div>
                 </div>
                 
-                <!-- Payment Status Info -->
-                <div class="payment-status-info" style="background: #fef3c7; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; margin-bottom: 20px;">
-                    <p style="margin: 0 0 8px 0; color: #92400e; font-weight: 600;">
-                        <i class="fas fa-clock"></i> Waiting for payment confirmation...
-                    </p>
-                    <p style="margin: 0; font-size: 14px; color: #78350f;">
-                        Please complete the payment using the instructions above. This page will automatically update when payment is confirmed.
-                    </p>
+                <!-- Automatic confirmation (polling) — no manual button -->
+                <div id="paymentModalAutoConfirm" class="payment-modal-auto-confirm payment-modal-auto-confirm--pending" aria-live="polite">
+                    <div class="payment-modal-auto-confirm__icon" id="paymentModalStatusIcon" aria-hidden="true">
+                        <i class="fas fa-circle-notch fa-spin"></i>
+                    </div>
+                    <div class="payment-modal-auto-confirm__text">
+                        <strong id="paymentModalStatusTitle">Confirming your payment</strong>
+                        <p id="paymentModalStatusDetail">Complete the payment on your phone if prompted. This screen updates automatically—you don’t need to refresh or tap anything else.</p>
+                    </div>
                 </div>
                 
                 <!-- Payment Expiry -->
@@ -443,14 +444,11 @@
                     </p>
                 </div>
                 
-                <!-- Action Buttons -->
-                <div class="modal-actions" style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button class="btn-primary" id="completedPaymentBtn" style="flex: 1; padding: 12px 24px; background: #10b981; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
-                        <i class="fas fa-check-circle"></i> I've Completed Payment
+                <div class="payment-modal-actions">
+                    <button type="button" class="payment-modal-cancel-btn" id="closePaymentInstructionsBtn2">
+                        Cancel and close
                     </button>
-                    <button class="btn-outline" id="closePaymentInstructionsBtn2" style="padding: 12px 24px; background: transparent; color: #64748b; border: 2px solid #e2e8f0; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
-                        Close
-                    </button>
+                    <p class="payment-modal-cancel-hint">Only use this if you want to abandon this payment attempt. Your order may stay pending until payment completes or expires.</p>
                 </div>
             </div>
         </div>

@@ -233,6 +233,14 @@ function setupColorInputs() {
     if (addColorBtn) {
         addColorBtn.addEventListener('click', addColorInput);
     }
+    const colorsContainer = document.getElementById('colorsContainer');
+    if (colorsContainer) {
+        colorsContainer.addEventListener('input', (e) => {
+            if (e.target.classList.contains('color-stock-input') || e.target.classList.contains('color-name-input')) {
+                refreshStockFieldFromColorInputs();
+            }
+        });
+    }
 }
 
 // Setup SKU auto-generation
@@ -433,17 +441,48 @@ async function generateSKUFromBrandModel(brand, model) {
 const _colorPendingFiles = new Map();
 let _colorKeyCounter = 0;
 
+/**
+ * Title-case each whitespace-separated word: first letter uppercase, rest lowercase.
+ * @param {string} raw
+ * @returns {string}
+ */
+function formatColorNameInputValue(raw) {
+    const s = (raw == null ? '' : String(raw)).trim();
+    if (!s) return '';
+    return s
+        .split(/\s+/)
+        .map((word) => {
+            if (!word) return '';
+            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        })
+        .join(' ');
+}
+
+function normalizeAllColorNameInputsInForm() {
+    const colorsContainer = document.getElementById('colorsContainer');
+    if (!colorsContainer) return;
+    colorsContainer.querySelectorAll('.color-name-input').forEach((input) => {
+        const formatted = formatColorNameInputValue(input.value);
+        if (formatted !== input.value) {
+            input.value = formatted;
+        }
+    });
+}
+
 // Build a color-input-group element. color = { name, image, hex, stock } (all optional)
 function _buildColorGroup(color) {
     const key = String(++_colorKeyCounter);
-    const name = (color && color.name) || '';
+    const name = formatColorNameInputValue((color && color.name) || '');
     const imageUrl = (color && color.image) || '';
     const hex = (color && color.hex) || '';
     const stock = (color && color.stock != null) ? color.stock : '';
+    const nameId = `color-name-${key}`;
+    const stockId = `color-stock-${key}`;
 
     const group = document.createElement('div');
     group.className = 'color-input-group';
     group.dataset.colorKey = key;
+    group.setAttribute('role', 'listitem');
     if (imageUrl) group.dataset.colorImage = imageUrl;
     if (hex) group.dataset.colorHex = hex;
 
@@ -451,24 +490,71 @@ function _buildColorGroup(color) {
     if (imageUrl) {
         previewHtml = `<img class="color-image-preview" src="${imageUrl}" alt="">`;
     } else if (hex) {
-        previewHtml = `<span class="color-upload-placeholder color-hex-swatch" style="background:${hex};display:block;width:100%;height:100%;border-radius:inherit;" title="Click to replace with image"></span><img class="color-image-preview" src="" alt="" style="display:none;">`;
+        previewHtml = `<span class="color-upload-placeholder color-hex-swatch" title="Click to upload a photo for this color"></span><img class="color-image-preview color-image-preview--hidden" src="" alt="">`;
     } else {
-        previewHtml = `<span class="color-upload-placeholder"><i class="fas fa-camera"></i></span><img class="color-image-preview" src="" alt="" style="display:none;">`;
+        previewHtml = `<span class="color-upload-placeholder"><i class="fas fa-image" aria-hidden="true"></i><span class="color-upload-placeholder-text">Add photo</span><span class="color-upload-placeholder-sub">JPG, PNG, WebP</span></span><img class="color-image-preview color-image-preview--hidden" src="" alt="">`;
     }
 
     group.innerHTML = `
-        <div class="color-image-upload" onclick="this.querySelector('.color-file-input').click()" title="Click to upload color image">
-            ${previewHtml}
-            <input type="file" class="color-file-input" accept="image/jpeg,image/jpg,image/png,image/webp" style="display:none;">
+        <div class="color-variant-header">
+            <span class="color-variant-heading">Color variant</span>
+            <button type="button" class="remove-color-btn" aria-label="Remove this color">
+                <i class="fas fa-times" aria-hidden="true"></i>
+                <span class="remove-color-btn-text">Remove</span>
+            </button>
         </div>
-        <input type="text" class="color-name-input" placeholder="Color name (e.g. Black)" value="${name}">
-        <input type="number" class="color-stock-input" placeholder="Stock" value="${stock}" min="0">
-        <button type="button" class="remove-color-btn" onclick="removeColor(this)">
-            <i class="fas fa-times"></i>
-        </button>
+        <div class="color-variant-photo-block">
+            <span class="color-variant-field-label" id="color-photo-label-${key}">Photo for this color</span>
+            <p class="color-variant-field-hint">This picture is shown when a customer selects this color.</p>
+            <div class="color-image-upload" role="button" tabindex="0" aria-labelledby="color-photo-label-${key}">
+                ${previewHtml}
+                <input type="file" class="color-file-input visually-hidden-color-input" accept="image/jpeg,image/jpg,image/png,image/webp">
+            </div>
+        </div>
+        <div class="color-variant-fields-block">
+            <div class="color-field-wrap">
+                <label class="color-variant-field-label" for="${nameId}">Color name</label>
+                <p class="color-variant-field-hint">As customers will see it (e.g. Midnight Black).</p>
+                <input type="text" id="${nameId}" class="form-input color-name-input" placeholder="e.g. Rose Gold" value="${name}" autocomplete="off">
+            </div>
+            <div class="color-field-wrap color-field-wrap--stock">
+                <label class="color-variant-field-label" for="${stockId}">Stock</label>
+                <p class="color-variant-field-hint">Units available in this color.</p>
+                <input type="number" id="${stockId}" class="form-input color-stock-input" placeholder="0" value="${stock}" min="0" step="1" inputmode="numeric">
+            </div>
+        </div>
     `;
 
-    group.querySelector('.color-file-input').addEventListener('change', function () {
+    const hexSwatch = group.querySelector('.color-hex-swatch');
+    if (hexSwatch && hex) {
+        hexSwatch.style.backgroundColor = hex;
+    }
+
+    const uploadZone = group.querySelector('.color-image-upload');
+    const fileInput = group.querySelector('.color-file-input');
+    const openFilePicker = () => fileInput.click();
+    uploadZone.addEventListener('click', openFilePicker);
+    uploadZone.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openFilePicker();
+        }
+    });
+
+    group.querySelector('.remove-color-btn').addEventListener('click', (e) => removeColor(e.currentTarget));
+
+    const nameInput = group.querySelector('.color-name-input');
+    if (nameInput) {
+        nameInput.addEventListener('blur', () => {
+            const formatted = formatColorNameInputValue(nameInput.value);
+            if (formatted !== nameInput.value) {
+                nameInput.value = formatted;
+            }
+            refreshStockFieldFromColorInputs();
+        });
+    }
+
+    fileInput.addEventListener('change', function () {
         const file = this.files[0];
         if (!file) return;
         _colorPendingFiles.set(key, file);
@@ -477,8 +563,8 @@ function _buildColorGroup(color) {
             const preview = group.querySelector('.color-image-preview');
             const placeholder = group.querySelector('.color-upload-placeholder');
             preview.src = e.target.result;
-            preview.style.display = 'block';
-            if (placeholder) placeholder.style.display = 'none';
+            preview.classList.remove('color-image-preview--hidden');
+            if (placeholder) placeholder.classList.add('color-upload-placeholder--hidden');
             group.dataset.colorImage = '';
         };
         reader.readAsDataURL(file);
@@ -492,6 +578,7 @@ function addColorInput() {
     const container = document.getElementById('colorsContainer');
     if (!container) return;
     container.appendChild(_buildColorGroup(null));
+    refreshStockFieldFromColorInputs();
 }
 
 // Remove color
@@ -500,7 +587,10 @@ function removeColor(btn) {
     if (group && group.dataset.colorKey) {
         _colorPendingFiles.delete(group.dataset.colorKey);
     }
-    group.remove();
+    if (group) {
+        group.remove();
+        refreshStockFieldFromColorInputs();
+    }
 }
 
 // Collect colors from form — returns { name, image, hex, stock, _pendingKey } per entry
@@ -510,7 +600,7 @@ function collectColors() {
 
     const colors = [];
     colorsContainer.querySelectorAll('.color-input-group').forEach(group => {
-        const name = (group.querySelector('.color-name-input')?.value || '').trim();
+        const name = formatColorNameInputValue(group.querySelector('.color-name-input')?.value || '');
         if (!name) return;
         const stockVal = group.querySelector('.color-stock-input')?.value;
         colors.push({
@@ -522,6 +612,60 @@ function collectColors() {
         });
     });
     return colors;
+}
+
+/** True if there is at least one color row with a name filled in. */
+function hasNamedColorVariantsInForm() {
+    const colorsContainer = document.getElementById('colorsContainer');
+    if (!colorsContainer) return false;
+    return Array.from(colorsContainer.querySelectorAll('.color-input-group')).some((group) => {
+        const name = formatColorNameInputValue(group.querySelector('.color-name-input')?.value || '');
+        return name.length > 0;
+    });
+}
+
+function refreshStockFieldFromColorInputs() {
+    const stockInput = document.getElementById('stock');
+    const hint = document.getElementById('stockQuantityHint');
+    if (!stockInput) return;
+    if (hasNamedColorVariantsInForm()) {
+        const sum = collectColors().reduce((s, c) => s + (Number.isFinite(c.stock) ? c.stock : 0), 0);
+        stockInput.value = String(sum);
+        stockInput.readOnly = true;
+        stockInput.classList.add('stock-input-derived');
+        stockInput.setAttribute('aria-readonly', 'true');
+        if (hint) {
+            hint.textContent = 'Total is the sum of each color\'s stock under Images & Media. Edit those fields to change inventory.';
+        }
+    } else {
+        stockInput.readOnly = false;
+        stockInput.classList.remove('stock-input-derived');
+        stockInput.removeAttribute('aria-readonly');
+        if (hint) {
+            hint.textContent = 'Total units for this product when you are not using color options.';
+        }
+    }
+}
+
+/** @returns {{ ok: boolean, message?: string }} */
+function validateNamedColorStockInputs() {
+    const colorsContainer = document.getElementById('colorsContainer');
+    if (!colorsContainer) return { ok: true };
+    const groups = colorsContainer.querySelectorAll('.color-input-group');
+    for (const group of groups) {
+        const name = formatColorNameInputValue(group.querySelector('.color-name-input')?.value || '');
+        if (!name) continue;
+        const raw = group.querySelector('.color-stock-input')?.value;
+        if (raw === '' || raw == null) continue;
+        const n = Number(raw);
+        if (!Number.isInteger(n) || n < 0) {
+            return {
+                ok: false,
+                message: `Color "${name}": stock must be a whole number ≥ 0.`
+            };
+        }
+    }
+    return { ok: true };
 }
 
 // Upload any pending color images and return colors array with resolved URLs
@@ -710,6 +854,7 @@ async function openProductModal(productId = null) {
         // Clear colors
         const colorsContainer = document.getElementById('colorsContainer');
         if (colorsContainer) colorsContainer.innerHTML = '';
+        refreshStockFieldFromColorInputs();
         // Reset status checkbox to checked
         const statusCheckbox = document.getElementById('status');
         if (statusCheckbox) statusCheckbox.checked = true;
@@ -843,6 +988,7 @@ async function loadProductData(productId) {
             colorsContainer.innerHTML = '';
             productColors.forEach(color => colorsContainer.appendChild(_buildColorGroup(color)));
         }
+        refreshStockFieldFromColorInputs();
         
         // Reset to first tab
         const tabBtns = document.querySelectorAll('.tab-btn');
@@ -1144,6 +1290,20 @@ async function handleFormSubmit(e) {
     if (skuInput) {
         productData.sku = skuInput.value.trim() || productData.sku;
     }
+
+    normalizeAllColorNameInputsInForm();
+    const rawColors = collectColors();
+    const colorStockCheck = validateNamedColorStockInputs();
+    if (!colorStockCheck.ok) {
+        showNotification(colorStockCheck.message, 'error');
+        return;
+    }
+    if (rawColors.length > 0) {
+        productData.stock = rawColors.reduce((s, c) => s + (Number.isFinite(c.stock) ? c.stock : 0), 0);
+        const stockInputEl = document.getElementById('stock');
+        if (stockInputEl) stockInputEl.value = String(productData.stock);
+        refreshStockFieldFromColorInputs();
+    }
     
     // Collect images before validation (needed for image validation)
     const previewGrid = document.getElementById('imagePreviewGrid');
@@ -1176,10 +1336,11 @@ async function handleFormSubmit(e) {
         return; // Prevent form submission
     }
     
-    // Collect colors and upload any pending color images
-    const rawColors = collectColors();
+    // Resolve color images and always send colors array (empty clears variants on save)
     if (rawColors.length > 0) {
         productData.colors = await uploadColorImages(rawColors);
+    } else {
+        productData.colors = [];
     }
 
     // Collect new File objects from the image module's pending map
@@ -1236,6 +1397,12 @@ async function handleFormSubmit(e) {
         
         // Map status checkbox to status field
         productData.status = productData.status ? 'active' : 'inactive';
+
+        if (Array.isArray(productData.colors) && productData.colors.length > 0) {
+            productData.stock = productData.colors.reduce((sum, c) => sum + (parseInt(c.stock, 10) || 0), 0);
+            const stockInputSync = document.getElementById('stock');
+            if (stockInputSync) stockInputSync.value = String(productData.stock);
+        }
         
         // Ensure images array exists
         if (!productData.images || productData.images.length === 0) {
@@ -1731,6 +1898,7 @@ async function duplicateProduct(productId) {
                 productCopy.colors.forEach(color => colorsContainer.appendChild(_buildColorGroup(color)));
             }
         }
+        refreshStockFieldFromColorInputs();
         
         // Reset to first tab
         const tabBtns = document.querySelectorAll('.tab-btn');

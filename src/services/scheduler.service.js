@@ -37,10 +37,26 @@ async function releaseExpiredReservations() {
 
             for (const item of items) {
                 const qty = parseInt(item.quantity) || 1;
+                const productId = parseInt(item.productId, 10);
+
+                // Release product-level reservation
                 await Product.update(
                     { reservedStock: sequelize.literal(`GREATEST(0, reservedStock - ${qty})`) },
-                    { where: { id: parseInt(item.productId, 10), reservedStock: { [Op.gt]: 0 } } }
+                    { where: { id: productId, reservedStock: { [Op.gt]: 0 } } }
                 );
+
+                // Restore color-specific stock that was decremented at order creation
+                if (item.selectedColor) {
+                    const product = await Product.findByPk(productId);
+                    if (product) {
+                        const updatedColors = (product.colors || []).map(c =>
+                            c.name === item.selectedColor
+                                ? { ...c, stock: (c.stock || 0) + qty }
+                                : c
+                        );
+                        await product.update({ colors: updatedColors });
+                    }
+                }
             }
 
             order.status = 'cancelled';
@@ -49,7 +65,7 @@ async function releaseExpiredReservations() {
             history.push({
                 status: 'cancelled',
                 paymentStatus: 'expired',
-                notes: 'Order expired — payment not received within 30 minutes',
+                notes: 'Order expired — payment not received within 10 minutes',
                 updatedBy: 'system',
                 updatedAt: new Date().toISOString(),
                 source: 'expiry_cron'

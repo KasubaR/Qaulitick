@@ -925,3 +925,98 @@ select.form-input:disabled {
     display: none;
 }
 
+/* Payment instructions modal — automatic confirmation (polling) */
+.payment-modal-auto-confirm {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 18px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border-left: 4px solid #3b82f6;
+    background: rgba(59, 130, 246, 0.08);
+}
+
+.payment-modal-auto-confirm--pending {
+    border-left-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.08);
+}
+
+.payment-modal-auto-confirm--success {
+    border-left-color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.payment-modal-auto-confirm--failed {
+    border-left-color: #ef4444;
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.payment-modal-auto-confirm__icon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    color: #3b82f6;
+}
+
+.payment-modal-auto-confirm--success .payment-modal-auto-confirm__icon {
+    color: #10b981;
+}
+
+.payment-modal-auto-confirm--failed .payment-modal-auto-confirm__icon {
+    color: #ef4444;
+}
+
+.payment-modal-auto-confirm__text strong {
+    display: block;
+    font-size: 15px;
+    color: #0f172a;
+    margin-bottom: 6px;
+}
+
+.payment-modal-auto-confirm__text p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #475569;
+}
+
+.payment-modal-actions {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.payment-modal-cancel-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #64748b;
+    background: transparent;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.payment-modal-cancel-btn:hover {
+    color: #0f172a;
+    border-color: #cbd5e1;
+    background: #f8fafc;
+}
+
+.payment-modal-cancel-hint {
+    margin: 10px 0 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: #94a3b8;
+    max-width: 420px;
+}
+

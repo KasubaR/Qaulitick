@@ -71,10 +71,11 @@
         font-size: 18px;
     }
 
-    /* Variant Sections */
-    .color-option {
-        width: 40px;
-        height: 40px;
+    /* Color dropdown */
+    .color-select-input {
+        max-width: none;
+        min-height: 48px;
+        font-size: 16px;
     }
 
     /* Action Buttons */
@@ -304,9 +305,10 @@
         margin-bottom: 10px;
     }
 
-    .color-option {
-        width: 38px;
-        height: 38px;
+    .color-select-input {
+        min-height: 46px;
+        padding-top: 11px;
+        padding-bottom: 11px;
     }
 
     .strap-option {
@@ -643,9 +645,8 @@
         min-height: 80px;
     }
 
-    .color-option {
-        min-width: 42px;
-        min-height: 42px;
+    .color-select-input {
+        min-height: 48px;
     }
 
     .quantity-btn {
@@ -659,7 +660,6 @@
 
     /* Remove hover effects on touch devices */
     .thumbnail:hover,
-    .color-option:hover,
     .strap-option:hover,
     .btn-primary:hover,
     .btn-secondary:hover,

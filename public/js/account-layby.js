@@ -102,17 +102,24 @@
             }
             if (data.success) {
                 const status = data.status || data.lencoStatus;
+                const statusNorm = String(status || '').toLowerCase();
+                const isPaid =
+                    statusNorm === 'completed' ||
+                    statusNorm === 'successful' ||
+                    statusNorm === 'success' ||
+                    statusNorm === 'paid' ||
+                    statusNorm === 'succeeded';
                 if (data.processing) {
                     if (statusEl) statusEl.textContent = 'Waiting for payment provider…';
                     await sleep(POLL_INTERVAL_MS);
                     continue;
                 }
-                if (status === 'completed') {
+                if (isPaid) {
                     if (statusEl) statusEl.textContent = 'Payment received. Reloading…';
                     window.location.reload();
                     return;
                 }
-                if (status === 'failed' || status === 'cancelled') {
+                if (statusNorm === 'failed' || statusNorm === 'cancelled' || statusNorm === 'canceled') {
                     if (statusEl) {
                         statusEl.textContent = data.failureReason || 'Payment did not complete.';
                     }

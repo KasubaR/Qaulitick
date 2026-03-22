@@ -127,6 +127,17 @@ exports.createOrder = async (req, res) => {
                     throw err;
                 }
 
+                // Check color-specific stock if a color variant was selected
+                const selectedColor = item.variant?.color || item.color || null;
+                if (selectedColor && Array.isArray(productObj.colors)) {
+                    const colorEntry = productObj.colors.find(c => c.name === selectedColor);
+                    if (colorEntry && colorEntry.stock != null && colorEntry.stock < requestedQuantity) {
+                        const err = new Error(`Only ${colorEntry.stock} of "${productObj.model}" in ${selectedColor} left`);
+                        err.statusCode = 409;
+                        throw err;
+                    }
+                }
+
                 // Server-side price — ignore whatever the client sent.
                 const originalPrice = productObj.price || 0;
                 const discount = productObj.discount || 0;
@@ -150,7 +161,9 @@ exports.createOrder = async (req, res) => {
                     image: item.image || (productObj.images && productObj.images[0]) || null,
                     productId: String(productObj.id),
                     sku: productObj.sku || null,
-                    stock: productObj.stock
+                    stock: productObj.stock,
+                    selectedColor: item.variant?.color || item.color || null,
+                    variant: item.variant || null
                 };
             }));
 
@@ -236,6 +249,22 @@ exports.createOrder = async (req, res) => {
                     const err = new Error(`Stock no longer available for "${item.name}"`);
                     err.statusCode = 409;
                     throw err;
+                }
+
+                // Decrement color-specific stock within the same transaction.
+                // The row lock from the reservedStock update above prevents concurrent
+                // orders for the same color from both reading and decrementing simultaneously.
+                if (item.selectedColor) {
+                    const freshProduct = await Product.findByPk(parseInt(item.productId, 10), { transaction: t });
+                    const updatedColors = (freshProduct.colors || []).map(c =>
+                        c.name === item.selectedColor
+                            ? { ...c, stock: Math.max(0, (c.stock || 0) - item.quantity) }
+                            : c
+                    );
+                    await Product.update(
+                        { colors: updatedColors },
+                        { where: { id: parseInt(item.productId, 10) }, transaction: t }
+                    );
                 }
             }
 
@@ -641,14 +670,15 @@ exports.verifyOrderPayment = async (req, res) => {
         let verified = false;
         let verificationError = null;
         
-        if (payment.lencoTransactionId || payment.lencoReference) {
+        if (payment.lencoTransactionId || payment.transactionId || payment.lencoReference) {
             try {
                 const lencoService = require('../services/lenco.service');
                 
-                // Verify payment with Lenco API
+                const merchantReference =
+                    (payment.transactionId && String(payment.transactionId).trim()) || null;
                 const verificationResult = await lencoService.verifyPayment(
-                    payment.lencoTransactionId,  // Collection ID (for Option B)
-                    payment.lencoReference       // Reference (for Option A - recommended)
+                    payment.lencoTransactionId,
+                    merchantReference
                 );
                 
                 // Update payment record with latest status

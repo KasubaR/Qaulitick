@@ -444,6 +444,28 @@ function validateProduct(productData, { partial = false } = {}) {
     if (productData.stock !== undefined && !validateStock(productData.stock)) {
         errors.push('Valid stock quantity is required');
     }
+
+    if (productData.colors && Array.isArray(productData.colors)) {
+        productData.colors.forEach((c) => {
+            if (!c || typeof c.name !== 'string' || !c.name.trim()) {
+                return;
+            }
+            const st = c.stock;
+            if (st === undefined || st === null || st === '') {
+                return;
+            }
+            let ok = false;
+            if (typeof st === 'number') {
+                ok = Number.isInteger(st) && st >= 0;
+            } else if (typeof st === 'string') {
+                const t = st.trim();
+                ok = t === '' || (/^\d+$/.test(t) && parseInt(t, 10) >= 0);
+            }
+            if (!ok) {
+                errors.push(`Color "${c.name.trim()}" has invalid stock (use a whole number ≥ 0)`);
+            }
+        });
+    }
     
     if (productData.images && Array.isArray(productData.images)) {
         productData.images.forEach((image, index) => {

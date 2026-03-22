@@ -2,18 +2,24 @@ const { sequelize } = require('../config/mysql');
 const { DataTypes, Op } = require('sequelize');
 
 function mapLencoStatusToPaymentStatus(lencoStatus) {
+    if (lencoStatus == null || lencoStatus === '') return 'pending';
+    const key = String(lencoStatus).toLowerCase().trim();
     const map = {
         pending: 'pending',
         'pay-offline': 'pending',
         processing: 'processing',
         successful: 'completed',
         success: 'completed',
+        succeeded: 'completed',
+        paid: 'completed',
         completed: 'completed',
+        complete: 'completed',
         failed: 'failed',
         cancelled: 'cancelled',
+        canceled: 'cancelled',
         expired: 'cancelled'
     };
-    return map[lencoStatus] || 'pending';
+    return map[key] || 'pending';
 }
 
 const Payment = sequelize.define('Payment', {
