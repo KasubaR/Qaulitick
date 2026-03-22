@@ -446,7 +446,19 @@ async function initiateMobileMoneyPayment(orderData, customerPhone, provider, am
         amountOverride != null && !Number.isNaN(Number(amountOverride))
             ? Number(amountOverride)
             : Number(orderData.totals.total);
-    
+
+    if (!Number.isFinite(chargeAmount) || chargeAmount < 0.01) {
+        log('error', 'Refusing mobile money collection: invalid amount', {
+            chargeAmount,
+            orderNumber: orderData.orderNumber,
+            function: 'initiateMobileMoneyPayment'
+        });
+        const err = new Error('Invalid payment amount');
+        err.code = 400;
+        err.retryable = false;
+        throw err;
+    }
+
     log('info', 'Initiating mobile money payment', {
         orderNumber: orderData.orderNumber,
         provider: provider.toLowerCase(),

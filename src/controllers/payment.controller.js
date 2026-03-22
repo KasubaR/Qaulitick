@@ -9,6 +9,7 @@ const LaybyPayment = require('../models/LaybyPayment.model');
 const LaybyPlan = require('../models/LaybyPlan.model');
 const { getAuthenticatedAdmin } = require('../middlewares/auth.middleware');
 const logger = require('../utils/logger').child({ module: 'PaymentController' });
+const { parseMoney } = require('../utils/price.utils');
 
 function roundMoney2(x) {
     return Math.round(Number(x) * 100) / 100;
@@ -99,7 +100,15 @@ exports.processPayment = async (req, res) => {
         }
 
         // Authoritative amount — never derived from req.body (except layby installment from DB row).
-        let authoritativeAmount = Number(order.totals.total);
+        let totalsRaw = order.totals;
+        if (typeof totalsRaw === 'string') {
+            try {
+                totalsRaw = JSON.parse(totalsRaw);
+            } catch {
+                totalsRaw = {};
+            }
+        }
+        let authoritativeAmount = roundMoney2(parseMoney(totalsRaw && totalsRaw.total));
         let orderDataForLenco = order.toJSON();
 
         if (laybyIdValid) {
@@ -179,6 +188,16 @@ exports.processPayment = async (req, res) => {
                 ...order.toJSON(),
                 totals: { ...order.totals, total: authoritativeAmount }
             };
+        }
+
+        authoritativeAmount = roundMoney2(authoritativeAmount);
+        if (!Number.isFinite(authoritativeAmount) || authoritativeAmount < 0.01) {
+            logger.warn({ orderNumber, authoritativeAmount }, 'Rejecting payment: invalid order total');
+            return res.status(400).json({
+                success: false,
+                message:
+                    'This order has an invalid payment total. Your cart may include a product with a missing price—remove that item, refresh, and try again, or contact support.'
+            });
         }
 
         // Validate payment method based on feature flags

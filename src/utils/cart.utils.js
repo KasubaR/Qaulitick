@@ -2,7 +2,7 @@
 // Helper functions for parsing and validating cart data from cookies
 
 const productService = require('../services/product.service');
-const { calculateFinalPrice, calculateSubtotal, calculateTotal } = require('./price.utils');
+const { calculateFinalPrice, calculateSubtotal, calculateTotal, parseMoney } = require('./price.utils');
 
 /**
  * Parse cart cookie and validate/enrich items with product data from database
@@ -109,10 +109,26 @@ async function parseAndValidateCartCookie(req) {
                 }
                 
                 // CRITICAL: Recalculate price from database (ignore client-provided price)
-                const originalPrice = productObj.price || 0;
+                const originalPrice = parseMoney(productObj.price);
+                if (!Number.isFinite(originalPrice) || originalPrice <= 0) {
+                    warnings.push({
+                        itemId: item.id,
+                        productId: String(productObj.id),
+                        message: `"${productObj.model}" has no valid price and was removed from the cart preview.`
+                    });
+                    continue;
+                }
                 const discount = productObj.discount || 0;
                 const authoritativePrice = calculateFinalPrice(originalPrice, discount);
-                
+                if (!Number.isFinite(authoritativePrice) || authoritativePrice < 0.01) {
+                    warnings.push({
+                        itemId: item.id,
+                        productId: String(productObj.id),
+                        message: `"${productObj.model}" has an invalid price after discount and was skipped.`
+                    });
+                    continue;
+                }
+
                 // Warn if client price doesn't match server price
                 const clientPrice = parseFloat(item.price) || 0;
                 if (Math.abs(clientPrice - authoritativePrice) > 0.01) {
