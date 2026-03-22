@@ -15,15 +15,15 @@ if (!productService || typeof productService.getProductById !== 'function') {
  */
 exports.addToCart = async (req, res) => {
     try {
-        const { productId, quantity = 1 } = req.body;
-        
+        const { productId, quantity = 1, color } = req.body;
+
         if (!productId) {
             return res.status(400).json({
                 success: false,
                 message: 'Product ID is required'
             });
         }
-        
+
         // Verify productService is available
         if (!productService || typeof productService.getProductById !== 'function') {
             console.error('[Cart Controller] productService is undefined or missing getProductById method');
@@ -32,38 +32,45 @@ exports.addToCart = async (req, res) => {
                 message: 'Server configuration error'
             });
         }
-        
+
         // Get product from database
         const product = await productService.getProductById(productId);
-        
+
         if (!product) {
             return res.status(404).json({
                 success: false,
                 message: 'Product not found'
             });
         }
-        
+
         const productObj = product.toJSON();
-        
         const requestedQuantity = Math.max(1, parseInt(quantity) || 1);
-        
+
+        // Resolve stock — use color-specific stock when a color variant is selected
+        let availableStock = productObj.stock;
+        if (color && Array.isArray(productObj.colors)) {
+            const colorEntry = productObj.colors.find(c => c.name === color);
+            if (colorEntry && colorEntry.stock != null) {
+                availableStock = colorEntry.stock;
+            }
+        }
+
         // Validate stock availability
-        if (productObj.stock < requestedQuantity) {
+        if (availableStock < requestedQuantity) {
             return res.status(400).json({
                 success: false,
-                message: `Only ${productObj.stock} item${productObj.stock !== 1 ? 's' : ''} available`,
-                availableStock: productObj.stock,
+                message: `Only ${availableStock} item${availableStock !== 1 ? 's' : ''} available`,
+                availableStock: availableStock,
                 requestedQuantity: requestedQuantity
             });
         }
-        
+
         // Calculate final price
         const originalPrice = productObj.price || 0;
         const discount = productObj.discount || 0;
         const finalPrice = calculateFinalPrice(originalPrice, discount);
-        
+
         // Return cart item data (client will store in localStorage)
-        // In production, you might want to reserve stock here
         res.json({
             success: true,
             cartItem: {
@@ -76,7 +83,7 @@ exports.addToCart = async (req, res) => {
                 discount: discount,
                 quantity: requestedQuantity,
                 image: productObj.images && productObj.images[0] ? productObj.images[0] : null,
-                stock: productObj.stock, // Include stock for client-side validation
+                stock: availableStock,
                 timestamp: new Date().toISOString()
             },
             message: 'Item added to cart successfully'
@@ -95,42 +102,51 @@ exports.addToCart = async (req, res) => {
  */
 exports.updateCartItem = async (req, res) => {
     try {
-        const { productId, quantity } = req.body;
-        
+        const { productId, quantity, color } = req.body;
+
         if (!productId || quantity === undefined) {
             return res.status(400).json({
                 success: false,
                 message: 'Product ID and quantity are required'
             });
         }
-        
+
         const requestedQuantity = Math.max(1, parseInt(quantity) || 1);
-        
+
         // Get product from database
         const product = await productService.getProductById(productId);
-        
+
         if (!product) {
             return res.status(404).json({
                 success: false,
                 message: 'Product not found'
             });
         }
-        
+
         const productObj = product.toJSON();
-        
+
+        // Resolve color-specific stock
+        let availableStock = productObj.stock;
+        if (color && Array.isArray(productObj.colors)) {
+            const colorEntry = productObj.colors.find(c => c.name === color);
+            if (colorEntry && colorEntry.stock != null) {
+                availableStock = colorEntry.stock;
+            }
+        }
+
         // Validate stock availability
-        if (productObj.stock < requestedQuantity) {
+        if (availableStock < requestedQuantity) {
             return res.status(400).json({
                 success: false,
-                message: `Only ${productObj.stock} item${productObj.stock !== 1 ? 's' : ''} available`,
-                availableStock: productObj.stock,
+                message: `Only ${availableStock} item${availableStock !== 1 ? 's' : ''} available`,
+                availableStock: availableStock,
                 requestedQuantity: requestedQuantity
             });
         }
-        
+
         res.json({
             success: true,
-            availableStock: productObj.stock,
+            availableStock: availableStock,
             quantity: requestedQuantity,
             message: 'Cart item updated successfully'
         });
@@ -212,25 +228,35 @@ exports.validateCart = async (req, res) => {
                 
                 const productObj = product.toJSON();
                 let requestedQuantity = Math.max(1, parseInt(item.quantity) || 1);
-                
+
+                // Resolve color-specific stock
+                const itemColor = item.variant?.color || item.color || null;
+                let availableStock = productObj.stock;
+                if (itemColor && Array.isArray(productObj.colors)) {
+                    const colorEntry = productObj.colors.find(c => c.name === itemColor);
+                    if (colorEntry && colorEntry.stock != null) {
+                        availableStock = colorEntry.stock;
+                    }
+                }
+
                 // Validate stock
-                if (productObj.stock < requestedQuantity) {
+                if (availableStock < requestedQuantity) {
                     warnings.push({
                         itemId: item.id,
                         productId: String(productObj.id),
-                        message: `Only ${productObj.stock} item${productObj.stock !== 1 ? 's' : ''} available for "${productObj.model}"`,
-                        availableStock: productObj.stock,
+                        message: `Only ${availableStock} item${availableStock !== 1 ? 's' : ''} available for "${productObj.model}"${itemColor ? ` (${itemColor})` : ''}`,
+                        availableStock: availableStock,
                         requestedQuantity: requestedQuantity
                     });
                     // Use available stock instead
-                    requestedQuantity = productObj.stock;
+                    requestedQuantity = availableStock;
                 }
-                
+
                 // CRITICAL: Recalculate price from database (ignore client-provided price)
                 const originalPrice = productObj.price || 0;
                 const discount = productObj.discount || 0;
                 const authoritativePrice = calculateFinalPrice(originalPrice, discount);
-                
+
                 // Warn if client price doesn't match server price
                 const clientPrice = parseFloat(item.price) || 0;
                 if (Math.abs(clientPrice - authoritativePrice) > 0.01) {
@@ -243,19 +269,20 @@ exports.validateCart = async (req, res) => {
                         newPrice: authoritativePrice
                     });
                 }
-                
+
                 validatedItems.push({
                     id: String(productObj.id),
                     productId: String(productObj.id),
                     name: productObj.model || item.name,
                     brand: productObj.brand,
-                    price: authoritativePrice, // Server-calculated price
+                    price: authoritativePrice,
                     originalPrice: originalPrice,
                     discount: discount,
                     quantity: requestedQuantity,
-                    image: productObj.images && productObj.images[0] ? productObj.images[0] : (item.image || null),
-                    stock: productObj.stock,
-                    sku: productObj.sku || null
+                    image: item.image || (productObj.images && productObj.images[0]) || null,
+                    stock: availableStock,
+                    sku: productObj.sku || null,
+                    variant: item.variant || null
                 });
             } catch (itemError) {
                 console.error(`[Cart Controller] Error validating item ${productId}:`, itemError);

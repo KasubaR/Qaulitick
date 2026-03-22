@@ -433,12 +433,13 @@ async function generateSKUFromBrandModel(brand, model) {
 const _colorPendingFiles = new Map();
 let _colorKeyCounter = 0;
 
-// Build a color-input-group element. color = { name, image, hex } (all optional)
+// Build a color-input-group element. color = { name, image, hex, stock } (all optional)
 function _buildColorGroup(color) {
     const key = String(++_colorKeyCounter);
     const name = (color && color.name) || '';
     const imageUrl = (color && color.image) || '';
     const hex = (color && color.hex) || '';
+    const stock = (color && color.stock != null) ? color.stock : '';
 
     const group = document.createElement('div');
     group.className = 'color-input-group';
@@ -461,6 +462,7 @@ function _buildColorGroup(color) {
             <input type="file" class="color-file-input" accept="image/jpeg,image/jpg,image/png,image/webp" style="display:none;">
         </div>
         <input type="text" class="color-name-input" placeholder="Color name (e.g. Black)" value="${name}">
+        <input type="number" class="color-stock-input" placeholder="Stock" value="${stock}" min="0">
         <button type="button" class="remove-color-btn" onclick="removeColor(this)">
             <i class="fas fa-times"></i>
         </button>
@@ -501,7 +503,7 @@ function removeColor(btn) {
     group.remove();
 }
 
-// Collect colors from form — returns { name, image, hex, _pendingKey } per entry
+// Collect colors from form — returns { name, image, hex, stock, _pendingKey } per entry
 function collectColors() {
     const colorsContainer = document.getElementById('colorsContainer');
     if (!colorsContainer) return [];
@@ -510,10 +512,12 @@ function collectColors() {
     colorsContainer.querySelectorAll('.color-input-group').forEach(group => {
         const name = (group.querySelector('.color-name-input')?.value || '').trim();
         if (!name) return;
+        const stockVal = group.querySelector('.color-stock-input')?.value;
         colors.push({
             name,
             image: group.dataset.colorImage || null,
             hex: group.dataset.colorHex || null,
+            stock: stockVal !== '' ? parseInt(stockVal) || 0 : 0,
             _pendingKey: group.dataset.colorKey || null
         });
     });
@@ -528,16 +532,16 @@ async function uploadColorImages(colors) {
         if (file) {
             try {
                 const urls = await window.uploadImages([file]);
-                const entry = { name: color.name, image: urls[0] || null };
+                const entry = { name: color.name, image: urls[0] || null, stock: color.stock || 0 };
                 if (color.hex) entry.hex = color.hex;
                 resolved.push(entry);
                 _colorPendingFiles.delete(color._pendingKey);
             } catch {
-                resolved.push({ name: color.name, image: color.image || null, ...(color.hex ? { hex: color.hex } : {}) });
+                resolved.push({ name: color.name, image: color.image || null, stock: color.stock || 0, ...(color.hex ? { hex: color.hex } : {}) });
             }
         } else {
             // No new file — preserve existing image or fallback to hex
-            const entry = { name: color.name };
+            const entry = { name: color.name, stock: color.stock || 0 };
             if (color.image) entry.image = color.image;
             if (color.hex) entry.hex = color.hex;
             resolved.push(entry);

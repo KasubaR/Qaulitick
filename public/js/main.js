@@ -43,8 +43,7 @@ function getCartItems() {
             if (localData) {
                 try {
                     cartData = JSON.parse(localData);
-                    console.log('[Cart] Loaded from localStorage (fallback)');
-                    
+
                     // Sync to cookie if possible (migrate from localStorage)
                     if (typeof window.CookieUtils !== 'undefined' && cartData) {
                         setCartItems(cartData); // This will save to both
@@ -197,8 +196,6 @@ function clearCartStorage() {
         
         // Clear localStorage
         localStorage.removeItem('cart');
-        
-        console.log('[Cart] Cart storage cleared');
     } catch (error) {
         console.error('[Cart] Error clearing cart storage:', error);
     }
@@ -216,16 +213,6 @@ function initGlobal() {
     addGradientAnimations();
     setupGlobalEventListeners();
     setupCartSync();
-    
-    // Initialize session management if available
-    if (typeof window.SessionManager !== 'undefined') {
-        // Session is already initialized in session.js
-        // Just verify it's working
-        const sessionInfo = window.SessionManager.getSessionInfo();
-        if (sessionInfo.sessionId) {
-
-        }
-    }
 }
 
 // Add gradient animations to elements
@@ -379,9 +366,6 @@ function toggleMenu() {
 function subscribeNewsletter(event) {
     event.preventDefault();
     const email = event.target.querySelector('.newsletter-input').value;
-
-    // In a real app, you would send this to your backend
-    console.log('Subscribing email:', email);
 
     // Show success message
     showNotification('Thank you for subscribing! Check your email for confirmation.');

@@ -135,18 +135,15 @@ if (!Array.isArray(product.images)) product.images = [];
                 <!-- COLOR VARIANTS -->
                 <% if (product.colors && product.colors.length > 0) { %>
                     <div class="variant-section">
-                        <span class="variant-label">Color:</span>
+                        <span class="variant-label">Color: <span class="selected-color-label"><%= product.colors[0].name %></span></span>
                         <div class="color-options">
                             <% product.colors.forEach((color, index) => { %>
-                                <div class="color-option <%= index === 0 ? 'selected' : '' %>"
-                                     data-color="<%= color.name %>"
-                                     title="<%= color.name %>">
-                                    <% if (color.image) { %>
-                                        <img src="<%= color.image %>" alt="<%= color.name %>">
-                                    <% } else if (color.hex) { %>
-                                        <span style="display:block;width:100%;height:100%;background-color:<%= color.hex %>;border-radius:inherit;"></span>
-                                    <% } %>
-                                </div>
+                                <button class="color-option <%= index === 0 ? 'selected' : '' %>"
+                                        data-color="<%= color.name %>"
+                                        data-image="<%= color.image || '' %>"
+                                        type="button">
+                                    <%= color.name %>
+                                </button>
                             <% }) %>
                         </div>
                     </div>

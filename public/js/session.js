@@ -78,8 +78,6 @@
                     sameSite: 'Lax'
                 }
             );
-
-            console.log('[Session] Essential session ID cookie created');
         }
 
         return sessionId;

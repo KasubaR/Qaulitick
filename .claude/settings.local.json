@@ -10,7 +10,8 @@
       "Bash(node -e \"require\\(''express-rate-limit''\\); console.log\\(''installed''\\)\")",
       "Bash(xargs grep:*)",
       "Bash(grep:*)",
-      "Bash(node -e \"require\\(''''./src/app''''\\)\")"
+      "Bash(node -e \"require\\(''''./src/app''''\\)\")",
+      "Bash(find /c/Users/Admin/Desktop/qualitick-collections -name *migrat* -o -name *seed* -o -name *.sql)"
     ]
   }
 }

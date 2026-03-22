@@ -56,7 +56,6 @@ function initProductPage() {
     // Also listen for storage events (cross-tab sync and same-tab updates)
     window.addEventListener('storage', (e) => {
         if (e.key === 'cart') {
-            console.log('[Product Details] Storage event - cart changed');
             updateAddToCartButton();
             updateCartCount();
         }
@@ -294,6 +293,50 @@ function isProductInCart() {
     });
 }
 
+// Update availability text and quantity max based on the current color's stock
+function updateStockDisplay() {
+    const colorStock = getColorStock();
+    const quantityInput = document.getElementById('quantityInput');
+    const availabilityEl = document.querySelector('.availability');
+
+    if (quantityInput) {
+        quantityInput.max = colorStock;
+        // Clamp current quantity to new max
+        if (quantity > colorStock) {
+            quantity = Math.max(1, colorStock);
+            quantityInput.value = quantity;
+        }
+        updateButtonStates();
+    }
+
+    if (availabilityEl) {
+        const threshold = product.lowStockThreshold || 5;
+        if (colorStock > threshold) {
+            availabilityEl.innerHTML = '<i class="fas fa-check-circle"></i> In Stock';
+            availabilityEl.className = 'availability in-stock';
+        } else if (colorStock > 0) {
+            availabilityEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> Low Stock (${colorStock} left)`;
+            availabilityEl.className = 'availability low-stock';
+        } else {
+            availabilityEl.innerHTML = '<i class="fas fa-times-circle"></i> Out of Stock';
+            availabilityEl.className = 'availability out-of-stock';
+        }
+    }
+
+    // Disable/enable add to cart based on color stock
+    const addToCartBtn = document.getElementById('addToCartBtn');
+    const buyNowBtn = document.getElementById('buyNowBtn');
+    if (addToCartBtn && !isProductInCart()) {
+        addToCartBtn.disabled = colorStock === 0;
+        if (colorStock === 0) {
+            addToCartBtn.innerHTML = '<i class="fas fa-shopping-cart"></i> Out of Stock';
+        } else {
+            addToCartBtn.innerHTML = '<i class="fas fa-shopping-cart"></i> Add to Cart';
+        }
+    }
+    if (buyNowBtn) buyNowBtn.disabled = colorStock === 0;
+}
+
 // Update Add to Cart button based on cart state
 function updateAddToCartButton() {
     const addToCartBtn = document.getElementById('addToCartBtn');
@@ -322,15 +365,25 @@ function handleAddToCartClick() {
     }
 }
 
+function getColorStock() {
+    if (selectedColor && Array.isArray(product.colors)) {
+        const colorEntry = product.colors.find(c => c.name === selectedColor);
+        if (colorEntry && colorEntry.stock != null) return colorEntry.stock;
+    }
+    return product.stock;
+}
+
 async function handleAddToCart() {
-    // Client-side stock check (quick validation)
-    if (product.stock === 0) {
-        showNotification('This product is currently out of stock', 'error');
+    // Client-side stock check using color-specific stock
+    const availableStock = getColorStock();
+
+    if (availableStock === 0) {
+        showNotification('This color is currently out of stock', 'error');
         return;
     }
 
-    if (quantity > product.stock) {
-        showNotification(`Only ${product.stock} item${product.stock !== 1 ? 's' : ''} available`, 'error');
+    if (quantity > availableStock) {
+        showNotification(`Only ${availableStock} item${availableStock !== 1 ? 's' : ''} available`, 'error');
         return;
     }
 
@@ -344,7 +397,8 @@ async function handleAddToCart() {
             },
             body: JSON.stringify({
                 productId: product._id || product.id || document.getElementById('addToCartBtn')?.dataset.productId,
-                quantity: quantity
+                quantity: quantity,
+                color: selectedColor || undefined
             })
         });
 
@@ -435,14 +489,28 @@ function initVariantSelectors() {
             colorOptions.forEach(opt => opt.classList.remove('selected'));
             option.classList.add('selected');
             selectedColor = option.dataset.color;
-            // Update button state when variant changes
+
+            // Update color label
+            const colorLabel = document.querySelector('.selected-color-label');
+            if (colorLabel) colorLabel.textContent = option.dataset.color;
+
+            // Swap main image to the color's image
+            const colorImage = option.dataset.image;
+            if (colorImage) {
+                const mainImage = document.getElementById('mainImage');
+                if (mainImage) mainImage.src = colorImage;
+            }
+
+            // Update stock display and quantity max for this color
+            updateStockDisplay();
             updateAddToCartButton();
         });
     });
 
-    // Initialize default color
+    // Initialize default color and refresh stock display
     if (colorOptions.length > 0) {
         selectedColor = colorOptions[0].dataset.color;
+        updateStockDisplay();
     }
 
     // Strap selector

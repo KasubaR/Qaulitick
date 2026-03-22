@@ -16,7 +16,6 @@ function initializeCartPage() {
     if (serverRenderedItems && serverRenderedItems.length > 0) {
         // Use server-rendered items (SSR) - no need to reload from cookies
         cartPageItems = serverRenderedItems;
-        console.log('[Cart Page] Using server-rendered cart items');
     } else {
         // No server-rendered items, load from cookies/localStorage (client-side only)
         loadCartItems();
@@ -116,7 +115,6 @@ function loadCartItems() {
             if (cookieData) {
                 try {
                     cartData = JSON.parse(cookieData);
-                    console.log('[Cart Page] Loaded from cookies');
                 } catch (e) {
                     console.warn('[Cart Page] Failed to parse cookie data, trying localStorage');
                 }
@@ -129,7 +127,6 @@ function loadCartItems() {
             if (localData) {
                 try {
                     cartData = JSON.parse(localData);
-                    console.log('[Cart Page] Loaded from localStorage (fallback)');
                 } catch (e) {
                     console.error('[Cart Page] Failed to parse localStorage data');
                 }
@@ -212,7 +209,6 @@ function saveCartItems() {
                     
                     if (cookieSuccess) {
                         savedToCookie = true;
-                        console.log('[Cart Page] Saved to cookies');
                     }
                 } catch (cookieError) {
                     console.warn('[Cart Page] Failed to save to cookie:', cookieError);
@@ -224,7 +220,6 @@ function saveCartItems() {
         try {
             localStorage.setItem('cart', cartJson);
             savedToLocalStorage = true;
-            console.log('[Cart Page] Saved to localStorage');
         } catch (localStorageError) {
             console.error('[Cart Page] Failed to save to localStorage:', localStorageError);
             
@@ -902,8 +897,6 @@ function clearCart() {
         
         // Clear localStorage
         localStorage.removeItem('cart');
-        
-        console.log('[Cart] Cart storage cleared');
     } catch (error) {
         console.error('[Cart] Error clearing cart storage:', error);
     }
