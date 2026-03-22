@@ -8,6 +8,7 @@
 const dashboardService = require('../services/dashboard.service');
 const Order = require('../models/Order.model');
 const Product = require('../models/Product.model');
+const { Op, fn, col, where, literal } = require('sequelize');
 
 /**
  * Get all dashboard statistics (KPIs)
@@ -273,62 +274,61 @@ exports.searchDashboard = async (req, res) => {
         
         // Sanitize search query
         const searchTerm = query.trim().substring(0, 100); // Limit length
-        const searchRegex = { $regex: searchTerm, $options: 'i' };
-        
+        const like = `%${searchTerm}%`;
+
+        const jsonLike = (field) => where(
+            fn('JSON_UNQUOTE', fn('JSON_EXTRACT', col('customer'), literal(`'$.${field}'`))),
+            { [Op.like]: like }
+        );
+
         // Search orders, products, and customers in parallel
         const [orders, products, customers] = await Promise.all([
             // Search orders by order number, customer name, email, or phone
-            Order.find({
-                $or: [
-                    { orderNumber: searchRegex },
-                    { 'customer.name': searchRegex },
-                    { 'customer.email': searchRegex },
-                    { 'customer.phone': searchRegex }
-                ]
-            })
-            .select('orderNumber customer.name customer.email createdAt totals.total status')
-            .sort({ createdAt: -1 })
-            .limit(10)
-            .lean(),
-            
+            Order.findAll({
+                where: {
+                    [Op.or]: [
+                        { orderNumber: { [Op.like]: like } },
+                        jsonLike('name'),
+                        jsonLike('email'),
+                        jsonLike('phone')
+                    ]
+                },
+                attributes: ['orderNumber', 'customer', 'createdAt', 'totals', 'status'],
+                order: [['createdAt', 'DESC']],
+                limit: 10
+            }),
+
             // Search products by model, brand, or SKU
-            Product.find({
-                $or: [
-                    { model: searchRegex },
-                    { brand: searchRegex },
-                    { sku: searchRegex }
+            Product.findAll({
+                where: {
+                    [Op.or]: [
+                        { model: { [Op.like]: like } },
+                        { brand: { [Op.like]: like } },
+                        { sku: { [Op.like]: like } }
+                    ],
+                    status: 'active'
+                },
+                attributes: ['model', 'brand', 'sku', 'price', 'stock', 'images'],
+                limit: 10
+            }),
+
+            // Search customers by grouping orders on customer email
+            Order.findAll({
+                where: {
+                    [Op.or]: [
+                        jsonLike('name'),
+                        jsonLike('email'),
+                        jsonLike('phone')
+                    ]
+                },
+                attributes: [
+                    'customer',
+                    [fn('COUNT', col('id')), 'orderCount'],
+                    [fn('SUM', literal("JSON_EXTRACT(totals, '$.total')")), 'totalSpent']
                 ],
-                status: 'active'
+                group: [literal("JSON_EXTRACT(customer, '$.email')")],
+                limit: 10
             })
-            .select('model brand sku price stock images')
-            .limit(10)
-            .lean(),
-            
-            // Search customers by aggregating orders
-            Order.aggregate([
-                {
-                    $match: {
-                        $or: [
-                            { 'customer.name': searchRegex },
-                            { 'customer.email': searchRegex },
-                            { 'customer.phone': searchRegex }
-                        ]
-                    }
-                },
-                {
-                    $group: {
-                        _id: '$customer.email',
-                        name: { $first: '$customer.name' },
-                        email: { $first: '$customer.email' },
-                        phone: { $first: '$customer.phone' },
-                        orderCount: { $sum: 1 },
-                        totalSpent: { $sum: '$totals.total' }
-                    }
-                },
-                {
-                    $limit: 10
-                }
-            ])
         ]);
         
         // Format results
@@ -351,13 +351,13 @@ exports.searchDashboard = async (req, res) => {
                 stock: product.stock,
                 image: product.images && product.images[0] ? product.images[0] : null
             })),
-            customers: customers.map(customer => ({
+            customers: customers.map(row => ({
                 type: 'customer',
-                name: customer.name,
-                email: customer.email,
-                phone: customer.phone,
-                orders: customer.orderCount,
-                totalSpent: customer.totalSpent
+                name: row.customer.name,
+                email: row.customer.email,
+                phone: row.customer.phone,
+                orders: row.dataValues.orderCount,
+                totalSpent: row.dataValues.totalSpent
             }))
         };
         

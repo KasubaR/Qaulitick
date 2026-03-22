@@ -36,6 +36,7 @@ const createTransporter = () => {
             port,
             secure,
             auth: { user: smtpUser, pass: smtpPass },
+            tls: { rejectUnauthorized: false },
             pool: true,
             maxConnections: 5,
             rateDelta: 1000,

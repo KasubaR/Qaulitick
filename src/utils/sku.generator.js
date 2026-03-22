@@ -1,4 +1,5 @@
 const Product = require('../models/Product.model');
+const { Op } = require('sequelize');
 
 /**
  * SKU Generator Utility
@@ -128,9 +129,10 @@ function cleanModelCode(model) {
 async function getNextSequenceNumber(baseSKU) {
     try {
         // Find all products with SKU starting with baseSKU
-        const products = await Product.find({
-            sku: { $regex: `^${baseSKU}-`, $options: 'i' }
-        }).select('sku').lean();
+        const products = await Product.findAll({
+            where: { sku: { [Op.like]: `${baseSKU}-%` } },
+            attributes: ['sku']
+        });
         
         if (products.length === 0) {
             return 1; // First product
