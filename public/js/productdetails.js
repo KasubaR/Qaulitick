@@ -11,14 +11,24 @@ let selectedStrap = null;
 let quantity = 1;
 let reviewRating = 0;
 
-// Get product data from EJS — fall back to DOM attributes if JSON parse failed
-const product = window.productData || (() => {
-    const btn = document.getElementById('addToCartBtn');
-    if (!btn) return {};
+// Product from server (window.productData) with reliable stock from data attributes as fallback
+function parseStockValue(raw) {
+    const n = parseInt(String(raw === undefined || raw === null ? '' : raw), 10);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+const addToCartBtnRef = document.getElementById('addToCartBtn');
+const product = (() => {
+    const base =
+        window.productData && typeof window.productData === 'object' ? { ...window.productData } : {};
+    const id = base._id || base.id || (addToCartBtnRef && addToCartBtnRef.dataset.productId);
+    const stockFromDom = addToCartBtnRef && addToCartBtnRef.dataset.productStock;
+    const stockRaw = base.stock != null && base.stock !== '' ? base.stock : stockFromDom;
     return {
-        _id: btn.dataset.productId,
-        id: btn.dataset.productId,
-        stock: parseInt(btn.dataset.productStock || '0', 10)
+        ...base,
+        _id: id,
+        id: id,
+        stock: parseStockValue(stockRaw)
     };
 })();
 

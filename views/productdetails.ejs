@@ -424,114 +424,72 @@ if (!Array.isArray(product.images)) product.images = [];
         </div>
     </div>
 
-    <!-- Pass product data to JavaScript -->
-    <script>
-        try {
-            window.productData = JSON.parse('<%- JSON.stringify(product)
-                .replace(/\\/g, '\\\\')
-                .replace(/'/g, "\\'")
-                .replace(/&/g, '\\u0026')
-                .replace(/</g, '\\u003c')
-                .replace(/>/g, '\\u003e')
-                .replace(/\n/g, '\\n')
-                .replace(/\r/g, '\\r') %>');
-        } catch(e) {
-            window.productData = null;
-        }
-    </script>
-
-    <!-- Schema.org Product Structured Data (JSON-LD) -->
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org/",
-        "@type": "Product",
-        "name": "<%= product.model %>",
-        "image": [
-            <% product.images.forEach((image, index) => { %>
-                "<%= image %>"<%= index < product.images.length - 1 ? ',' : '' %>
-            <% }) %>
-        ],
-        "description": "<%= (product.description || '').replace(/"/g, '\\"') %>",
-        "sku": "<%= product.sku || product._id %>",
-        "brand": {
-            "@type": "Brand",
-            "name": "<%= product.brand %>"
+    <% 
+    const _stockNum = Number(product.stock);
+    const _inStock = Number.isFinite(_stockNum) && _stockNum > 0;
+    const _productUrl = typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com/product/' + product._id;
+    const productLd = {
+        '@context': 'https://schema.org/',
+        '@type': 'Product',
+        name: product.model,
+        image: Array.isArray(product.images) ? product.images : [],
+        description: product.description || '',
+        sku: String(product.sku || product._id || ''),
+        brand: { '@type': 'Brand', name: product.brand || '' },
+        offers: {
+            '@type': 'Offer',
+            url: _productUrl,
+            priceCurrency: 'ZMW',
+            price: String(product.price != null ? product.price : ''),
+            priceValidUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            itemCondition: 'https://schema.org/NewCondition',
+            availability: _inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+            seller: { '@type': 'Organization', name: 'Qualitick Collections' }
         },
-        "offers": {
-            "@type": "Offer",
-            "url": "<%= typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com/product/' + product._id %>",
-            "priceCurrency": "ZMW",
-            "price": "<%= product.price %>",
-            "priceValidUntil": "<%= new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] %>",
-            "itemCondition": "https://schema.org/NewCondition",
-            "availability": "<%= product.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock' %>",
-            "seller": {
-                "@type": "Organization",
-                "name": "Qualitick Collections"
-            }
-        },
-        <% if (product.rating) { %>
-        "aggregateRating": {
-            "@type": "AggregateRating",
-            "ratingValue": "<%= product.rating %>",
-            "reviewCount": "<%= product.reviews ? product.reviews.length : 0 %>",
-            "bestRating": "5",
-            "worstRating": "1"
-        },
-        <% } %>
-        <% if (product.reviews && product.reviews.length > 0) { %>
-        "review": [
-            <% product.reviews.forEach((review, index) => { %>
-            {
-                "@type": "Review",
-                "reviewRating": {
-                    "@type": "Rating",
-                    "ratingValue": "<%= review.rating %>",
-                    "bestRating": "5"
-                },
-                "author": {
-                    "@type": "Person",
-                    "name": "<%= review.name %>"
-                },
-                "reviewBody": "<%= (review.comment || '').replace(/"/g, '\\"') %>",
-                "datePublished": "<%= new Date(review.date).toISOString() %>"
-            }<%= index < product.reviews.length - 1 ? ',' : '' %>
-            <% }) %>
-        ],
-        <% } %>
-        "category": "<%= product.gender %> Watches",
-        "material": "<%= product.caseMaterial || 'Stainless Steel' %>",
-        "color": "<%= product.color || (product.colors && product.colors[0] ? product.colors[0].name : '') %>"
+        category: (product.gender || '') + ' Watches',
+        material: product.caseMaterial || 'Stainless Steel',
+        color: product.color || (product.colors && product.colors[0] ? product.colors[0].name : '') || ''
+    };
+    if (product.rating) {
+        productLd.aggregateRating = {
+            '@type': 'AggregateRating',
+            ratingValue: String(product.rating),
+            reviewCount: String(product.reviews ? product.reviews.length : 0),
+            bestRating: '5',
+            worstRating: '1'
+        };
     }
-    </script>
-
-    <!-- BreadcrumbList Schema.org -->
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        "itemListElement": [
-            {
-                "@type": "ListItem",
-                "position": 1,
-                "name": "Home",
-                "item": "https://qualitick-collections.com/"
+    if (product.reviews && product.reviews.length > 0) {
+        productLd.review = product.reviews.map((review) => ({
+            '@type': 'Review',
+            reviewRating: {
+                '@type': 'Rating',
+                ratingValue: String(review.rating != null ? review.rating : ''),
+                bestRating: '5'
             },
-            {
-                "@type": "ListItem",
-                "position": 2,
-                "name": "Shop",
-                "item": "https://qualitick-collections.com/shop"
-            },
-            {
-                "@type": "ListItem",
-                "position": 3,
-                "name": "<%= product.model %>",
-                "item": "<%= typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com/product/' + product._id %>"
-            }
+            author: { '@type': 'Person', name: review.name || 'Anonymous' },
+            reviewBody: review.comment || '',
+            datePublished: new Date(review.date || review.createdAt || Date.now()).toISOString()
+        }));
+    }
+    const breadcrumbLd = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://qualitick-collections.com/' },
+            { '@type': 'ListItem', position: 2, name: 'Shop', item: 'https://qualitick-collections.com/shop' },
+            { '@type': 'ListItem', position: 3, name: product.model || 'Product', item: _productUrl }
         ]
-    }
+    };
+    %>
+
+    <!-- Pass product data to JavaScript (JSON is valid JS; avoids JSON.parse inside single-quoted strings breaking on apostrophes) -->
+    <script>
+        window.productData = <%- JSON.stringify(product).replace(/</g, '\\u003c') %>;
     </script>
+
+    <script type="application/ld+json"><%- JSON.stringify(productLd).replace(/</g, '\\u003c') %></script>
+    <script type="application/ld+json"><%- JSON.stringify(breadcrumbLd).replace(/</g, '\\u003c') %></script>
 
     <script src="/js/productdetails.js"></script>
 <%- include('partials/footer') %>
