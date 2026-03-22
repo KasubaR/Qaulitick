@@ -14,6 +14,7 @@ const Product = sequelize.define('Product', {
     originalPrice: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
     discount: { type: DataTypes.INTEGER, defaultValue: 0 },
     stock: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    reservedStock: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
     lowStockThreshold: { type: DataTypes.INTEGER, defaultValue: 5 },
     description: { type: DataTypes.TEXT, allowNull: true },
     images: {
@@ -85,7 +86,8 @@ const Product = sequelize.define('Product', {
 
 Product.prototype.isLowStock = function(threshold = null) {
     const t = threshold !== null ? threshold : (this.lowStockThreshold || 5);
-    return this.stock > 0 && this.stock <= t;
+    const available = Math.max(0, this.stock - (this.reservedStock || 0));
+    return available > 0 && available <= t;
 };
 
 Product.prototype.updateStock = async function(quantity) {

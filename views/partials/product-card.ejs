@@ -17,8 +17,10 @@
             <% if (_discount > 0) { %>
                 <span class="discount-badge">-<%= _discount %>%</span>
             <% } %>
-            <% if (product.stock === 0) { %>
+            <% if (product.stockStatus === 'out-of-stock') { %>
                 <div class="out-of-stock-overlay">Out of Stock</div>
+            <% } else if (product.stockStatus === 'low-stock') { %>
+                <div class="low-stock-badge">Only <%= product.stock %> left</div>
             <% } %>
             <img
                 src="<%= _firstImage %>"

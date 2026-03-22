@@ -3,6 +3,8 @@
 
 const Order = require('../models/Order.model');
 const Payment = require('../models/Payment.model');
+const Product = require('../models/Product.model');
+const { sequelize } = require('../config/mysql');
 const { Op } = require('sequelize');
 
 /**
@@ -167,9 +169,50 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
         
         // Save order
         await order.save();
-        
+
+        // Adjust stock based on payment outcome.
+        // Guards against duplicate webhook calls: only act when the payment status
+        // actually transitions into a terminal state for the first time.
+        const items = order.items || [];
+
+        if (paymentStatus === 'completed' && previousPaymentStatus !== 'completed') {
+            // Convert reservation to a real sale: deduct from stock and release the hold.
+            for (const item of items) {
+                const qty = parseInt(item.quantity) || 1;
+                const [rows] = await Product.update(
+                    {
+                        stock:         sequelize.literal(`stock - ${qty}`),
+                        reservedStock: sequelize.literal(`GREATEST(0, reservedStock - ${qty})`)
+                    },
+                    {
+                        where: {
+                            id: parseInt(item.productId, 10),
+                            stock:         { [Op.gte]: qty },
+                            reservedStock: { [Op.gte]: qty }
+                        }
+                    }
+                );
+                if (rows === 0) {
+                    console.warn(`[Order Service] Stock decrement skipped for product ${item.productId} on order ${orderNumber} — may have already been applied`);
+                }
+            }
+            console.log(`[Order Service] Stock decremented for order ${orderNumber}`);
+
+        } else if ((paymentStatus === 'failed' || paymentStatus === 'cancelled') &&
+                   previousPaymentStatus !== 'failed' && previousPaymentStatus !== 'cancelled') {
+            // Release the reservation — stock returns to available.
+            for (const item of items) {
+                const qty = parseInt(item.quantity) || 1;
+                await Product.update(
+                    { reservedStock: sequelize.literal(`GREATEST(0, reservedStock - ${qty})`) },
+                    { where: { id: parseInt(item.productId, 10), reservedStock: { [Op.gt]: 0 } } }
+                );
+            }
+            console.log(`[Order Service] Stock reservation released for order ${orderNumber}`);
+        }
+
         console.log(`[Order Service] Order ${orderNumber} status updated from "${previousStatus}" to "${newOrderStatus}" (payment: "${previousPaymentStatus}" → "${newPaymentStatus}")`);
-        
+
         return order;
     } catch (error) {
         console.error(`[Order Service] Error updating order status from payment:`, error);

@@ -102,15 +102,9 @@ const normalizedColors = (product.colors || []).map(function (c) {
                     <div class="product-meta">
                         <span class="sku">SKU: <span class="meta-value"><%= product.sku || product._id %></span></span>
                         <span class="availability">
-                            <%
-                                // Use product-specific low stock threshold when available, fallback to 5
-                                const lowStockThreshold = typeof product.lowStockThreshold === 'number'
-                                    ? product.lowStockThreshold
-                                    : 5;
-                            %>
-                            <% if (product.stock > lowStockThreshold) { %>
+                            <% if (product.stockStatus === 'in-stock') { %>
                                 <i class="fas fa-check-circle"></i> In Stock
-                            <% } else if (product.stock > 0) { %>
+                            <% } else if (product.stockStatus === 'low-stock') { %>
                                 <i class="fas fa-exclamation-circle"></i> Low Stock (<%= product.stock %> left)
                             <% } else { %>
                                 <i class="fas fa-times-circle"></i> Out of Stock

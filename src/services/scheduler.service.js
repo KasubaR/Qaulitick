@@ -6,6 +6,63 @@
  */
 
 const featuredProductService = require('./featuredProduct.service');
+const Order = require('../models/Order.model');
+const Product = require('../models/Product.model');
+const { sequelize } = require('../config/mysql');
+const { Op } = require('sequelize');
+
+const RESERVATION_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+/**
+ * Release stock reservations for orders that never received payment.
+ * Targets orders where paymentStatus = 'pending' and createdAt < now - 30 min.
+ */
+async function releaseExpiredReservations() {
+    const cutoff = new Date(Date.now() - RESERVATION_TTL_MS);
+
+    const expiredOrders = await Order.findAll({
+        where: {
+            paymentStatus: 'pending',
+            createdAt: { [Op.lt]: cutoff }
+        }
+    });
+
+    if (expiredOrders.length === 0) return;
+
+    console.log(`[Scheduler] Releasing reservations for ${expiredOrders.length} expired order(s)...`);
+
+    for (const order of expiredOrders) {
+        try {
+            const items = order.items || [];
+
+            for (const item of items) {
+                const qty = parseInt(item.quantity) || 1;
+                await Product.update(
+                    { reservedStock: sequelize.literal(`GREATEST(0, reservedStock - ${qty})`) },
+                    { where: { id: parseInt(item.productId, 10), reservedStock: { [Op.gt]: 0 } } }
+                );
+            }
+
+            order.status = 'cancelled';
+            order.paymentStatus = 'expired';
+            const history = Array.isArray(order.history) ? [...order.history] : [];
+            history.push({
+                status: 'cancelled',
+                paymentStatus: 'expired',
+                notes: 'Order expired — payment not received within 30 minutes',
+                updatedBy: 'system',
+                updatedAt: new Date().toISOString(),
+                source: 'expiry_cron'
+            });
+            order.history = history;
+            await order.save();
+
+            console.log(`[Scheduler] Expired order ${order.orderNumber} — reservation released`);
+        } catch (err) {
+            console.error(`[Scheduler] Error expiring order ${order.orderNumber}:`, err);
+        }
+    }
+}
 
 class SchedulerService {
     constructor() {
@@ -61,7 +118,16 @@ class SchedulerService {
             }
         }, 12 * 60 * 60 * 1000); // 12 hours
 
-        this.intervals.push(cleanupDeletedInterval, cleanupInactiveInterval);
+        // Release stale stock reservations every 5 minutes
+        const expireReservationsInterval = setInterval(async () => {
+            try {
+                await releaseExpiredReservations();
+            } catch (error) {
+                console.error('[Scheduler] Error during reservation expiry:', error);
+            }
+        }, 5 * 60 * 1000); // 5 minutes
+
+        this.intervals.push(cleanupDeletedInterval, cleanupInactiveInterval, expireReservationsInterval);
 
         // Run initial cleanup on startup (after 1 minute delay to let server fully start)
         setTimeout(async () => {
@@ -71,6 +137,9 @@ class SchedulerService {
                 if (removedCount > 0) {
                     console.log(`[Scheduler] Initial cleanup: Removed ${removedCount} featured product(s) that referenced deleted products`);
                 }
+
+                // Also release any reservations that expired while the server was down
+                await releaseExpiredReservations();
             } catch (error) {
                 console.error('[Scheduler] Error during initial cleanup:', error);
             }

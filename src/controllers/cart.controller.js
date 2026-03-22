@@ -3,6 +3,7 @@
 
 const productService = require('../services/product.service');
 const { calculateFinalPrice } = require('../utils/price.utils');
+const { getStockStatus } = require('../utils/stock.utils');
 
 // Verify productService is loaded correctly
 if (!productService || typeof productService.getProductById !== 'function') {
@@ -229,13 +230,16 @@ exports.validateCart = async (req, res) => {
                 const productObj = product.toJSON();
                 let requestedQuantity = Math.max(1, parseInt(item.quantity) || 1);
 
-                // Resolve color-specific stock
+                // Resolve color-specific stock, accounting for product-level reservations
                 const itemColor = item.variant?.color || item.color || null;
-                let availableStock = productObj.stock;
+                const baseAvailable = Math.max(0, (productObj.stock || 0) - (productObj.reservedStock || 0));
+                let availableStock = baseAvailable;
                 if (itemColor && Array.isArray(productObj.colors)) {
                     const colorEntry = productObj.colors.find(c => c.name === itemColor);
                     if (colorEntry && colorEntry.stock != null) {
-                        availableStock = colorEntry.stock;
+                        // Color stock is tracked separately; cap it by base available
+                        // so product-level reservations are still respected.
+                        availableStock = Math.min(colorEntry.stock, baseAvailable);
                     }
                 }
 
@@ -281,6 +285,7 @@ exports.validateCart = async (req, res) => {
                     quantity: requestedQuantity,
                     image: item.image || (productObj.images && productObj.images[0]) || null,
                     stock: availableStock,
+                    stockStatus: getStockStatus(availableStock, productObj.lowStockThreshold),
                     sku: productObj.sku || null,
                     variant: item.variant || null
                 });
@@ -436,7 +441,8 @@ exports.getCartItems = async (req, res) => {
             item.price = calculateFinalPrice(originalPrice, discount);
             item.originalPrice = originalPrice;
             item.stock = productObj.stock;
-            
+            item.stockStatus = getStockStatus(productObj.stock, productObj.lowStockThreshold);
+
             validatedItems.push(item);
         }
         

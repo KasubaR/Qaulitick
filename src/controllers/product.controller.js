@@ -3,6 +3,7 @@ const { UniqueConstraintError } = require('sequelize');
 const productService = require('../services/product.service');
 const { calculateFinalPrice, calculateSavings } = require('../utils/price.utils');
 const { clearCache } = require('../middlewares/cache.middleware');
+const { getStockStatus } = require('../utils/stock.utils');
 
 /**
  * Convert a Sequelize model instance to a plain object.
@@ -47,7 +48,9 @@ function withPrices(productObj) {
     const savings        = origPrice > currentPrice
         ? Math.round(origPrice - currentPrice)
         : calculateSavings(origPrice, discount);
-    return { ...productObj, price: currentPrice, originalPrice: origPrice, finalPrice: currentPrice, savings };
+    const availableStock = Math.max(0, (productObj.stock || 0) - (productObj.reservedStock || 0));
+    const stockStatus    = getStockStatus(availableStock, productObj.lowStockThreshold);
+    return { ...productObj, price: currentPrice, originalPrice: origPrice, finalPrice: currentPrice, savings, availableStock, stockStatus };
 }
 
 /**
@@ -263,12 +266,15 @@ exports.renderProductDetails = async (req, res) => {
         
         console.log(`[Product Controller] Sanitized reviews count:`, sanitizedReviews.length);
 
+        const availableStock = Math.max(0, (productObj.stock || 0) - (productObj.reservedStock || 0));
         const productWithPrices = {
             ...productObj,
             originalPrice: originalPrice,
             finalPrice: finalPrice,
             savings: savings,
-            reviews: sanitizedReviews
+            reviews: sanitizedReviews,
+            availableStock: availableStock,
+            stockStatus: getStockStatus(availableStock, productObj.lowStockThreshold)
         };
         
         // Get related products (same brand)
@@ -284,7 +290,8 @@ exports.renderProductDetails = async (req, res) => {
                     ...pObj,
                     originalPrice: pOriginalPrice,
                     finalPrice: calculateFinalPrice(pOriginalPrice, pDiscount),
-                    savings: calculateSavings(pOriginalPrice, pDiscount)
+                    savings: calculateSavings(pOriginalPrice, pDiscount),
+                    stockStatus: getStockStatus(pObj.stock, pObj.lowStockThreshold)
                 };
             });
         

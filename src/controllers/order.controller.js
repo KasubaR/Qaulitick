@@ -119,9 +119,10 @@ exports.createOrder = async (req, res) => {
 
                 const productObj = product.toJSON();
                 const requestedQuantity = Math.max(1, parseInt(item.quantity) || 1);
+                const availableStock = productObj.stock - (productObj.reservedStock || 0);
 
-                if (productObj.stock < requestedQuantity) {
-                    const err = new Error(`Insufficient stock for "${productObj.model}". Available: ${productObj.stock}, Requested: ${requestedQuantity}`);
+                if (availableStock < requestedQuantity) {
+                    const err = new Error(`Insufficient stock for "${productObj.model}". Available: ${availableStock}, Requested: ${requestedQuantity}`);
                     err.statusCode = 409;
                     throw err;
                 }
@@ -215,16 +216,18 @@ exports.createOrder = async (req, res) => {
                 updatedAt: new Date().toISOString()
             };
 
-            // Atomic stock decrement: WHERE stock >= quantity prevents overselling
-            // even under concurrent requests. rowsAffected === 0 means another request
-            // already consumed the last unit between our read and this update.
+            // Atomic soft-reserve: increment reservedStock WHERE (stock - reservedStock) >= quantity.
+            // This holds units for this order without consuming them from inventory.
+            // stock is only decremented when payment is confirmed (see updateOrderStatusFromPayment).
+            // rowsAffected === 0 means another concurrent request consumed the last available unit
+            // between our read above and this update — safe to reject.
             for (const item of validatedItems) {
                 const [rowsAffected] = await Product.update(
-                    { stock: sequelize.literal(`stock - ${item.quantity}`) },
+                    { reservedStock: sequelize.literal(`reservedStock + ${item.quantity}`) },
                     {
                         where: {
                             id: parseInt(item.productId, 10),
-                            stock: { [Op.gte]: item.quantity }
+                            [Op.and]: sequelize.literal(`(stock - reservedStock) >= ${item.quantity}`)
                         },
                         transaction: t
                     }
