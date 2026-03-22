@@ -43,6 +43,9 @@ router.get('/export', authenticateAdmin, paymentController.exportPayments);
 // Retry failed payment (must come before /:id to avoid route conflict)
 router.post('/retry/:orderNumber', paymentController.retryPayment);
 
+// Cancel a pending payment by transaction ID (must come before /:id to avoid route conflict)
+router.patch('/cancel/:transactionId', paymentController.cancelPayment);
+
 // Get payment by ID (admin) - MUST be last to avoid matching other routes
 router.get('/:id', authenticateAdmin, paymentController.getPaymentById);
 

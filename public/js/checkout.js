@@ -814,37 +814,25 @@ async function handleFormSubmit(e) {
             throw new Error('Your cart is empty. Please add items before checkout.');
         }
 
-        // SECURITY: Final server-side validation before order creation
-        // This ensures prices haven't been tampered with since page load
-        const csrfToken = typeof getCSRFToken === 'function' ? getCSRFToken() : (typeof window.getCSRFToken === 'function' ? window.getCSRFToken() : '');
-
-        const validationResponse = await fetch('/api/cart/validate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-Token': csrfToken
-            },
-            body: JSON.stringify({
-                items: checkoutCartItems,
+        // Cart and totals were validated in loadCartItems() (POST /api/cart/validate).
+        // Order creation still validates server-side; skipping a second validate here avoids redundant latency.
+        const validatedItems = checkoutCartItems;
+        let validatedTotals = window.serverValidatedTotals;
+        if (!validatedTotals) {
+            let subtotalCalc = 0;
+            for (const item of checkoutCartItems) {
+                const p = typeof item.price === 'number'
+                    ? item.price
+                    : parseFloat(String(item.price).replace(/[K,]/g, '')) || 0;
+                subtotalCalc += p * (item.quantity || 1);
+            }
+            validatedTotals = {
+                subtotal: subtotalCalc,
+                discount: 0,
                 delivery: deliveryFee,
-                couponDiscount: 0
-            })
-        });
-
-        const validationData = await validationResponse.json();
-
-        if (!validationResponse.ok || !validationData.success) {
-            throw new Error(validationData.message || 'Cart validation failed. Please review your cart.');
+                total: subtotalCalc + deliveryFee
+            };
         }
-
-        // Use server-validated items and totals (prevents price manipulation)
-        const validatedItems = validationData.items || checkoutCartItems;
-        const validatedTotals = validationData.totals || {
-            subtotal: 0,
-            discount: 0,
-            delivery: deliveryFee,
-            total: 0
-        };
 
         // Prepare order data with server-validated prices
         const checkoutModeRadio = document.querySelector('input[name="checkoutMode"]:checked');
@@ -1220,12 +1208,69 @@ function updatePaymentStatusIndicator(status, message) {
     }
 }
 
-// Close payment instructions modal
+// Close payment instructions modal and cancel the pending transaction
 function closePaymentInstructionsModal() {
     const modal = document.getElementById('paymentInstructionsModal');
     if (modal) {
         modal.style.display = 'none';
     }
+
+    // Hide the status indicator
+    updatePaymentStatusIndicator('cancelled');
+
+    // Cancel the transaction on the server and stop polling
+    const txId = currentTransactionId;
+    stopPaymentPolling();
+
+    if (txId) {
+        const cancelFailedUserMessage =
+            "We couldn't cancel the payment request on your phone. You may still receive a prompt — please decline it.";
+        fetch(`/api/payments/cancel/${txId}`, { method: 'PATCH' })
+            .then(async (response) => {
+                if (!response.ok) {
+                    let detail = response.statusText || '';
+                    try {
+                        const body = await response.json();
+                        if (body && body.message) detail = body.message;
+                    } catch {
+                        /* non-JSON body */
+                    }
+                    console.warn('[Checkout] Payment cancel failed:', response.status, detail);
+                    showNotification(cancelFailedUserMessage, 'warning');
+                }
+            })
+            .catch((err) => {
+                console.warn('[Checkout] Payment cancel request failed:', err);
+                showNotification(cancelFailedUserMessage, 'warning');
+            });
+    }
+}
+
+// Schedule the next poll after the previous one finishes (avoids stacking intervals during 429 backoff)
+async function scheduleNextPoll(transactionId) {
+    if (currentTransactionId !== transactionId) {
+        return;
+    }
+    if (!paymentPollStartTime) {
+        return;
+    }
+
+    const elapsed = Date.now() - paymentPollStartTime;
+    if (elapsed > PAYMENT_POLL_TIMEOUT) {
+        stopPaymentPolling();
+        showPaymentTimeoutError();
+        return;
+    }
+
+    await pollPaymentStatus(transactionId);
+
+    if (currentTransactionId !== transactionId) {
+        return;
+    }
+
+    const nextDelay = Math.max(PAYMENT_POLL_INTERVAL, rateLimitBackoff);
+    console.log(`[Payment Polling] Next poll in ${nextDelay}ms (${nextDelay / 1000}s)`);
+    paymentPollInterval = setTimeout(() => scheduleNextPoll(transactionId), nextDelay);
 }
 
 // Start payment status polling
@@ -1246,7 +1291,7 @@ function startPaymentPolling(transactionId) {
     console.log(`[Payment Polling] Starting polling for transaction: ${transactionId}`);
     console.log(`[Payment Polling] Waiting 8 seconds before first check to allow Lenco to create collection...`);
     console.log(`[Payment Polling] Poll start time: ${new Date(paymentPollStartTime).toISOString()}`);
-    console.log(`[Payment Polling] Poll interval: ${PAYMENT_POLL_INTERVAL}ms (${PAYMENT_POLL_INTERVAL / 1000}s)`);
+    console.log(`[Payment Polling] Base poll interval: ${PAYMENT_POLL_INTERVAL}ms (${PAYMENT_POLL_INTERVAL / 1000}s)`);
 
     // Reset backoff when starting new polling
     rateLimitBackoff = 0;
@@ -1254,50 +1299,14 @@ function startPaymentPolling(transactionId) {
     // IMPORTANT: Wait 8 seconds before first poll
     // Lenco needs time to create the collection record after initiating payment
     // Polling too early causes "Collection details was not found" errors
-    setTimeout(() => {
-        // Verify we're still polling the same transaction (prevent race conditions)
+    paymentPollInterval = setTimeout(() => {
         if (currentTransactionId !== transactionId) {
             console.log(`[Payment Polling] Transaction changed, stopping old polling`);
             return;
         }
-
-        // Check timeout before first poll
-        const elapsed = Date.now() - paymentPollStartTime;
-        if (elapsed > PAYMENT_POLL_TIMEOUT) {
-            console.warn('[Payment Polling] Timeout reached before first poll, stopping polling');
-            stopPaymentPolling();
-            showPaymentTimeoutError();
-            return;
-        }
-
-        // First poll after initial delay
-        console.log(`[Payment Polling] First poll after ${elapsed}ms delay`);
-        pollPaymentStatus(transactionId);
-
-        // Then poll at regular intervals
-        paymentPollInterval = setInterval(() => {
-            // Verify we're still polling the same transaction
-            if (currentTransactionId !== transactionId) {
-                console.log(`[Payment Polling] Transaction changed, stopping old polling`);
-                clearInterval(paymentPollInterval);
-                paymentPollInterval = null;
-                return;
-            }
-
-            const elapsed = Date.now() - paymentPollStartTime;
-
-            // Check timeout
-            if (elapsed > PAYMENT_POLL_TIMEOUT) {
-                console.warn(`[Payment Polling] Timeout reached after ${elapsed}ms, stopping polling`);
-                stopPaymentPolling();
-                showPaymentTimeoutError();
-                return;
-            }
-
-            console.log(`[Payment Polling] Polling at ${elapsed}ms elapsed`);
-            pollPaymentStatus(transactionId);
-        }, PAYMENT_POLL_INTERVAL);
-    }, 8000); // Wait 8 seconds before starting polling
+        console.log(`[Payment Polling] First poll after ${Date.now() - paymentPollStartTime}ms delay`);
+        scheduleNextPoll(transactionId);
+    }, 8000);
 }
 
 // Poll payment status
@@ -1309,13 +1318,7 @@ async function pollPaymentStatus(transactionId) {
             return;
         }
 
-        // Apply rate limit backoff if needed
-        if (rateLimitBackoff > 0) {
-            console.log(`[Payment Polling] Rate limit backoff: waiting ${rateLimitBackoff}ms before next poll`);
-            await new Promise(resolve => setTimeout(resolve, rateLimitBackoff));
-            // Reduce backoff for next time (exponential backoff decay)
-            rateLimitBackoff = Math.max(0, rateLimitBackoff * 0.5);
-        }
+        // Backoff delay is applied via scheduleNextPoll's setTimeout (nextDelay), not here — avoids stacking with fixed intervals
 
         const response = await fetch(`/api/payments/verify/${transactionId}`);
 
@@ -1395,7 +1398,7 @@ function getStatusMessage(status) {
 // Stop payment polling
 function stopPaymentPolling() {
     if (paymentPollInterval) {
-        clearInterval(paymentPollInterval);
+        clearTimeout(paymentPollInterval);
         paymentPollInterval = null;
     }
     currentTransactionId = null;

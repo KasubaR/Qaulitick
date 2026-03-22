@@ -197,7 +197,7 @@ exports.validateCart = async (req, res) => {
             });
         }
         
-        const { calculateFinalPrice, calculateSubtotal, calculateTotal, parseMoney } = require('../utils/price.utils');
+        const { calculateSubtotal, calculateTotal, parseMoney } = require('../utils/price.utils');
         
         const validatedItems = [];
         const errors = [];
@@ -253,25 +253,9 @@ exports.validateCart = async (req, res) => {
                 }
 
                 // CRITICAL: Recalculate price from database (ignore client-provided price)
-                const originalPrice = parseMoney(productObj.price);
-                if (!Number.isFinite(originalPrice) || originalPrice <= 0) {
-                    errors.push({
-                        itemId: item.id,
-                        productId: String(productObj.id),
-                        message: `"${productObj.model}" has no valid price. Remove it from your cart or contact support.`
-                    });
-                    continue;
-                }
+                const originalPrice = productObj.price || 0;
                 const discount = productObj.discount || 0;
                 const authoritativePrice = calculateFinalPrice(originalPrice, discount);
-                if (!Number.isFinite(authoritativePrice) || authoritativePrice < 0.01) {
-                    errors.push({
-                        itemId: item.id,
-                        productId: String(productObj.id),
-                        message: `"${productObj.model}" has an invalid price after discount. Remove it from your cart or contact support.`
-                    });
-                    continue;
-                }
 
                 // Warn if client price doesn't match server price
                 const clientPrice = parseFloat(item.price) || 0;

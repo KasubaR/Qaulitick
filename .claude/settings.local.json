@@ -11,7 +11,8 @@
       "Bash(xargs grep:*)",
       "Bash(grep:*)",
       "Bash(node -e \"require\\(''''./src/app''''\\)\")",
-      "Bash(find /c/Users/Admin/Desktop/qualitick-collections -name *migrat* -o -name *seed* -o -name *.sql)"
+      "Bash(find /c/Users/Admin/Desktop/qualitick-collections -name *migrat* -o -name *seed* -o -name *.sql)",
+      "Bash(node -e \"const { sequelize } = require\\(''''./src/config/mysql''''\\); const { DataTypes } = require\\(''''sequelize''''\\); const Order = require\\(''''./src/models/Order.model''''\\); Order.findByOrderNumber\\(''''ORD-000007''''\\).then\\(o => { console.log\\(''''totals type:'''', typeof o.totals\\); console.log\\(''''totals:'''', JSON.stringify\\(o.totals\\)\\); process.exit\\(0\\); }\\).catch\\(e => { console.error\\(e.message\\); process.exit\\(1\\); }\\);\")"
     ]
   }
 }

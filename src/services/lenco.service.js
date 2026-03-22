@@ -442,18 +442,21 @@ async function initiateMobileMoneyPayment(orderData, customerPhone, provider, am
 
     const paymentReference = generatePaymentReference(orderData.orderNumber);
 
-    const chargeAmount =
-        amountOverride != null && !Number.isNaN(Number(amountOverride))
-            ? Number(amountOverride)
-            : Number(orderData.totals.total);
+    const rawAmount = amountOverride != null && !Number.isNaN(Number(amountOverride))
+        ? Number(amountOverride)
+        : Number(orderData.totals?.total);
 
-    if (!Number.isFinite(chargeAmount) || chargeAmount < 0.01) {
-        log('error', 'Refusing mobile money collection: invalid amount', {
-            chargeAmount,
+    const chargeAmount = Math.round(rawAmount * 100) / 100; // Round to 2 decimal places
+
+    if (!chargeAmount || isNaN(chargeAmount) || chargeAmount <= 0) {
+        log('error', 'Invalid charge amount', {
             orderNumber: orderData.orderNumber,
-            function: 'initiateMobileMoneyPayment'
+            rawTotal: orderData.totals?.total,
+            amountOverride,
+            chargeAmount
         });
-        const err = new Error('Invalid payment amount');
+        const err = new Error(`Invalid amount: ${chargeAmount}`);
+        err.name = 'validation_error';
         err.code = 400;
         err.retryable = false;
         throw err;
@@ -556,6 +559,7 @@ async function initiateMobileMoneyPayment(orderData, customerPhone, provider, am
         log('error', 'Failed to initiate mobile money payment', {
             orderNumber: orderData.orderNumber,
             provider: provider,
+            chargeAmount,
             error: {
                 message: error.message,
                 type: error.name,
@@ -1035,10 +1039,38 @@ async function getBanks() {
     }
 }
 
+/**
+ * Cancel a Lenco collection (stops retries and USSD prompts on the user's phone)
+ * @param {string} collectionId - Lenco collection ID (col_xxx / lencoTransactionId)
+ * @returns {Promise<boolean>} true if cancelled, false if already terminal or not found
+ */
+async function cancelCollection(collectionId) {
+    if (!collectionId) return false;
+    try {
+        await makeApiRequest({
+            method: 'DELETE',
+            url: `/collections/${collectionId}`,
+            metadata: { operation: 'cancel_collection', transactionId: collectionId }
+        });
+        log('info', 'Collection cancelled on Lenco', { collectionId });
+        return true;
+    } catch (error) {
+        // 404 = already gone, 4xx = already terminal — treat as success
+        const code = error.code || error.status;
+        if (code === 404 || (code >= 400 && code < 500)) {
+            log('info', 'Collection already terminal or not found on Lenco', { collectionId, code });
+            return true;
+        }
+        log('warn', 'Failed to cancel collection on Lenco', { collectionId, error: error.message });
+        return false;
+    }
+}
+
 module.exports = {
     initiateMobileMoneyPayment,
     initiateBankTransfer,
     verifyPayment,
+    cancelCollection,
     handleWebhook,
     generatePaymentReference,
     validateWebhookSignature,

@@ -91,7 +91,7 @@ exports.createOrder = async (req, res) => {
             });
         }
 
-        const { calculateFinalPrice, calculateSubtotal, calculateTotal, parseMoney } = require('../utils/price.utils');
+        const { calculateFinalPrice, calculateSubtotal, calculateTotal } = require('../utils/price.utils');
 
         // Coupon codes are not yet implemented — reject loudly so the client knows.
         if (coupon && coupon.code) {
@@ -127,23 +127,9 @@ exports.createOrder = async (req, res) => {
                 }
 
                 // Server-side price — ignore whatever the client sent.
-                const originalPrice = parseMoney(productObj.price);
-                if (!Number.isFinite(originalPrice) || originalPrice <= 0) {
-                    const err = new Error(
-                        `Product "${productObj.model}" has no valid price. Update it in admin or remove it from your cart.`
-                    );
-                    err.statusCode = 400;
-                    throw err;
-                }
+                const originalPrice = productObj.price || 0;
                 const discount = productObj.discount || 0;
                 const serverPrice = calculateFinalPrice(originalPrice, discount);
-                if (!Number.isFinite(serverPrice) || serverPrice < 0.01) {
-                    const err = new Error(
-                        `Product "${productObj.model}" has an invalid price after discount. Check admin settings.`
-                    );
-                    err.statusCode = 400;
-                    throw err;
-                }
 
                 const clientPrice = parseFloat(item.price) || 0;
                 if (Math.abs(clientPrice - serverPrice) > 0.01) {
@@ -317,13 +303,6 @@ exports.createOrder = async (req, res) => {
 
         if (error.statusCode === 403) {
             return res.status(403).json({
-                success: false,
-                message: error.message
-            });
-        }
-
-        if (error.statusCode === 400) {
-            return res.status(400).json({
                 success: false,
                 message: error.message
             });

@@ -9,7 +9,6 @@ const LaybyPayment = require('../models/LaybyPayment.model');
 const LaybyPlan = require('../models/LaybyPlan.model');
 const { getAuthenticatedAdmin } = require('../middlewares/auth.middleware');
 const logger = require('../utils/logger').child({ module: 'PaymentController' });
-const { parseMoney } = require('../utils/price.utils');
 
 function roundMoney2(x) {
     return Math.round(Number(x) * 100) / 100;
@@ -44,6 +43,24 @@ async function assertLaybyPaymentVerifyAuthorized(req, payment) {
         return { status: 403, body: { success: false, message: 'Not authorized' } };
     }
     return null;
+}
+
+/**
+ * Atomically claim the right to send admin email for a terminal payment (completed/failed).
+ * Prevents duplicate emails when verify (poll) and webhook run concurrently.
+ */
+async function tryClaimPaymentAdminNotification(paymentId) {
+    const [count] = await Payment.update(
+        { notifiedAt: new Date() },
+        {
+            where: {
+                id: paymentId,
+                notifiedAt: { [Op.is]: null },
+                status: { [Op.in]: ['completed', 'failed'] }
+            }
+        }
+    );
+    return count > 0;
 }
 
 // Payment retry limit (configurable via environment variable)
@@ -100,15 +117,7 @@ exports.processPayment = async (req, res) => {
         }
 
         // Authoritative amount — never derived from req.body (except layby installment from DB row).
-        let totalsRaw = order.totals;
-        if (typeof totalsRaw === 'string') {
-            try {
-                totalsRaw = JSON.parse(totalsRaw);
-            } catch {
-                totalsRaw = {};
-            }
-        }
-        let authoritativeAmount = roundMoney2(parseMoney(totalsRaw && totalsRaw.total));
+        let authoritativeAmount = Number(order.totals.total);
         let orderDataForLenco = order.toJSON();
 
         if (laybyIdValid) {
@@ -188,16 +197,6 @@ exports.processPayment = async (req, res) => {
                 ...order.toJSON(),
                 totals: { ...order.totals, total: authoritativeAmount }
             };
-        }
-
-        authoritativeAmount = roundMoney2(authoritativeAmount);
-        if (!Number.isFinite(authoritativeAmount) || authoritativeAmount < 0.01) {
-            logger.warn({ orderNumber, authoritativeAmount }, 'Rejecting payment: invalid order total');
-            return res.status(400).json({
-                success: false,
-                message:
-                    'This order has an invalid payment total. Your cart may include a product with a missing price—remove that item, refresh, and try again, or contact support.'
-            });
         }
 
         // Validate payment method based on feature flags
@@ -553,9 +552,6 @@ exports.verifyPayment = async (req, res) => {
                     'Lenco verification result'
                 );
                 
-                // Capture DB status BEFORE any mutations so notification checks are accurate
-                const previousPaymentStatus = payment.status;
-
                 const newStatus = payment.mapLencoStatusToPaymentStatus(lencoResult.status);
                 const updatePayload = {
                     lencoStatus: lencoResult.status,
@@ -611,15 +607,17 @@ exports.verifyPayment = async (req, res) => {
                     }
                 }
 
-                // Send notification now that DB is confirmed updated
-                if (previousPaymentStatus !== newStatus &&
-                    (newStatus === 'completed' || newStatus === 'failed')) {
-                    try {
-                        const emailService = require('../services/email.service');
-                        const paymentObj = payment.toJSON();
-                        await emailService.sendPaymentNotificationToAdmin(paymentObj);
-                    } catch (emailError) {
-                        console.error('[Payment Controller] Error sending payment notification:', emailError);
+                // Admin email: single send per payment row (atomic notifiedAt vs concurrent webhook)
+                if (newStatus === 'completed' || newStatus === 'failed') {
+                    const claimed = await tryClaimPaymentAdminNotification(payment.id);
+                    if (claimed) {
+                        try {
+                            const emailService = require('../services/email.service');
+                            const fresh = await Payment.findByPk(payment.id);
+                            await emailService.sendPaymentNotificationToAdmin(fresh.toJSON());
+                        } catch (emailError) {
+                            console.error('[Payment Controller] Error sending payment notification:', emailError);
+                        }
                     }
                 }
 
@@ -880,18 +878,6 @@ exports.handleLencoWebhook = async (req, res) => {
             },
             'Payment status updated via webhook'
         );
-        
-        // Send payment notification if status changed to completed or failed
-        if (previousStatus !== payment.status && (payment.status === 'completed' || payment.status === 'failed')) {
-            try {
-                const emailService = require('../services/email.service');
-                const paymentObj = payment.toJSON();
-                await emailService.sendPaymentNotificationToAdmin(paymentObj);
-            } catch (emailError) {
-                console.error('[Payment Controller] Error sending payment notification:', emailError);
-                // Continue even if email fails - don't block webhook processing
-            }
-        }
 
         // Update order status based on payment status
         // Use payment.orderNumber (from payment record) instead of webhookData.orderNumber
@@ -938,6 +924,20 @@ exports.handleLencoWebhook = async (req, res) => {
             }
         } else {
             console.warn(`[Payment Controller] No order number found in payment record or webhook data. Payment ID: ${payment.id}`);
+        }
+
+        // Admin email after order sync; atomic notifiedAt dedupes concurrent verify (poll)
+        if (payment.status === 'completed' || payment.status === 'failed') {
+            const claimed = await tryClaimPaymentAdminNotification(payment.id);
+            if (claimed) {
+                try {
+                    const emailService = require('../services/email.service');
+                    const fresh = await Payment.findByPk(payment.id);
+                    await emailService.sendPaymentNotificationToAdmin(fresh.toJSON());
+                } catch (emailError) {
+                    console.error('[Payment Controller] Error sending payment notification:', emailError);
+                }
+            }
         }
 
         // Return 200 OK to Lenco
@@ -1037,6 +1037,83 @@ exports.getBanks = async (req, res) => {
             success: false,
             message: 'Failed to fetch banks list',
             error: error.message
+        });
+    }
+};
+
+/**
+ * Cancel a pending payment (e.g. user closed the payment instructions modal).
+ * Local DB is updated to cancelled even if Lenco’s cancel API fails.
+ */
+exports.cancelPayment = async (req, res) => {
+    try {
+        const { transactionId } = req.params;
+        if (!transactionId || !String(transactionId).trim()) {
+            return res.status(400).json({ success: false, message: 'Transaction ID required' });
+        }
+
+        let payment = await Payment.findByTransactionId(transactionId);
+        if (!payment) {
+            payment = await Payment.findByLencoTransactionId(transactionId);
+        }
+        if (!payment) {
+            payment = await Payment.findByLencoReference(transactionId);
+        }
+
+        if (!payment) {
+            return res.status(404).json({ success: false, message: 'Payment not found' });
+        }
+
+        const terminalStatuses = ['completed', 'failed', 'cancelled', 'refunded'];
+        if (terminalStatuses.includes(payment.status)) {
+            return res.json({
+                success: true,
+                message: `Payment already ${payment.status}`,
+                status: payment.status,
+                orderNumber: payment.orderNumber
+            });
+        }
+
+        if (payment.lencoTransactionId) {
+            try {
+                await lencoService.cancelCollection(payment.lencoTransactionId);
+            } catch (err) {
+                logger.warn({ err }, 'Lenco cancel failed; marking cancelled locally anyway');
+            }
+        }
+
+        await Payment.update(
+            {
+                status: 'cancelled',
+                lencoStatus: 'cancelled',
+                cancelledAt: new Date()
+            },
+            { where: { id: payment.id } }
+        );
+
+        if (!payment.laybyPaymentId) {
+            try {
+                await orderService.updateOrderStatusFromPayment(
+                    payment.orderNumber,
+                    'cancelled',
+                    payment.lencoTransactionId,
+                    'Payment cancelled by customer'
+                );
+            } catch (orderErr) {
+                logger.error({ err: orderErr }, 'Error updating order after payment cancel');
+            }
+        }
+
+        return res.json({
+            success: true,
+            message: 'Payment cancelled',
+            orderNumber: payment.orderNumber
+        });
+    } catch (error) {
+        logger.error({ err: error }, 'cancelPayment failed');
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to cancel payment'
         });
     }
 };
@@ -1244,7 +1321,7 @@ exports.retryPayment = async (req, res) => {
                 });
             }
 
-            // Update order payment status to pending
+            // Update order payment status to pending (non-fatal if this fails)
             try {
                 await orderService.updateOrderStatusFromPayment(
                     orderNumber,
@@ -1254,11 +1331,10 @@ exports.retryPayment = async (req, res) => {
                 );
             } catch (orderError) {
                 console.error('[Payment Controller] Error updating order status after retry:', orderError);
-                // Continue even if order update fails
             }
-        
-        res.json({
-            success: true,
+
+            return res.json({
+                success: true,
                 message: 'Payment retry initiated successfully',
                 payment: newPaymentRecord,
                 paymentInstructions: lencoResponse.paymentInstructions,
@@ -1267,10 +1343,9 @@ exports.retryPayment = async (req, res) => {
                 bankAccount: lencoResponse.bankAccount,
                 expiresAt: lencoResponse.expiresAt
             });
-
         } catch (error) {
             console.error('[Payment Controller] Error initiating payment retry:', error);
-            
+
             // Create failed payment record for the retry attempt
             try {
                 await Payment.create({
@@ -1293,15 +1368,15 @@ exports.retryPayment = async (req, res) => {
             } catch (createError) {
                 console.error('[Payment Controller] Error creating failed retry payment record:', createError);
             }
-            
-            res.status(500).json({
+
+            return res.status(500).json({
                 success: false,
                 message: error.message || 'Failed to retry payment'
             });
         }
     } catch (error) {
         console.error('[Payment Controller] Error retrying payment:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: 'Failed to retry payment'
         });

@@ -52,6 +52,9 @@ const Payment = sequelize.define('Payment', {
     failureReason: { type: DataTypes.TEXT, allowNull: true },
     failedAt: { type: DataTypes.DATE, allowNull: true },
     completedAt: { type: DataTypes.DATE, allowNull: true },
+    /** Set atomically when admin payment email is sent (dedupes poll vs webhook). */
+    notifiedAt: { type: DataTypes.DATE, allowNull: true },
+    cancelledAt: { type: DataTypes.DATE, allowNull: true },
     retryOf: { type: DataTypes.INTEGER, allowNull: true },
     retryCount: { type: DataTypes.INTEGER, defaultValue: 0 },
     /** When set, this Payment row is for a specific layby installment (see layby_payments.id). */

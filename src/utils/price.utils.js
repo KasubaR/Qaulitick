@@ -1,27 +1,15 @@
 // Price Calculation Utilities (Server-side only)
 
 /**
- * Parse a monetary value from DB/API (decimal string, number, etc.)
- * @param {*} value
- * @returns {number} finite number or NaN
- */
-function parseMoney(value) {
-    if (value == null || value === '') return NaN;
-    const n = parseFloat(String(value).replace(/,/g, '').trim());
-    return Number.isFinite(n) ? n : NaN;
-}
-
-/**
  * Calculate final price after discount (server-side)
- * @param {number|string} price - Original price
+ * @param {number} price - Original price
  * @param {number} discount - Discount percentage
  * @returns {number} - Final price
  */
 function calculateFinalPrice(price, discount) {
-    const p = parseMoney(price);
-    if (!Number.isFinite(p) || p <= 0) return 0;
+    if (!price || price <= 0) return 0;
     const discountAmount = discount || 0;
-    return Math.round(p * (1 - discountAmount / 100));
+    return Math.round(price * (1 - discountAmount / 100));
 }
 
 /**
@@ -61,7 +49,6 @@ function calculateTotal(subtotal, discount = 0, delivery = 0) {
 }
 
 module.exports = {
-    parseMoney,
     calculateFinalPrice,
     calculateSavings,
     calculateSubtotal,

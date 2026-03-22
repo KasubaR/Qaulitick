@@ -176,7 +176,7 @@
             <% if (typeof error !== 'undefined' && error) { %>
             <div class="access-denied-error">
                 <i class="fas fa-exclamation-circle"></i>
-                <!-- SECURITY: use escaped EJS output for error text, never unescaped. Error may contain user-influenced content. -->
+                <%# SECURITY: use escaped output (<%=) here, never unescaped (<%-). Error may contain user-influenced content. %>
                 <strong>Error:</strong> <%= error %>
             </div>
             <% } %>
