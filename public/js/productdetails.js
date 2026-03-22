@@ -32,6 +32,80 @@ const product = (() => {
     };
 })();
 
+function getFirstColorName(colors) {
+    if (!Array.isArray(colors) || colors.length === 0) return null;
+    const c = colors[0];
+    return typeof c === 'string' ? c : (c && c.name) || null;
+}
+
+function findColorEntry(colors, name) {
+    if (!Array.isArray(colors) || !name) return null;
+    return colors.find((c) => (typeof c === 'string' ? c === name : c && c.name === name));
+}
+
+function parseColorImagesMap() {
+    const el = document.getElementById('product-color-images-data');
+    if (!el || !el.textContent.trim()) return new Map();
+    try {
+        const arr = JSON.parse(el.textContent);
+        const map = new Map();
+        if (Array.isArray(arr)) {
+            arr.forEach((entry) => {
+                const n = (entry && entry.name ? String(entry.name) : '').trim();
+                const img = (entry && entry.image ? String(entry.image) : '').trim();
+                if (n) map.set(n, img);
+            });
+        }
+        return map;
+    } catch {
+        return new Map();
+    }
+}
+
+function normalizeUrlForCompare(url) {
+    if (!url || typeof url !== 'string') return '';
+    try {
+        if (/^https?:\/\//i.test(url) || url.startsWith('//')) {
+            const u = new URL(url.startsWith('//') ? `https:${url}` : url);
+            return u.pathname + u.search;
+        }
+        const u = new URL(url, window.location.origin);
+        return u.pathname + u.search;
+    } catch {
+        return url.split('?')[0];
+    }
+}
+
+function urlsEquivalent(a, b) {
+    if (!a || !b) return false;
+    if (a === b) return true;
+    return normalizeUrlForCompare(a) === normalizeUrlForCompare(b);
+}
+
+function syncThumbnailsToMainSrc(mainSrc) {
+    const thumbnails = document.querySelectorAll('.thumbnail:not([data-video])');
+    let foundIndex = -1;
+    if (mainSrc && Array.isArray(product.images)) {
+        product.images.forEach((gallerySrc, index) => {
+            if (urlsEquivalent(gallerySrc, mainSrc)) foundIndex = index;
+        });
+    }
+    thumbnails.forEach((t, index) => {
+        t.classList.toggle('active', foundIndex >= 0 && index === foundIndex);
+    });
+    if (foundIndex >= 0) currentImageIndex = foundIndex;
+}
+
+function setMainImageFromColorUrl(url) {
+    const mainImage = document.getElementById('mainImage');
+    if (!mainImage || !url) return;
+    mainImage.src = url;
+    mainImage.style.animation = 'none';
+    void mainImage.offsetHeight;
+    mainImage.style.animation = 'fadeIn 0.3s ease';
+    syncThumbnailsToMainSrc(url);
+}
+
 // ====================================
 // INITIALIZATION
 // ====================================
@@ -265,7 +339,7 @@ function isProductInCart() {
     // Ensure cart is an array and not empty
     if (!Array.isArray(cart) || cart.length === 0) return false;
 
-    const currentColor = selectedColor || (product.colors && product.colors[0] ? product.colors[0].name : null);
+    const currentColor = selectedColor || getFirstColorName(product.colors);
     const currentStrap = selectedStrap || (product.strapOptions && product.strapOptions[0] ? product.strapOptions[0] : null);
 
     return cart.some(item => {
@@ -367,8 +441,10 @@ function handleAddToCartClick() {
 
 function getColorStock() {
     if (selectedColor && Array.isArray(product.colors)) {
-        const colorEntry = product.colors.find(c => c.name === selectedColor);
-        if (colorEntry && colorEntry.stock != null) return colorEntry.stock;
+        const colorEntry = findColorEntry(product.colors, selectedColor);
+        if (colorEntry && typeof colorEntry === 'object' && colorEntry.stock != null) {
+            return colorEntry.stock;
+        }
     }
     return product.stock;
 }
@@ -482,24 +558,23 @@ function handleBuyNow() {
 // ====================================
 
 function initVariantSelectors() {
+    const colorImageByName = parseColorImagesMap();
+
     // Color selector
     const colorOptions = document.querySelectorAll('.color-option');
     colorOptions.forEach(option => {
         option.addEventListener('click', () => {
             colorOptions.forEach(opt => opt.classList.remove('selected'));
             option.classList.add('selected');
-            selectedColor = option.dataset.color;
+            const colorName = (option.dataset.color || '').trim();
+            selectedColor = colorName;
 
             // Update color label
             const colorLabel = document.querySelector('.selected-color-label');
-            if (colorLabel) colorLabel.textContent = option.dataset.color;
+            if (colorLabel) colorLabel.textContent = colorName;
 
-            // Swap main image to the color's image
-            const colorImage = option.dataset.image;
-            if (colorImage) {
-                const mainImage = document.getElementById('mainImage');
-                if (mainImage) mainImage.src = colorImage;
-            }
+            const colorImage = (colorImageByName.get(colorName) || '').trim();
+            if (colorImage) setMainImageFromColorUrl(colorImage);
 
             // Update stock display and quantity max for this color
             updateStockDisplay();
@@ -507,9 +582,11 @@ function initVariantSelectors() {
         });
     });
 
-    // Initialize default color and refresh stock display
+    // Initialize default color, optional first-color image, and refresh stock display
     if (colorOptions.length > 0) {
-        selectedColor = colorOptions[0].dataset.color;
+        selectedColor = (colorOptions[0].dataset.color || '').trim();
+        const firstImg = (colorImageByName.get(selectedColor) || '').trim();
+        if (firstImg) setMainImageFromColorUrl(firstImg);
         updateStockDisplay();
     }
 

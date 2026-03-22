@@ -4,6 +4,12 @@ if (typeof product.images === 'string') {
     try { product.images = JSON.parse(product.images); } catch(e) { product.images = []; }
 }
 if (!Array.isArray(product.images)) product.images = [];
+// Colors may be objects { name, image } or legacy strings; images may use image / imageUrl / img
+const normalizedColors = (product.colors || []).map(function (c) {
+    if (typeof c === 'string') return { name: c, image: '' };
+    const img = c.image || c.imageUrl || c.img || '';
+    return { name: (c.name || '').trim(), image: typeof img === 'string' ? img.trim() : '' };
+}).filter(function (c) { return c.name; });
 %>
 <%- include('partials/header', {
     title: typeof title !== 'undefined' ? title : 'Product Details - ' + product.model,
@@ -133,20 +139,20 @@ if (!Array.isArray(product.images)) product.images = [];
                 </div>
 
                 <!-- COLOR VARIANTS -->
-                <% if (product.colors && product.colors.length > 0) { %>
+                <% if (normalizedColors.length > 0) { %>
                     <div class="variant-section">
-                        <span class="variant-label">Color: <span class="selected-color-label"><%= product.colors[0].name %></span></span>
+                        <span class="variant-label">Color: <span class="selected-color-label"><%= normalizedColors[0].name %></span></span>
                         <div class="color-options">
-                            <% product.colors.forEach((color, index) => { %>
+                            <% normalizedColors.forEach((color, index) => { %>
                                 <button class="color-option <%= index === 0 ? 'selected' : '' %>"
                                         data-color="<%= color.name %>"
-                                        data-image="<%= color.image || '' %>"
                                         type="button">
                                     <%= color.name %>
                                 </button>
                             <% }) %>
                         </div>
                     </div>
+                    <script type="application/json" id="product-color-images-data"><%- JSON.stringify(normalizedColors.map(function (c) { return { name: c.name, image: c.image }; })).replace(/</g, '\\u003c') %></script>
                 <% } %>
 
                 <!-- STRAP TYPE -->
