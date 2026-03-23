@@ -8,6 +8,7 @@ const { csrfTokenValidator } = require('../middlewares/csrf.middleware');
 // Public routes (for home page) — no auth required
 router.get('/api/marketing/featured-products', marketingController.getFeaturedProducts);
 router.get('/api/marketing/flash-sales', marketingController.getActiveFlashSales);
+router.get('/api/marketing/testimonials', marketingController.getHomepageTestimonials);
 
 // Admin routes — authentication + CSRF required on all mutations
 router.get('/api/admin/marketing/flash-sales',

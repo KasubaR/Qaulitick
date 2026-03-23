@@ -102,7 +102,7 @@ class SettingsService {
         } catch (error) {
             console.error('[Settings Service] Error getting notification email:', error);
             // Return default email if error occurs
-            return 'Peterkinpin98@gmail.com';
+            return process.env.CONTACT_ADMIN_EMAIL || 'support@qualitickzm.com';
         }
     }
 

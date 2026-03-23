@@ -704,10 +704,12 @@ function renderOrders(orders) {
                             <i class="fas fa-eye"></i>
                             <span>View Details</span>
                         </button>
+                        ${!['confirmed','packed','shipped','delivered'].includes(order.status) ? `
                         <button class="action-menu-item" data-action="process" data-order="${on}">
-                            <i class="fas fa-cog"></i>
-                            <span>Process Order</span>
-                        </button>
+                            <i class="fas fa-check"></i>
+                            <span>Confirm Order</span>
+                        </button>` : ''}
+
                         <button class="action-menu-item" data-action="ship" data-order="${on}">
                             <i class="fas fa-shipping-fast"></i>
                             <span>Ship Order</span>
@@ -909,8 +911,8 @@ async function processOrder(orderId) {
     const order = currentOrdersMap.get(orderId);
     const currentStatus = order?.status || 'unknown';
 
-    // Guard: only auto-confirm pending orders; anything further along must not be downgraded.
-    if (currentStatus !== 'pending') {
+    // Guard: only confirm orders that haven't started fulfilment yet.
+    if (currentStatus !== 'pending' && currentStatus !== 'paid') {
         showNotification(
             `Cannot confirm: order is already "${currentStatus}". Open the order details to change its status manually.`,
             'error'

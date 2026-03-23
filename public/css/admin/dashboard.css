@@ -296,11 +296,12 @@
     background: var(--admin-bg-card);
     border: 1px solid var(--admin-border);
     border-radius: 12px;
-    padding: 20px;
+    padding: 14px 16px;
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 12px;
     transition: transform 0.3s, box-shadow 0.3s;
+    overflow: hidden;
 }
 
 .kpi-card:hover {
@@ -313,13 +314,14 @@
 }
 
 .kpi-icon {
-    width: 60px;
-    height: 60px;
-    border-radius: 12px;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 24px;
+    font-size: 18px;
 }
 
 .kpi-icon.sales {
@@ -354,21 +356,22 @@
 
 .kpi-content {
     flex: 1;
+    min-width: 0;
 }
 
 .kpi-label {
-    font-size: 12px;
+    font-size: 10px;
     color: #aaa;
-    margin-bottom: 5px;
+    margin-bottom: 4px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .kpi-value {
-    font-size: 24px;
+    font-size: 18px;
     font-weight: 700;
     color: #fff;
-    margin-bottom: 5px;
+    margin-bottom: 4px;
 }
 
 .kpi-change {

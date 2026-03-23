@@ -153,7 +153,7 @@ exports.updateAddress = async (req, res) => {
 exports.renderOrders = async (req, res) => {
     try {
         const orders = await Order.findAll({
-            where: { userId: req.customerUser.id },
+            where: { userId: req.customerUser.id, status: 'paid' },
             order: [['createdAt', 'DESC']],
             limit: 100
         });

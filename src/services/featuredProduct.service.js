@@ -19,17 +19,14 @@ class FeaturedProductService {
      */
     async getAllFeaturedProducts(filters = {}, options = {}) {
         try {
-            const {
-                sort = { order: 1 }, // Default sort by order ascending
-                limit = 0,
-                skip = 0
-            } = options;
-
-            const query = FeaturedProduct.find(filters);
-            if (sort) query.sort(sort);
-            if (skip) query.skip(skip);
-            if (limit) query.limit(limit);
-            const featuredProducts = await query.exec();
+            const { limit, skip = 0 } = options;
+            const findOptions = {
+                where: filters,
+                order: [['order', 'ASC']],
+                offset: skip
+            };
+            if (limit) findOptions.limit = limit;
+            const featuredProducts = await FeaturedProduct.findAll(findOptions);
             return featuredProducts;
         } catch (error) {
             console.error('[Featured Product Service] Error getting all featured products:', error);
@@ -322,19 +319,18 @@ class FeaturedProductService {
      */
     async cleanupDeletedProducts() {
         try {
-            const featuredProducts = await FeaturedProduct.find({ isActive: true });
+            const featuredProducts = await FeaturedProduct.findAll({ where: { isActive: true } });
 
             let removedCount = 0;
 
             for (const featuredProduct of featuredProducts) {
-                const product = await Product.findById(featuredProduct.productId);
+                const product = await Product.findByPk(featuredProduct.productId);
                 if (!product) {
-                    await FeaturedProduct.findByIdAndDelete(featuredProduct.id);
+                    await featuredProduct.destroy();
                     removedCount++;
                 }
             }
 
-            // Reorder remaining products after cleanup
             if (removedCount > 0) {
                 await this.reorderFeaturedProducts();
             }
@@ -353,48 +349,43 @@ class FeaturedProductService {
      */
     async cleanupInactiveProducts(autoRemove = false) {
         try {
-            const featuredProducts = await FeaturedProduct.find({ isActive: true });
+            const featuredProducts = await FeaturedProduct.findAll({ where: { isActive: true } });
 
             let removedCount = 0;
             const warnings = [];
 
             for (const featuredProduct of featuredProducts) {
-                const product = await Product.findById(featuredProduct.productId);
+                const product = await Product.findByPk(featuredProduct.productId);
 
                 if (!product) {
-                    // Product was deleted - remove it
                     if (autoRemove) {
-                        await FeaturedProduct.findByIdAndDelete(featuredProduct.id);
+                        await featuredProduct.destroy();
                         removedCount++;
                     }
                     warnings.push(`Featured product references deleted product: ${featuredProduct.productId}`);
                     continue;
                 }
 
-                // Check if product is inactive
                 if (product.status !== 'active') {
-                    const warning = `Product ${product._id} (${product.brand} ${product.model}) has status "${product.status}" (not active)`;
+                    const warning = `Product ${product.id} (${product.brand} ${product.model}) has status "${product.status}" (not active)`;
                     warnings.push(warning);
                     console.warn(`[Featured Product Service] ${warning}`);
 
                     if (autoRemove) {
-                        await FeaturedProduct.findByIdAndDelete(featuredProduct.id);
+                        await featuredProduct.destroy();
                         removedCount++;
-                        console.log(`[Featured Product Service] Auto-removed inactive product: ${product._id}`);
                     }
                     continue;
                 }
 
-                // Check if product has no stock
                 if (!product.stock || product.stock <= 0) {
-                    const warning = `Product ${product._id} (${product.brand} ${product.model}) has no stock (stock: ${product.stock})`;
+                    const warning = `Product ${product.id} (${product.brand} ${product.model}) has no stock (stock: ${product.stock})`;
                     warnings.push(warning);
                     console.warn(`[Featured Product Service] ${warning}`);
 
                     if (autoRemove) {
-                        await FeaturedProduct.findByIdAndDelete(featuredProduct.id);
+                        await featuredProduct.destroy();
                         removedCount++;
-                        console.log(`[Featured Product Service] Auto-removed out-of-stock product: ${product._id}`);
                     }
                     continue;
                 }

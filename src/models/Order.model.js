@@ -82,4 +82,30 @@ Order.findByOrderNumber = function(orderNumber) {
     return this.findOne({ where: { orderNumber } });
 };
 
+Order.delete = async function(orderNumber) {
+    const order = await this.findByOrderNumber(orderNumber);
+    if (!order) return null;
+    await order.destroy();
+    return order;
+};
+
+Order.updateStatus = async function(orderNumber, status, notes, updatedBy = 'admin') {
+    const order = await this.findByOrderNumber(orderNumber);
+    if (!order) return null;
+
+    const history = Array.isArray(order.history) ? [...order.history] : [];
+    history.push({
+        status,
+        paymentStatus: order.paymentStatus,
+        notes: notes || '',
+        updatedBy,
+        updatedAt: new Date()
+    });
+
+    order.status = status;
+    order.history = history;
+    await order.save();
+    return order;
+};
+
 module.exports = Order;

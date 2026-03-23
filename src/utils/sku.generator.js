@@ -177,12 +177,14 @@ function validateSKUFormat(sku) {
  */
 async function isSKUAvailable(sku, excludeId = null) {
     try {
-        const query = { sku: sku.toUpperCase() };
-        if (excludeId) {
-            query._id = { $ne: excludeId };
+        const where = { sku: String(sku).toUpperCase() };
+        if (excludeId !== null && excludeId !== undefined && excludeId !== '') {
+            const pk = parseInt(String(excludeId), 10);
+            // Exclude the current product record when checking availability during updates.
+            if (!Number.isNaN(pk)) where.id = { [Op.ne]: pk };
         }
-        
-        const existing = await Product.findOne(query);
+
+        const existing = await Product.findOne({ where });
         return !existing;
     } catch (error) {
         console.error('Error checking SKU availability:', error);

@@ -16,8 +16,7 @@
             <div class="cart-header">
                 <h1 class="cart-title">Shopping Cart</h1>
                 <div class="cart-item-count" id="cartItemCount">
-                    <% 
-                    if (typeof initialCartItems !== 'undefined' && initialCartItems && initialCartItems.length > 0) {
+                    <% if (initialCartItems.length > 0) {
                         const totalItems = initialCartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
                     %>
                         <%= totalItems %> <%= totalItems === 1 ? 'item' : 'items' %>
@@ -42,7 +41,7 @@
                 <!-- Cart Items Section (70%) -->
                 <div class="cart-items-section">
                     <!-- Empty Cart State -->
-                    <div class="empty-cart" id="emptyCart" style="display: <%= (typeof initialCartItems !== 'undefined' && initialCartItems && initialCartItems.length > 0) ? 'none' : 'block' %>;">
+                    <div class="empty-cart" id="emptyCart" style="display: <%= initialCartItems.length > 0 ? 'none' : 'block' %>;">
                         <div class="empty-cart-icon">
                             <i class="fas fa-shopping-cart"></i>
                         </div>
@@ -52,12 +51,11 @@
                     </div>
 
                     <!-- Cart Items Table -->
-                    <div class="cart-items-container" id="cartItemsContainer" style="display: <%= (typeof initialCartItems !== 'undefined' && initialCartItems && initialCartItems.length > 0) ? 'block' : 'none' %>;">
+                    <div class="cart-items-container" id="cartItemsContainer" style="display: <%= initialCartItems.length > 0 ? 'block' : 'none' %>;">
                         <table class="cart-table">
                             <thead>
                                 <tr>
                                     <th class="product-col">Product</th>
-                                    <th class="variant-col">Variants</th>
                                     <th class="price-col">Price</th>
                                     <th class="quantity-col">Quantity</th>
                                     <th class="subtotal-col">Subtotal</th>
@@ -65,26 +63,8 @@
                                 </tr>
                             </thead>
                             <tbody id="cartItemsBody">
-                                <% if (typeof initialCartItems !== 'undefined' && initialCartItems && initialCartItems.length > 0) { %>
-                                    <% 
-                                    // Helper function to get color hex (simple mapping)
-                                    function getColorHex(colorName) {
-                                        if (!colorName) return '#000000';
-                                        const colorMap = {
-                                            'black': '#000000',
-                                            'white': '#FFFFFF',
-                                            'silver': '#C0C0C0',
-                                            'gold': '#FFD700',
-                                            'rose gold': '#E8B4B8',
-                                            'blue': '#0000FF',
-                                            'brown': '#A52A2A',
-                                            'green': '#008000',
-                                            'red': '#FF0000'
-                                        };
-                                        return colorMap[colorName.toLowerCase()] || '#000000';
-                                    }
-                                    
-                                    initialCartItems.forEach((item, index) => {
+                                <% if (initialCartItems.length > 0) { %>
+                                    <% initialCartItems.forEach((item, index) => {
                                         const finalPrice = typeof item.price === 'number' ? item.price : (parseFloat(item.price) || 0);
                                         const originalPrice = item.originalPrice || finalPrice;
                                         const subtotal = finalPrice * item.quantity;
@@ -103,13 +83,6 @@
                                                         </div>
                                                     <% } %>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td class="variant-col" data-label="Variants">
-                                            <div class="variant-display">
-                                                <% if (item.variant && item.variant.color) { %>
-                                                    <div class="color-swatch" style="background-color: <%= getColorHex(item.variant.color) %>"></div>
-                                                <% } %>
                                             </div>
                                         </td>
                                         <td class="price-col" data-label="Price">
@@ -205,7 +178,7 @@
                         </div>
 
                         <!-- Checkout Button -->
-                        <button class="btn-primary btn-checkout" id="checkoutBtn" <%= (typeof initialCartItems !== 'undefined' && initialCartItems && initialCartItems.length > 0) ? '' : 'disabled' %>>
+                        <button class="btn-primary btn-checkout" id="checkoutBtn" <%= initialCartItems.length > 0 ? '' : 'disabled' %>>
                             <i class="fas fa-lock"></i> Proceed to Checkout
                         </button>
 
@@ -231,7 +204,7 @@
                         <div class="sticky-total">
                             <span>Total: <strong id="mobileTotal">K<%= (typeof initialCartTotals !== 'undefined' && initialCartTotals) ? initialCartTotals.total.toLocaleString() : '0' %></strong></span>
                         </div>
-                        <button class="btn-primary btn-checkout-mobile" id="checkoutBtnMobile" <%= (typeof initialCartItems !== 'undefined' && initialCartItems && initialCartItems.length > 0) ? '' : 'disabled' %>>
+                        <button class="btn-primary btn-checkout-mobile" id="checkoutBtnMobile" <%= initialCartItems.length > 0 ? '' : 'disabled' %>>
                             Checkout
                         </button>
                     </div>

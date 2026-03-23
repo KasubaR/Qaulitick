@@ -17,6 +17,7 @@ const inventoryController = require('../controllers/inventory.controller');
 const settingsController = require('../controllers/settings.controller');
 const contactController = require('../controllers/contact.controller');
 const adminLaybyController = require('../controllers/admin.layby.controller');
+const reviewAdminController = require('../controllers/review.admin.controller');
 
 const adminOrderRoutes = require('./admin.order.routes');
 
@@ -107,6 +108,10 @@ router.get('/admin/marketing/featured-products', requireAdminAuth, (req, res) =>
 });
 
 router.get('/admin/contact-submissions', requireAdminAuth, contactController.renderContactSubmissionsPage);
+
+router.get('/admin/reviews', requireAdminAuth, (req, res) => {
+    res.render('admin/reviews', { title: 'Reviews | Admin Panel', page: 'admin', activePage: 'reviews' });
+});
 
 // ============================================
 // Admin Product API
@@ -388,6 +393,44 @@ router.post('/api/admin/layby/installments/:installmentId/confirm-offline',
     authenticateAdmin,
     csrfTokenValidator(),
     adminLaybyController.confirmInstallmentOffline
+);
+
+// ============================================
+// Admin Reviews API
+// ============================================
+
+// Static segments must come before :productId/:reviewId param routes
+router.get('/api/admin/reviews/homepage-testimonials',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
+    authenticateAdmin,
+    reviewAdminController.getHomepageTestimonials
+);
+
+router.get('/api/admin/reviews',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
+    authenticateAdmin,
+    reviewAdminController.getAllReviews
+);
+
+router.delete('/api/admin/reviews/:productId/:reviewId',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }),
+    authenticateAdmin,
+    csrfTokenValidator(),
+    reviewAdminController.deleteReview
+);
+
+router.post('/api/admin/reviews/:productId/:reviewId/feature',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }),
+    authenticateAdmin,
+    csrfTokenValidator(),
+    reviewAdminController.featureReview
+);
+
+router.delete('/api/admin/reviews/:productId/:reviewId/feature',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }),
+    authenticateAdmin,
+    csrfTokenValidator(),
+    reviewAdminController.unfeatureReview
 );
 
 // ============================================

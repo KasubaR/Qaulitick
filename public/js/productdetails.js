@@ -742,12 +742,13 @@ async function handleReviewSubmit(e) {
     }
 
     const formData = new FormData(e.target);
+    const loggedInUser = window.currentUser || null;
     const reviewData = {
         rating: reviewRating,
         title: formData.get('title'),
         comment: formData.get('comment'),
         name: formData.get('name'),
-        email: formData.get('email')
+        email: loggedInUser ? loggedInUser.email : formData.get('email')
     };
 
     if (reviewRating === 0) {
@@ -756,7 +757,11 @@ async function handleReviewSubmit(e) {
     }
 
     // Validate required fields
-    if (!reviewData.email || !reviewData.title || !reviewData.comment || !reviewData.name) {
+    if (!reviewData.title || !reviewData.comment || !reviewData.name) {
+        showNotification('Please fill in all required fields', 'error');
+        return;
+    }
+    if (!loggedInUser && !reviewData.email) {
         showNotification('Please fill in all required fields', 'error');
         return;
     }

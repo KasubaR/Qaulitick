@@ -1045,6 +1045,167 @@ async function sendCustomerPasswordResetEmail({ to, name, resetUrl }) {
     }
 }
 
+/**
+ * Send order confirmation email to customer when admin confirms their order.
+ * @param {Object} order - Order instance (Sequelize model or plain object)
+ * @returns {Promise<Object>} - { success, messageId } or { success: false, error }
+ */
+async function sendOrderConfirmationEmail(order) {
+    const transporter = getTransporter();
+    if (!transporter) {
+        logger.warn('Cannot send order confirmation email: transporter not configured');
+        return { success: false, error: 'Email service not configured' };
+    }
+
+    try {
+        const customerName = esc(order.customer?.name || 'Valued Customer');
+        const orderNumber  = esc(order.orderNumber || '');
+        const orderDate    = new Date(order.createdAt || Date.now()).toLocaleString('en-US', {
+            dateStyle: 'long',
+            timeStyle: 'short'
+        });
+
+        const items = Array.isArray(order.items) ? order.items : [];
+        const totals = order.totals || {};
+
+        const itemRows = items.map(item => `
+            <tr>
+                <td style="padding: 10px 8px; border-bottom: 1px solid #eee;">${esc(item.name)}</td>
+                <td style="padding: 10px 8px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
+                <td style="padding: 10px 8px; border-bottom: 1px solid #eee; text-align: right;">K${formatCurrency(item.price * item.quantity)}</td>
+            </tr>
+        `).join('');
+
+        const deliveryBlock = order.shipping && !order.shipping.pickup
+            ? `<div class="section">
+                   <h3 style="margin: 0 0 12px; color: #333; font-size: 15px;">Delivery Address</h3>
+                   <p style="margin: 4px 0;">${esc(order.shipping.address)}</p>
+                   <p style="margin: 4px 0;">${esc(order.shipping.city)}${order.shipping.province ? ', ' + esc(order.shipping.province) : ''}</p>
+               </div>`
+            : `<div class="section">
+                   <h3 style="margin: 0 0 12px; color: #333; font-size: 15px;">Delivery Method</h3>
+                   <p style="margin: 4px 0;">Store Pickup</p>
+               </div>`;
+
+        const discountRow = totals.discount > 0
+            ? `<tr><td style="padding: 6px 8px; color: #555;">Discount</td><td style="padding: 6px 8px; text-align: right;">-K${formatCurrency(totals.discount)}</td></tr>`
+            : '';
+
+        const deliveryRow = totals.delivery > 0
+            ? `<tr><td style="padding: 6px 8px; color: #555;">Delivery Fee</td><td style="padding: 6px 8px; text-align: right;">K${formatCurrency(totals.delivery)}</td></tr>`
+            : '';
+
+        const html = `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    body { margin: 0; padding: 0; background: #f4f4f4; font-family: Arial, sans-serif; color: #333; }
+                    .wrapper { max-width: 600px; margin: 30px auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+                    .header { background: linear-gradient(135deg, #FFEEC1 0%, #FFD700 100%); padding: 36px 30px; text-align: center; }
+                    .header h1 { margin: 0; font-size: 26px; color: #222; letter-spacing: 0.5px; }
+                    .header p { margin: 6px 0 0; color: #555; font-size: 14px; }
+                    .body { padding: 32px 30px; }
+                    .section { background: #fafafa; border-left: 4px solid #FFD700; border-radius: 4px; padding: 18px 20px; margin: 20px 0; }
+                    .items-table { width: 100%; border-collapse: collapse; margin: 0; }
+                    .items-table th { background: #FFD700; color: #222; padding: 10px 8px; text-align: left; font-size: 13px; }
+                    .items-table th:last-child { text-align: right; }
+                    .items-table th:nth-child(2) { text-align: center; }
+                    .totals-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+                    .total-final td { font-size: 16px; font-weight: bold; padding: 12px 8px !important; border-top: 2px solid #FFD700; }
+                    .cta { display: inline-block; margin-top: 24px; padding: 12px 28px; background: #FFD700; color: #222; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px; }
+                    .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #999; text-align: center; line-height: 1.8; }
+                </style>
+            </head>
+            <body>
+                <div class="wrapper">
+                    <div class="header">
+                        <h1>Order Confirmed ✓</h1>
+                        <p>Qualitick Collections</p>
+                    </div>
+                    <div class="body">
+                        <p>Dear ${customerName},</p>
+                        <p>
+                            Thank you for your order! We've successfully received and confirmed it, and our team is already
+                            getting everything ready for you.
+                        </p>
+                        <p>
+                            You'll receive another update as soon as your order has been shipped. If you have any questions
+                            in the meantime, feel free to reach out — we're here to help!
+                        </p>
+
+                        <div class="section">
+                            <h3 style="margin: 0 0 12px; color: #333; font-size: 15px;">Order Details</h3>
+                            <table style="width: 100%; font-size: 14px;">
+                                <tr>
+                                    <td style="padding: 4px 0; color: #555; width: 45%;">Order Number</td>
+                                    <td style="padding: 4px 0; font-weight: bold;">${orderNumber}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 4px 0; color: #555;">Order Date</td>
+                                    <td style="padding: 4px 0;">${orderDate}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 4px 0; color: #555;">Payment Method</td>
+                                    <td style="padding: 4px 0;">${esc(formatPaymentMethod(order.paymentMethod))}</td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div class="section">
+                            <h3 style="margin: 0 0 14px; color: #333; font-size: 15px;">Items Ordered</h3>
+                            <table class="items-table">
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th>Qty</th>
+                                        <th>Price</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${itemRows}</tbody>
+                            </table>
+                            <table class="totals-table" style="margin-top: 10px; font-size: 14px;">
+                                <tr><td style="padding: 6px 8px; color: #555;">Subtotal</td><td style="padding: 6px 8px; text-align: right;">K${formatCurrency(totals.subtotal || 0)}</td></tr>
+                                ${discountRow}
+                                ${deliveryRow}
+                                <tr class="total-final"><td style="padding: 6px 8px;">Total</td><td style="padding: 6px 8px; text-align: right;">K${formatCurrency(totals.total || 0)}</td></tr>
+                            </table>
+                        </div>
+
+                        ${deliveryBlock}
+
+                        <div style="text-align: center;">
+                            <a href="${process.env.APP_PUBLIC_URL || 'https://qualitick-collections.com'}/account/orders" class="cta">View My Orders</a>
+                        </div>
+
+                        <div class="footer">
+                            <p><strong>Qualitick Collections</strong> — Premium Luxury Watches</p>
+                            <p>Questions? Contact us at <a href="mailto:support@qualitickzm.com" style="color: #999;">support@qualitickzm.com</a></p>
+                            <p>This is an automated message. Please do not reply directly to this email.</p>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        const info = await transporter.sendMail({
+            from: MAIL_FROM,
+            to: order.customer.email,
+            subject: `Your order ${orderNumber} has been confirmed — Qualitick Collections`,
+            html
+        });
+
+        logger.info({ orderNumber: order.orderNumber, messageId: info.messageId }, 'Order confirmation email sent');
+        return { success: true, messageId: info.messageId };
+    } catch (error) {
+        logger.error({ err: error, orderNumber: order.orderNumber }, 'Error sending order confirmation email');
+        return { success: false, error: error.message };
+    }
+}
+
 module.exports = {
     sendContactNotificationToAdmin,
     sendContactConfirmationToUser,
@@ -1054,6 +1215,7 @@ module.exports = {
     sendPaymentNotificationToAdmin,
     sendCustomerEmailVerification,
     sendCustomerPasswordResetEmail,
+    sendOrderConfirmationEmail,
     verifyTransporter
 };
 

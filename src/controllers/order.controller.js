@@ -1,4 +1,5 @@
 // Order Controller
+const emailService = require('../services/email.service');
 const crypto = require('crypto');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/mysql');
@@ -269,7 +270,9 @@ exports.createOrder = async (req, res) => {
             }
 
             const created = await Order.create(orderData, { transaction: t });
-            const orderNumber = `ORD-${String(created.id).padStart(6, '0')}`;
+            const _d = new Date(created.createdAt || Date.now());
+            const _date = String(_d.getDate()).padStart(2, '0') + String(_d.getMonth() + 1).padStart(2, '0') + _d.getFullYear();
+            const orderNumber = `ORD-${_date}-${String(created.id).padStart(6, '0')}`;
             await created.update({ orderNumber }, { transaction: t });
 
             if (checkoutMode === 'layby') {
@@ -306,7 +309,6 @@ exports.createOrder = async (req, res) => {
 
         // Send new order notification to admin (if enabled)
         try {
-            const emailService = require('../services/email.service');
             const orderObj = order.toJSON();
             await emailService.sendOrderNotificationToAdmin(orderObj);
         } catch (emailError) {
@@ -528,6 +530,12 @@ exports.updateOrderStatus = async (req, res) => {
         }
 
         logger.info({ orderNumber, status }, 'Order status updated');
+
+        if (status === 'confirmed') {
+            emailService.sendOrderConfirmationEmail(order.toJSON()).catch(err =>
+                logger.error({ err, orderNumber }, 'Failed to send order confirmation email')
+            );
+        }
 
         res.json({
             success: true,
@@ -818,8 +826,8 @@ exports.generateInvoice = async (req, res) => {
  * Generates invoice PDF and sends it to customer via email
  */
 /**
- * Delete Order (Soft Delete)
- * Sets order status to 'cancelled' and adds deletion note
+ * Delete Order
+ * Permanently removes the order from the database
  */
 exports.deleteOrder = async (req, res) => {
     try {
@@ -954,7 +962,6 @@ exports.sendInvoiceEmail = async (req, res) => {
         const pdfBuffer = await invoiceService.generateInvoicePDF(order);
 
         // Send email with PDF attachment
-        const emailService = require('../services/email.service');
         const emailResult = await emailService.sendInvoiceEmail(order, pdfBuffer, { cc, bcc });
 
         if (!emailResult.success) {

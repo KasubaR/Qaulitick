@@ -81,6 +81,11 @@ const Settings = sequelize.define('Settings', {
             enableCSP: true,
             enableRateLimiting: true
         })
+    },
+    homepageTestimonials: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: []
     }
 }, {
     tableName: 'settings',
@@ -139,7 +144,8 @@ Settings.getDefaultSettings = function() {
             enable2FA: false,
             enableCSP: true,
             enableRateLimiting: true
-        }
+        },
+        homepageTestimonials: []
     };
 };
 
@@ -172,7 +178,7 @@ Settings.prototype.updateSettings = async function(category, data) {
 };
 
 Settings.prototype.getNotificationEmail = function() {
-    return this.notifications?.email?.notificationEmail || 'Peterkinpin98@gmail.com';
+    return this.notifications?.email?.notificationEmail || process.env.CONTACT_ADMIN_EMAIL || 'support@qualitickzm.com';
 };
 
 Settings.prototype.shouldSendNotification = function(type) {

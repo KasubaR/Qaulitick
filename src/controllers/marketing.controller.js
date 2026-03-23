@@ -3,6 +3,8 @@ const flashSaleService = require('../services/flashSale.service');
 const productService = require('../services/product.service');
 const featuredProductService = require('../services/featuredProduct.service');
 const { calculateFinalPrice, calculateSavings } = require('../utils/price.utils');
+const Settings = require('../models/Settings.model');
+const Product = require('../models/Product.model');
 
 // Attach correct price fields to a normalised product plain object.
 function withPrices(productObj) {
@@ -46,9 +48,9 @@ exports.getFeaturedProducts = async (req, res) => {
             })
         );
 
-        // Filter out null values (deleted products) and sort by order
+        // Filter out null values (deleted products) and out-of-stock products, then sort by order
         const validFeaturedProducts = featuredProducts
-            .filter(p => p !== null)
+            .filter(p => p !== null && p.stock > 0)
             .sort((a, b) => a.featuredOrder - b.featuredOrder);
 
         res.json({
@@ -87,10 +89,10 @@ exports.getActiveFlashSales = async (req, res) => {
                             const product = await productService.getProductById(productId);
                             if (product) {
                                 const productObj  = product.toJSON();
+                                if (!productObj.stock || productObj.stock <= 0) return null;
                                 const currentPrice = Number(productObj.price) || 0;
                                 return {
                                     ...productObj,
-                                    // originalPrice = normal selling price (shown crossed-out)
                                     originalPrice:     currentPrice,
                                     flashSaleDiscount: saleDiscount,
                                     finalPrice:        calculateFinalPrice(currentPrice, saleDiscount),
@@ -149,6 +151,29 @@ exports.getAllFlashSales = async (req, res) => {
 exports.createFlashSale = async (req, res) => {
     try {
         const saleData = req.body;
+
+        if (Array.isArray(saleData.productIds) && saleData.productIds.length > 0) {
+            if (saleData.productIds.length > 4) {
+                return res.status(400).json({ success: false, message: 'A flash sale can include a maximum of 4 products' });
+            }
+            const outOfStock = [];
+            for (const productId of saleData.productIds) {
+                const product = await productService.getProductById(productId);
+                if (!product) {
+                    return res.status(400).json({ success: false, message: `Product ${productId} does not exist` });
+                }
+                if (!product.stock || product.stock <= 0) {
+                    outOfStock.push(productId);
+                }
+            }
+            if (outOfStock.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `The following products are out of stock and cannot be added to a flash sale: ${outOfStock.join(', ')}`
+                });
+            }
+        }
+
         const newSale = await flashSaleService.createFlashSale(saleData);
         const saleDataObj = newSale.toJSON();
 
@@ -171,6 +196,29 @@ exports.updateFlashSale = async (req, res) => {
     try {
         const { id } = req.params;
         const saleData = req.body;
+
+        if (Array.isArray(saleData.productIds) && saleData.productIds.length > 0) {
+            if (saleData.productIds.length > 4) {
+                return res.status(400).json({ success: false, message: 'A flash sale can include a maximum of 4 products' });
+            }
+            const outOfStock = [];
+            for (const productId of saleData.productIds) {
+                const product = await productService.getProductById(productId);
+                if (!product) {
+                    return res.status(400).json({ success: false, message: `Product ${productId} does not exist` });
+                }
+                if (!product.stock || product.stock <= 0) {
+                    outOfStock.push(productId);
+                }
+            }
+            if (outOfStock.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `The following products are out of stock and cannot be added to a flash sale: ${outOfStock.join(', ')}`
+                });
+            }
+        }
+
         const updatedSale = await flashSaleService.updateFlashSale(id, saleData);
 
         if (updatedSale) {
@@ -365,6 +413,57 @@ exports.cleanupInactiveProducts = async (req, res) => {
             success: false,
             message: error.message || 'Failed to cleanup inactive products'
         });
+    }
+};
+
+// Public: Get Homepage Testimonials
+exports.getHomepageTestimonials = async (req, res) => {
+    try {
+        const settings     = await Settings.getSettings();
+        const testimonials = Array.isArray(settings.homepageTestimonials)
+            ? settings.homepageTestimonials
+            : [];
+
+        if (!testimonials.length) {
+            return res.json({ success: true, testimonials: [] });
+        }
+
+        const resolved = await Promise.all(
+            testimonials.map(async ({ productId, reviewId }) => {
+                try {
+                    const product = await Product.findByPk(productId, {
+                        attributes: ['id', 'model', 'brand', 'images', 'reviews']
+                    });
+                    if (!product) return null;
+
+                    const review = (product.reviews || []).find(r => r.id === reviewId);
+                    if (!review) return null;
+
+                    // Strip sensitive fields
+                    const { email, ipAddress, orderNumber, ...safeReview } = review;
+
+                    return {
+                        ...safeReview,
+                        productId:    product.id,
+                        productName:  `${product.brand} ${product.model}`.trim(),
+                        productImage: Array.isArray(product.images) && product.images.length
+                            ? product.images[0]
+                            : null
+                    };
+                } catch (err) {
+                    console.warn(`[Marketing Controller] Stale testimonial productId=${productId} reviewId=${reviewId}:`, err.message);
+                    return null;
+                }
+            })
+        );
+
+        res.json({
+            success:      true,
+            testimonials: resolved.filter(t => t !== null)
+        });
+    } catch (error) {
+        console.error('[Marketing Controller] Error fetching homepage testimonials:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch testimonials' });
     }
 };
 

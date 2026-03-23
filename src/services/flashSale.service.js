@@ -129,6 +129,38 @@ class FlashSaleService {
     }
 
     /**
+     * Check active flash sales containing the given product.
+     * If all products in a sale are out of stock, end the sale and hide its banner.
+     * @param {number} productId
+     * @returns {Promise<void>}
+     */
+    async endSaleIfAllOutOfStock(productId) {
+        try {
+            const Product = require('../models/Product.model');
+            const activeSales = await this.getActiveFlashSales();
+
+            for (const sale of activeSales) {
+                const raw = sale.productIds;
+                const ids = Array.isArray(raw)
+                    ? raw
+                    : (typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []);
+
+                if (!ids.map(toId).includes(toId(productId))) continue;
+
+                const products = await Product.findAll({ where: { id: ids.map(toId) } });
+                const allOutOfStock = products.every(p => !p.stock || p.stock <= 0);
+
+                if (allOutOfStock) {
+                    await sale.update({ status: 'ended', showBanner: false });
+                    console.log(`[Flash Sale Service] Sale "${sale.name}" (id: ${sale.id}) ended — all products out of stock`);
+                }
+            }
+        } catch (error) {
+            console.error('[Flash Sale Service] Error checking sale stock status:', error);
+        }
+    }
+
+    /**
      * Remove a product from all flash sales that reference it.
      * Any sale that becomes empty as a result is ended immediately.
      * Called after a product is deleted.

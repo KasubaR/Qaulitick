@@ -84,15 +84,7 @@ const normalizedColors = (product.colors || []).map(function (c) {
                     <!-- Rating & Reviews -->
                     <div class="product-rating">
                         <div class="stars">
-                            <% for(let i = 1; i <= 5; i++) { %>
-                                <% if (i <= Math.floor(product.rating)) { %>
-                                    <i class="fas fa-star"></i>
-                                <% } else if (i === Math.ceil(product.rating) && product.rating % 1 !== 0) { %>
-                                    <i class="fas fa-star-half-alt"></i>
-                                <% } else { %>
-                                    <i class="far fa-star"></i>
-                                <% } %>
-                            <% } %>
+                            <%- include('partials/star-rating', { rating: product.rating }) %>
                         </div>
                         <span class="rating-value"><%= product.rating %></span>
                         <span class="review-count">(<%= product.reviews && product.reviews.length ? product.reviews.length : 0 %> reviews)</span>
@@ -261,15 +253,7 @@ const normalizedColors = (product.colors || []).map(function (c) {
                             <div class="overall-rating">
                                 <span class="rating-number"><%= product.rating %></span>
                                 <div class="stars-large">
-                                    <% for(let i = 1; i <= 5; i++) { %>
-                                        <% if (i <= Math.floor(product.rating)) { %>
-                                            <i class="fas fa-star"></i>
-                                        <% } else if (i === Math.ceil(product.rating) && product.rating % 1 !== 0) { %>
-                                            <i class="fas fa-star-half-alt"></i>
-                                        <% } else { %>
-                                            <i class="far fa-star"></i>
-                                        <% } %>
-                                    <% } %>
+                                    <%- include('partials/star-rating', { rating: product.rating }) %>
                                 </div>
                                 <p>Based on <%= product.reviews && product.reviews.length ? product.reviews.length : 0 %> reviews</p>
                             </div>
@@ -335,14 +319,10 @@ const normalizedColors = (product.colors || []).map(function (c) {
         <section class="related-products-section">
             <h2 class="section-title">You May Also Like</h2>
             <div class="related-products-grid">
-                <% relatedProducts.forEach(related => {
-                    let _rImgs = related.images;
-                    if (typeof _rImgs === 'string') { try { _rImgs = JSON.parse(_rImgs); } catch(e) { _rImgs = []; } }
-                    if (!Array.isArray(_rImgs)) _rImgs = [];
-                %>
+                <% relatedProducts.forEach(related => { %>
                     <a href="/product/<%= related._id %>" class="related-product-card">
                         <div class="related-product-image">
-                            <img src="<%= _rImgs[0] || '/images/placeholder.jpg' %>" alt="<%= related.model %>">
+                            <img src="<%= related.images[0] || '/images/placeholder.jpg' %>" alt="<%= related.model %>">
                             <% if (related.discount > 0) { %>
                                 <div class="discount-badge-small">-<%= related.discount %>%</div>
                             <% } %>
@@ -382,10 +362,17 @@ const normalizedColors = (product.colors || []).map(function (c) {
         <div class="review-modal-content">
             <button class="review-close" id="reviewClose">&times;</button>
             <h3>Write a Review</h3>
+            <% if (currentUser) { %>
+            <div class="review-info-message" style="background: #e8f5e9; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 14px; color: #2e7d32;">
+                <i class="fas fa-check-circle"></i>
+                Reviewing as <strong><%= currentUser.name %></strong> (<%= currentUser.email %>)
+            </div>
+            <% } else { %>
             <div class="review-info-message" style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 14px; color: #1976d2;">
                 <i class="fas fa-info-circle"></i>
                 Only verified buyers can review. Please use the same email used during checkout.
             </div>
+            <% } %>
             <form id="reviewForm">
                 <div class="form-group">
                     <label>Your Rating *</label>
@@ -408,80 +395,24 @@ const normalizedColors = (product.colors || []).map(function (c) {
                 </div>
                 <div class="form-group">
                     <label for="reviewName">Your Name *</label>
-                    <input type="text" id="reviewName" name="name" autocomplete="name" required maxlength="100">
+                    <input type="text" id="reviewName" name="name" autocomplete="name" required maxlength="100"<% if (currentUser) { %> value="<%= currentUser.name %>"<% } %>>
                 </div>
+                <% if (!currentUser) { %>
                 <div class="form-group">
                     <label for="reviewEmail">Your Email *</label>
                     <input type="email" id="reviewEmail" name="email" autocomplete="email" required placeholder="Use the email from your order">
                     <small style="color: #666; font-size: 12px;">We'll verify your purchase using this email</small>
                 </div>
+                <% } %>
                 <button type="submit" class="btn-primary">Submit Review</button>
             </form>
         </div>
     </div>
 
-    <% 
-    const _stockNum = Number(product.stock);
-    const _inStock = Number.isFinite(_stockNum) && _stockNum > 0;
-    const _productUrl = typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com/product/' + product._id;
-    const productLd = {
-        '@context': 'https://schema.org/',
-        '@type': 'Product',
-        name: product.model,
-        image: Array.isArray(product.images) ? product.images : [],
-        description: product.description || '',
-        sku: String(product.sku || product._id || ''),
-        brand: { '@type': 'Brand', name: product.brand || '' },
-        offers: {
-            '@type': 'Offer',
-            url: _productUrl,
-            priceCurrency: 'ZMW',
-            price: String(product.price != null ? product.price : ''),
-            priceValidUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            itemCondition: 'https://schema.org/NewCondition',
-            availability: _inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-            seller: { '@type': 'Organization', name: 'Qualitick Collections' }
-        },
-        category: (product.gender || '') + ' Watches',
-        material: product.caseMaterial || 'Stainless Steel',
-        color: product.color || (product.colors && product.colors[0] ? product.colors[0].name : '') || ''
-    };
-    if (product.rating) {
-        productLd.aggregateRating = {
-            '@type': 'AggregateRating',
-            ratingValue: String(product.rating),
-            reviewCount: String(product.reviews ? product.reviews.length : 0),
-            bestRating: '5',
-            worstRating: '1'
-        };
-    }
-    if (product.reviews && product.reviews.length > 0) {
-        productLd.review = product.reviews.map((review) => ({
-            '@type': 'Review',
-            reviewRating: {
-                '@type': 'Rating',
-                ratingValue: String(review.rating != null ? review.rating : ''),
-                bestRating: '5'
-            },
-            author: { '@type': 'Person', name: review.name || 'Anonymous' },
-            reviewBody: review.comment || '',
-            datePublished: new Date(review.date || review.createdAt || Date.now()).toISOString()
-        }));
-    }
-    const breadcrumbLd = {
-        '@context': 'https://schema.org',
-        '@type': 'BreadcrumbList',
-        itemListElement: [
-            { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://qualitick-collections.com/' },
-            { '@type': 'ListItem', position: 2, name: 'Shop', item: 'https://qualitick-collections.com/shop' },
-            { '@type': 'ListItem', position: 3, name: product.model || 'Product', item: _productUrl }
-        ]
-    };
-    %>
-
-    <!-- Pass product data to JavaScript (JSON is valid JS; avoids JSON.parse inside single-quoted strings breaking on apostrophes) -->
+    <!-- Pass product and user data to JavaScript -->
     <script>
         window.productData = <%- JSON.stringify(product).replace(/</g, '\\u003c') %>;
+        window.currentUser = <%- JSON.stringify(currentUser || null).replace(/</g, '\\u003c') %>;
     </script>
 
     <script type="application/ld+json"><%- JSON.stringify(productLd).replace(/</g, '\\u003c') %></script>

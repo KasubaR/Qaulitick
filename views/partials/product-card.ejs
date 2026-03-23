@@ -37,15 +37,7 @@
             <div class="product-brand"><%= product.brand || 'Brand' %></div>
             <h3 class="product-name"><%= product.model %></h3>
             <div class="product-rating">
-                <% for(let i = 1; i <= 5; i++) { %>
-                    <% if (i <= Math.floor(product.rating || 0)) { %>
-                        <i class="fas fa-star"></i>
-                    <% } else if (i === Math.ceil(product.rating || 0) && (product.rating || 0) % 1 !== 0) { %>
-                        <i class="fas fa-star-half-alt"></i>
-                    <% } else { %>
-                        <i class="far fa-star"></i>
-                    <% } %>
-                <% } %>
+                <%- include('star-rating', { rating: product.rating }) %>
                 <span class="rating-value">(<%= product.rating || 0 %>)</span>
             </div>
 

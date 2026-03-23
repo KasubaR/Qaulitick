@@ -113,19 +113,13 @@ class SchedulerService {
             }
         }, 6 * 60 * 60 * 1000); // 6 hours
 
-        // Cleanup inactive/out-of-stock products every 12 hours (warnings only, no auto-remove)
+        // Cleanup inactive/out-of-stock products every 12 hours (auto-remove enabled)
         const cleanupInactiveInterval = setInterval(async () => {
             try {
-                console.log('[Scheduler] Running cleanup check for inactive/out-of-stock products...');
-                const result = await featuredProductService.cleanupInactiveProducts(false); // Warnings only
-                if (result.warnings && result.warnings.length > 0) {
-                    console.warn(`[Scheduler] Found ${result.warnings.length} inactive/out-of-stock featured product(s):`);
-                    result.warnings.slice(0, 5).forEach(warning => {
-                        console.warn(`[Scheduler]   - ${warning}`);
-                    });
-                    if (result.warnings.length > 5) {
-                        console.warn(`[Scheduler]   ... and ${result.warnings.length - 5} more`);
-                    }
+                console.log('[Scheduler] Running cleanup for inactive/out-of-stock featured products...');
+                const result = await featuredProductService.cleanupInactiveProducts(true);
+                if (result.removedCount > 0) {
+                    console.log(`[Scheduler] Removed ${result.removedCount} inactive/out-of-stock featured product(s)`);
                 } else {
                     console.log('[Scheduler] All featured products are active and in stock');
                 }

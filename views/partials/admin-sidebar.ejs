@@ -26,7 +26,10 @@
         <a href="/admin/contact-submissions" class="nav-item <%= typeof activePage !== 'undefined' && activePage === 'contact-submissions' ? 'active' : '' %>">
             <i class="fas fa-envelope"></i>
             <span>Contact Submissions</span>
-            <span class="badge" id="newSubmissionsBadge"><%= typeof newSubmissionsCount !== 'undefined' ? newSubmissionsCount : 0 %></span>
+        </a>
+        <a href="/admin/reviews" class="nav-item <%= typeof activePage !== 'undefined' && activePage === 'reviews' ? 'active' : '' %>">
+            <i class="fas fa-star"></i>
+            <span>Reviews</span>
         </a>
         <a href="/admin/customers" class="nav-item <%= typeof activePage !== 'undefined' && activePage === 'customers' ? 'active' : '' %>">
             <i class="fas fa-users"></i>
@@ -35,7 +38,6 @@
         <a href="/admin/inventory" class="nav-item <%= typeof activePage !== 'undefined' && activePage === 'inventory' ? 'active' : '' %>">
             <i class="fas fa-warehouse"></i>
             <span>Inventory</span>
-            <span class="badge alert" id="lowStockBadge">0</span>
         </a>
         <a href="/admin/payments" class="nav-item <%= typeof activePage !== 'undefined' && activePage === 'payments' ? 'active' : '' %>">
             <i class="fas fa-credit-card"></i>
@@ -53,26 +55,8 @@
             <i class="fas fa-cog"></i>
             <span>Settings</span>
         </a>
-        <a href="/admin/logs" class="nav-item <%= typeof activePage !== 'undefined' && activePage === 'logs' ? 'active' : '' %>">
-            <i class="fas fa-history"></i>
-            <span>Logs</span>
-        </a>
-        
         <!-- Separator -->
         <div class="nav-separator"></div>
-        
-        <!-- Admin Info (if authenticated) -->
-        <% if (typeof admin !== 'undefined' && admin) { %>
-        <div class="nav-item admin-info">
-            <div class="admin-info-avatar">
-                <i class="fas fa-user-shield"></i>
-            </div>
-            <div class="admin-info-details">
-                <span class="admin-info-name"><%= admin.name || 'Admin' %></span>
-                <span class="admin-info-email"><%= admin.email %></span>
-            </div>
-        </div>
-        <% } %>
         
         <!-- Back to Site -->
         <a href="/" class="nav-item" target="_blank" rel="noopener noreferrer">

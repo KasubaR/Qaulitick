@@ -182,6 +182,10 @@ class ProductService {
             const product = await Product.findByPk(id);
             if (!product) throw new Error('Product not found');
             await product.updateStock(quantity);
+            if (product.stock <= 0) {
+                const flashSaleService = require('./flashSale.service');
+                await flashSaleService.endSaleIfAllOutOfStock(id);
+            }
             return product;
         } catch (error) {
             console.error('Error updating product stock:', error);
@@ -359,9 +363,34 @@ class ProductService {
             if (filters.maxPrice) where.price[Op.lte] = parseFloat(filters.maxPrice);
         }
 
-        if (filters.brand)                         where.brand    = { [Op.like]: `%${filters.brand}%` };
+        if (filters.brand) {
+            const brands = filters.brand.split(',').map(b => b.trim()).filter(Boolean);
+            if (brands.length === 1) {
+                where.brand = { [Op.like]: `%${brands[0]}%` };
+            } else if (brands.length > 1) {
+                where[Op.or] = brands.map(b => ({ brand: { [Op.like]: `%${b}%` } }));
+            }
+        }
         if (filters.gender && filters.gender !== 'all') where.gender = filters.gender;
         if (filters.movement)                       where.movement = filters.movement;
+
+        if (filters.strap) {
+            const straps = filters.strap.split(',').map(s => s.trim()).filter(Boolean);
+            if (straps.length === 1) {
+                where.strapType = { [Op.like]: `%${straps[0]}%` };
+            } else if (straps.length > 1) {
+                const strapConditions = straps.map(s => ({ strapType: { [Op.like]: `%${s}%` } }));
+                where[Op.or] = where[Op.or]
+                    ? [...where[Op.or], ...strapConditions]
+                    : strapConditions;
+            }
+        }
+
+        if (filters.minRating) {
+            where.rating = { [Op.gte]: parseFloat(filters.minRating) };
+        }
+
+        if (filters.lowStock === true || filters.lowStock === 'true') filters.lowStockOnly = true;
 
         if (filters.lowStockOnly === true || filters.lowStockOnly === 'true') {
             where.stock = { [Op.gt]: 0, [Op.lte]: 5 };

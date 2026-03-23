@@ -21,7 +21,7 @@
             <h1 class="shop-title">Luxury Watch Collection</h1>
             <div class="shop-tools">
                 <div class="total-products">
-                    <span id="productCount"><%= typeof products !== 'undefined' && products ? products.length : 0 %></span> Products Found
+                    <span id="productCount"><%= productCount %></span> Products Found
                 </div>
                 <div class="shop-controls">
                     <div class="search-control">
@@ -284,49 +284,6 @@
     </div>
 
     <!-- Schema.org CollectionPage Structured Data -->
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "CollectionPage",
-        "name": "Luxury Watch Collection",
-        "description": "Shop premium triple-A luxury watches from top brands",
-        "url": "https://qualitick-collections.com/shop",
-        "mainEntity": {
-            "@type": "ItemList",
-            "numberOfItems": "<%= typeof products !== 'undefined' && products ? products.length : 0 %>",
-            "itemListElement": [
-                <% if (typeof products !== 'undefined' && products) { %>
-                    <% products.forEach((product, index) => {
-                        let _imgsLd = product.images;
-                        if (typeof _imgsLd === 'string') { try { _imgsLd = JSON.parse(_imgsLd); } catch(e) { _imgsLd = []; } }
-                        if (!Array.isArray(_imgsLd)) _imgsLd = [];
-                        const _firstImageLd = _imgsLd[0] || '/images/placeholder.jpg';
-                    %>
-                    {
-                        "@type": "ListItem",
-                        "position": <%= index + 1 %>,
-                        "item": {
-                            "@type": "Product",
-                            "name": "<%= product.model %>",
-                            "url": "https://qualitick-collections.com/product/<%= product._id %>",
-                            "image": "<%= _firstImageLd %>",
-                            "brand": {
-                                "@type": "Brand",
-                                "name": "<%= product.brand %>"
-                            },
-                            "offers": {
-                                "@type": "Offer",
-                                "price": "<%= product.price %>",
-                                "priceCurrency": "ZMW",
-                                "availability": "<%= product.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock' %>"
-                            }
-                        }
-                    }<%= index < products.length - 1 ? ',' : '' %>
-                    <% }) %>
-                <% } %>
-            ]
-        }
-    }
-    </script>
+    <script type="application/ld+json"><%- JSON.stringify(shopLd).replace(/</g, '\\u003c') %></script>
 
     <%- include('partials/footer') %>

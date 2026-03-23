@@ -17,9 +17,9 @@
     function initSidebar() {
         if (!sidebar) return;
 
-        // Load saved state from localStorage
+        // Load saved state from localStorage (default: collapsed)
         const savedState = localStorage.getItem(SIDEBAR_STATE_KEY);
-        const isCollapsed = savedState === 'true';
+        const isCollapsed = savedState === null ? true : savedState === 'true';
 
         if (isCollapsed) {
             collapseSidebar(false); // Don't animate on initial load
@@ -35,6 +35,17 @@
         
         // Don't interfere with mobile sidebar toggle (sidebarToggle button)
         // Mobile toggle is handled by dashboard.js, products.js, etc.
+
+        // Close mobile sidebar when any nav link is clicked
+        sidebar.querySelectorAll('a.nav-item').forEach(link => {
+            link.addEventListener('click', function() {
+                if (sidebar.classList.contains('active')) {
+                    sidebar.classList.remove('active');
+                    document.body.classList.remove('sidebar-open');
+                    document.body.style.overflow = '';
+                }
+            });
+        });
 
         // Setup tooltips for collapsed state
         setupTooltips();

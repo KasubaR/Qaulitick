@@ -54,6 +54,41 @@ function withPrices(productObj) {
 }
 
 /**
+ * Build the Schema.org CollectionPage + ItemList JSON-LD object for the shop page.
+ * Products must already be normalised (images is an array).
+ */
+function buildShopLd(products, canonicalUrl) {
+    return {
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: 'Luxury Watch Collection',
+        description: 'Shop premium triple-A luxury watches from top brands',
+        url: canonicalUrl,
+        mainEntity: {
+            '@type': 'ItemList',
+            numberOfItems: products.length,
+            itemListElement: products.map((p, index) => ({
+                '@type': 'ListItem',
+                position: index + 1,
+                item: {
+                    '@type': 'Product',
+                    name: p.model,
+                    url: `https://qualitick-collections.com/product/${p._id}`,
+                    image: p.images[0] || '/images/placeholder.jpg',
+                    brand: { '@type': 'Brand', name: p.brand },
+                    offers: {
+                        '@type': 'Offer',
+                        price: String(p.price),
+                        priceCurrency: 'ZMW',
+                        availability: p.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock'
+                    }
+                }
+            }))
+        }
+    };
+}
+
+/**
  * Validate product ID (positive integer). Sequelize PKs are integers; !parseInt(id) wrongly rejects 0 and is loose for non-numeric strings.
  */
 function isValidId(id) {
@@ -86,9 +121,12 @@ exports.getProductsAPI = async (req, res) => {
             brand: sanitizedQuery.brand,
             gender: sanitizedQuery.gender,
             movement: sanitizedQuery.movement,
+            strap: sanitizedQuery.strap,
             minPrice: sanitizedQuery.minPrice,
             maxPrice: sanitizedQuery.maxPrice,
+            minRating: sanitizedQuery.minRating,
             inStockOnly: sanitizedQuery.inStockOnly,
+            lowStock: sanitizedQuery.lowStock,
             sortBy: sanitizedQuery.sortBy || 'newest',
             status: statusFilter === 'all' ? undefined : (statusFilter || 'active')
         };
@@ -295,6 +333,61 @@ exports.renderProductDetails = async (req, res) => {
                 };
             });
         
+        const inStock = Number.isFinite(Number(productWithPrices.stock)) && Number(productWithPrices.stock) > 0;
+        const productLd = {
+            '@context': 'https://schema.org/',
+            '@type': 'Product',
+            name: productWithPrices.model,
+            image: productWithPrices.images,
+            description: productWithPrices.description || '',
+            sku: String(productWithPrices.sku || productWithPrices._id || ''),
+            brand: { '@type': 'Brand', name: productWithPrices.brand || '' },
+            offers: {
+                '@type': 'Offer',
+                url: canonicalUrl,
+                priceCurrency: 'ZMW',
+                price: String(productWithPrices.price != null ? productWithPrices.price : ''),
+                priceValidUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                itemCondition: 'https://schema.org/NewCondition',
+                availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+                seller: { '@type': 'Organization', name: 'Qualitick Collections' }
+            },
+            category: (productWithPrices.gender || '') + ' Watches',
+            material: productWithPrices.caseMaterial || 'Stainless Steel',
+            color: productWithPrices.color || (productWithPrices.colors[0] ? productWithPrices.colors[0].name : '') || ''
+        };
+        if (productWithPrices.rating) {
+            productLd.aggregateRating = {
+                '@type': 'AggregateRating',
+                ratingValue: String(productWithPrices.rating),
+                reviewCount: String(sanitizedReviews.length),
+                bestRating: '5',
+                worstRating: '1'
+            };
+        }
+        if (sanitizedReviews.length > 0) {
+            productLd.review = sanitizedReviews.map(review => ({
+                '@type': 'Review',
+                reviewRating: {
+                    '@type': 'Rating',
+                    ratingValue: String(review.rating != null ? review.rating : ''),
+                    bestRating: '5'
+                },
+                author: { '@type': 'Person', name: review.name || 'Anonymous' },
+                reviewBody: review.comment || '',
+                datePublished: new Date(review.createdAt || review.date || Date.now()).toISOString()
+            }));
+        }
+        const breadcrumbLd = {
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+                { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://qualitick-collections.com/' },
+                { '@type': 'ListItem', position: 2, name: 'Shop', item: 'https://qualitick-collections.com/shop' },
+                { '@type': 'ListItem', position: 3, name: productWithPrices.model || 'Product', item: canonicalUrl }
+            ]
+        };
+
         res.setHeader('Cache-Control', 'no-store');
         res.render('productdetails', {
             title: `${productObj.model} - ${productObj.brand} | Qualitick Collections`,
@@ -306,7 +399,9 @@ exports.renderProductDetails = async (req, res) => {
             canonicalUrl: canonicalUrl,
             ogImage: ogImage,
             ogType: 'product',
-            url: `/product/${productSlug}`
+            url: `/product/${productSlug}`,
+            productLd: productLd,
+            breadcrumbLd: breadcrumbLd
         });
     } catch (error) {
         console.error('[Product Controller] Error rendering product details:', error);
@@ -454,6 +549,12 @@ exports.updateProduct = async (req, res) => {
             });
         }
 
+        // If stock was updated to 0, check if any active flash sale should be ended
+        if (product.stock !== undefined && product.stock <= 0) {
+            const flashSaleService = require('../services/flashSale.service');
+            await flashSaleService.endSaleIfAllOutOfStock(Number(productId));
+        }
+
         clearCache('/api/products');
         res.json({
             success: true,
@@ -542,42 +643,44 @@ exports.renderShop = async (req, res) => {
         // If there are no products, render the shop page with an empty list
         // and let the frontend handle messaging. This avoids showing a
         // misleading \"No products available\" error when data is still loading.
+        const canonicalUrl = 'https://qualitick-collections.com/shop';
+        const description = 'Shop premium triple-A luxury watches. Browse Rolex, Omega, Tag Heuer, Cartier and more. Free worldwide shipping.';
+        const keywords = 'luxury watches, AAA replica watches, premium watches, Rolex, Omega, Tag Heuer, Cartier, men watches, women watches, shop watches';
+
         if (!products || products.length === 0) {
-                const canonicalUrl = 'https://qualitick-collections.com/shop';
-                const description = 'Shop premium triple-A luxury watches. Browse Rolex, Omega, Tag Heuer, Cartier and more. Free worldwide shipping.';
-                const keywords = 'luxury watches, AAA replica watches, premium watches, Rolex, Omega, Tag Heuer, Cartier, men watches, women watches, shop watches';
-                
-                return res.render('shop', {
-                    title: 'Shop Luxury Watches | Qualitick Collections',
-                    page: 'shop',
-                    products: [],
-                    description: description,
-                    keywords: keywords,
-                    canonicalUrl: canonicalUrl,
-                    url: '/shop',
-                    ogType: 'website'
-                });
+            const shopLd = buildShopLd([], canonicalUrl);
+            return res.render('shop', {
+                title: 'Shop Luxury Watches | Qualitick Collections',
+                page: 'shop',
+                products: [],
+                productCount: 0,
+                description,
+                keywords,
+                canonicalUrl,
+                url: '/shop',
+                ogType: 'website',
+                shopLd
+            });
         }
-        
+
         // Calculate prices for all products
         const productsWithPrices = products.map(product =>
             withPrices(normalizeProduct(toPlain(product)))
         );
-        
-        // SEO data
-        const canonicalUrl = 'https://qualitick-collections.com/shop';
-        const description = 'Shop premium triple-A luxury watches. Browse Rolex, Omega, Tag Heuer, Cartier and more. Free worldwide shipping.';
-        const keywords = 'luxury watches, AAA replica watches, premium watches, Rolex, Omega, Tag Heuer, Cartier, men watches, women watches, shop watches';
-        
+
+        const shopLd = buildShopLd(productsWithPrices, canonicalUrl);
+
         res.render('shop', {
             title: 'Shop Luxury Watches | Qualitick Collections',
             page: 'shop',
             products: productsWithPrices,
-            description: description,
-            keywords: keywords,
-            canonicalUrl: canonicalUrl,
+            productCount: productsWithPrices.length,
+            description,
+            keywords,
+            canonicalUrl,
             url: '/shop',
-            ogType: 'website'
+            ogType: 'website',
+            shopLd
         });
     } catch (error) {
         console.error('[Product Controller] Error rendering shop page:', error);
@@ -731,6 +834,13 @@ exports.submitReview = async (req, res) => {
         // Sanitize input
         const sanitizedData = sanitizeObject(req.body);
 
+        // If logged in, override email and name with verified session data
+        const sessionUser = req.customerUser || null;
+        if (sessionUser) {
+            sanitizedData.email = sessionUser.email;
+            sanitizedData.name = sanitizedData.name || sessionUser.name;
+        }
+
         // Validate review data
         const validation = reviewService.validateReviewData(sanitizedData);
         if (!validation.valid) {
@@ -757,7 +867,8 @@ exports.submitReview = async (req, res) => {
         const duplicateCheck = await reviewService.checkDuplicateReview(
             numericId,
             reviewData.email,
-            ipAddress
+            ipAddress,
+            sessionUser?.id || null
         );
         if (duplicateCheck.exists) {
             return res.status(409).json({
@@ -771,7 +882,8 @@ exports.submitReview = async (req, res) => {
             ...reviewData,
             verified: purchaseVerification.verified,
             orderNumber: purchaseVerification.orderNumber,
-            ipAddress: ipAddress
+            ipAddress: ipAddress,
+            userId: sessionUser?.id || null
         };
 
         const product = await productService.addReview(numericId, finalReviewData);

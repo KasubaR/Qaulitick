@@ -397,17 +397,15 @@ async function loadProducts(page = null) {
                 apiParams.gender = filters.gender;
             }
             
-            // Straps - Not currently supported by API filterProducts method
-            // TODO: Add strap filter support to API if needed
-            // if (filters.straps && filters.straps.length > 0) {
-            //     apiParams.strap = filters.straps.join(',');
-            // }
-            
-            // Ratings - Not currently supported by API filterProducts method
-            // TODO: Add rating filter support to API if needed
-            // if (filters.ratings && filters.ratings.length > 0) {
-            //     apiParams.rating = filters.ratings.join(',');
-            // }
+            // Straps
+            if (filters.straps && filters.straps.length > 0) {
+                apiParams.strap = filters.straps.join(',');
+            }
+
+            // Ratings - send the minimum selected rating
+            if (filters.ratings && filters.ratings.length > 0) {
+                apiParams.minRating = Math.min(...filters.ratings);
+            }
             
             // Stock filters
             // Frontend: filters.stockOnly = true → API: inStockOnly = true (boolean)
@@ -416,9 +414,9 @@ async function loadProducts(page = null) {
                 apiParams.inStockOnly = true;
             }
             
-            // Note: lowStock filter is not supported by API filterProducts method
-            // The API only supports inStockOnly (stock > 0)
-            // TODO: Add lowStock filter support to API if needed
+            if (filters.lowStock) {
+                apiParams.lowStock = 'true';
+            }
             
             // Price range - already in correct format
             // Frontend: filters.minPrice = 100 → API: minPrice = 100
@@ -524,15 +522,15 @@ async function loadProducts(page = null) {
             showLoadingSpinner(false);
             return;
         } else if (data.success && data.products && data.products.length === 0) {
-            // No products found from API
+            // No products found from API - always clear the grid first
+            const productGrid = document.getElementById('productGrid');
+            if (productGrid) productGrid.innerHTML = '';
+
             const hasActiveFilters = hasFiltersApplied();
             if (hasActiveFilters) {
-                // Filters are active - show filter-related message
                 showNoProductsMessage('No products found matching your search criteria. Try adjusting your filters.', true);
             } else {
-                // No filters active - do not show global \"no products\" error,
-                // keep any server-rendered products visible.
-                // Optionally, you could clear client-side grid here if needed.
+                showNoProductsMessage('No watches found', false);
             }
             updateActiveFilters(); // Update active filters display even when no products
             // Update product count (will show 0 when no products)
@@ -675,7 +673,7 @@ function showNoProductsMessage(message, showFilterOptions = true, isError = fals
 
     const h3 = document.createElement('h3');
     h3.textContent = message || (isError ? 'Error loading products' : 'No watches found');
-    h3.style.cssText = 'font-size: 24px; margin-bottom: 10px; color: #fff;';
+    h3.style.cssText = 'font-size: 24px; margin-bottom: 10px; color: #000;';
     noProductsDiv.appendChild(h3);
 
     // Show retry button for errors

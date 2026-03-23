@@ -7,6 +7,7 @@
  * - Review data sanitization
  */
 
+const { Op, literal } = require('sequelize');
 const Order = require('../models/Order.model');
 const Product = require('../models/Product.model');
 
@@ -22,31 +23,26 @@ class ReviewService {
      */
     async verifyPurchase(productId, email) {
         try {
-            // Convert productId to string for comparison (Order stores productId as String)
             const productIdStr = String(productId);
             const normalizedEmail = email.toLowerCase().trim();
-            
-            // Use findOne() to get order details (exists() doesn't return orderNumber)
-            // Optimized query: uses indexes on customer.email and status
+
+            // Query orders where customer.email matches and items contains productId
             const order = await Order.findOne({
-                'customer.email': normalizedEmail,
-                'items.productId': productIdStr,
-                status: { $in: VALID_STATUSES }
-            }).select('orderNumber status').lean();
+                where: {
+                    status: { [Op.in]: VALID_STATUSES },
+                    [Op.and]: [
+                        literal(`JSON_UNQUOTE(JSON_EXTRACT(customer, '$.email')) = ${Order.sequelize.escape(normalizedEmail)}`),
+                        literal(`JSON_SEARCH(items, 'one', ${Order.sequelize.escape(productIdStr)}, NULL, '$[*].productId') IS NOT NULL`)
+                    ]
+                },
+                attributes: ['orderNumber', 'status']
+            });
 
             if (order) {
                 return {
                     verified: true,
                     orderNumber: order.orderNumber
                 };
-            }
-
-            // Log failed verification attempts for analytics (non-blocking)
-            // This helps identify potential issues or abuse patterns
-            if (process.env.NODE_ENV === 'production') {
-                // In production, you might want to log to analytics service
-                // For now, we'll just log to console in development
-                console.log(`[Review Service] Purchase verification failed: productId=${productIdStr}, email=${normalizedEmail.substring(0, 5)}...`);
             }
 
             return null;
@@ -63,31 +59,34 @@ class ReviewService {
      * @param {String} ipAddress - Customer IP address
      * @returns {Promise<Object>} - Returns { exists: boolean, reason?: string }
      */
-    async checkDuplicateReview(productId, email, ipAddress) {
+    async checkDuplicateReview(productId, email, ipAddress, userId = null) {
         try {
-            // Optimized: Only select reviews array, not entire product document
-            const product = await Product.findById(productId).select('reviews.email reviews.ipAddress').lean();
+            const product = await Product.findByPk(productId, { attributes: ['reviews'] });
             if (!product) {
                 return { exists: true, reason: 'Product not found' };
             }
 
+            const reviews = product.reviews || [];
             const normalizedEmail = email.toLowerCase().trim();
 
             // Multi-layer duplicate detection
-            // Check by email (indexed for fast lookup)
-            const emailExists = product.reviews && product.reviews.some(r => 
+            const emailExists = reviews.some(r =>
                 r.email && r.email.toLowerCase() === normalizedEmail
             );
 
-            // Check by IP (for guest users, also indexed)
-            const ipExists = product.reviews && product.reviews.some(r => 
+            const ipExists = reviews.some(r =>
                 r.ipAddress && r.ipAddress === ipAddress
             );
 
-            if (emailExists || ipExists) {
+            // Check by userId for logged-in users
+            const userIdExists = userId != null && reviews.some(r =>
+                r.userId != null && r.userId === userId
+            );
+
+            if (emailExists || ipExists || userIdExists) {
                 return {
                     exists: true,
-                    reason: emailExists ? 'Email already reviewed' : 'IP already reviewed'
+                    reason: emailExists ? 'Email already reviewed' : userIdExists ? 'Account already reviewed' : 'IP already reviewed'
                 };
             }
 

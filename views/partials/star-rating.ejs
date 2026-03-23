@@ -1,0 +1,10 @@
+<% const _r = rating || 0; %>
+<% for (let i = 1; i <= 5; i++) { %>
+    <% if (i <= Math.floor(_r)) { %>
+        <i class="fas fa-star"></i>
+    <% } else if (i === Math.ceil(_r) && _r % 1 !== 0) { %>
+        <i class="fas fa-star-half-alt"></i>
+    <% } else { %>
+        <i class="far fa-star"></i>
+    <% } %>
+<% } %>

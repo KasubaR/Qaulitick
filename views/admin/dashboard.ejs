@@ -123,18 +123,6 @@
                         </div>
                     </div>
 
-                    <div class="kpi-card">
-                        <div class="kpi-icon revenue">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <h3 class="kpi-label">Revenue</h3>
-                            <p class="kpi-value" id="totalRevenue">K0</p>
-                            <span class="kpi-change positive" id="revenueChange">
-                                <i class="fas fa-arrow-up"></i> 0%
-                            </span>
-                        </div>
-                    </div>
 
                     <div class="kpi-card alert">
                         <div class="kpi-icon alerts">
@@ -172,68 +160,6 @@
                         </div>
                         <div class="chart-container">
                             <canvas id="revenueChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Quick Actions & Order Summary -->
-                <div class="actions-orders-grid">
-                    <!-- Quick Actions Panel -->
-                    <div class="quick-actions-card">
-                        <div class="card-header">
-                            <h3>Quick Actions</h3>
-                        </div>
-                        <div class="actions-grid">
-                            <button class="action-btn" id="addProductBtn">
-                                <i class="fas fa-plus-circle"></i>
-                                <span>Add Product</span>
-                            </button>
-                            <button class="action-btn" id="createCouponBtn">
-                                <i class="fas fa-ticket-alt"></i>
-                                <span>Create Coupon</span>
-                            </button>
-                            <button class="action-btn" id="flashSaleBtn">
-                                <i class="fas fa-bolt"></i>
-                                <span>Launch Flash Sale</span>
-                            </button>
-                            <button class="action-btn" id="sendNotificationBtn">
-                                <i class="fas fa-bell"></i>
-                                <span>Send Notification</span>
-                            </button>
-                            <button class="action-btn" id="exportReportBtn">
-                                <i class="fas fa-download"></i>
-                                <span>Export Reports</span>
-                            </button>
-                            <button class="action-btn" id="viewAnalyticsBtn">
-                                <i class="fas fa-chart-pie"></i>
-                                <span>View Analytics</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Order Summary Panel -->
-                    <div class="order-summary-card">
-                        <div class="card-header">
-                            <h3>Order Summary</h3>
-                            <a href="/admin/orders" class="view-all-link">View All</a>
-                        </div>
-                        <div class="summary-stats">
-                            <div class="summary-stat">
-                                <span class="stat-label">New Orders</span>
-                                <span class="stat-value new" id="newOrdersCount">0</span>
-                            </div>
-                            <div class="summary-stat">
-                                <span class="stat-label">Processing</span>
-                                <span class="stat-value processing" id="processingOrdersCount">0</span>
-                            </div>
-                            <div class="summary-stat">
-                                <span class="stat-label">Delivered</span>
-                                <span class="stat-value delivered" id="deliveredOrdersCount">0</span>
-                            </div>
-                            <div class="summary-stat">
-                                <span class="stat-label">Cancelled</span>
-                                <span class="stat-value cancelled" id="cancelledOrdersCount">0</span>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -391,10 +317,7 @@
         <a href="/admin/settings" class="dropdown-item">
             <i class="fas fa-cog"></i> Settings
         </a>
-        <a href="/admin/logs" class="dropdown-item">
-            <i class="fas fa-history"></i> Activity Logs
-        </a>
-        <div class="dropdown-divider"></div>
+<div class="dropdown-divider"></div>
         <form method="POST" action="/admin/logout" style="display:inline">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button type="submit" class="dropdown-item logout">

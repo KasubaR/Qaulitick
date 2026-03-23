@@ -5,10 +5,12 @@
  * Aggregates data from Orders, Products, and Payments
  */
 
-const { Op } = require('sequelize');
+const { Op, QueryTypes } = require('sequelize');
+const { sequelize } = require('../config/mysql');
 const Order = require('../models/Order.model');
 const Product = require('../models/Product.model');
 const Payment = require('../models/Payment.model');
+const User = require('../models/User.model');
 
 class DashboardService {
     /**
@@ -41,7 +43,20 @@ class DashboardService {
 
             const currentRevenueValue = 0;
             const previousRevenueValue = 0;
-            const currentCustomersCount = 0;
+
+            // Count unique customers by email across registered users and guest orders
+            const [{ total }] = await sequelize.query(`
+                SELECT COUNT(*) AS total FROM (
+                    SELECT LOWER(email) AS email FROM users
+                    UNION
+                    SELECT LOWER(JSON_UNQUOTE(JSON_EXTRACT(customer, '$.email'))) AS email
+                    FROM orders
+                    WHERE JSON_UNQUOTE(JSON_EXTRACT(customer, '$.email')) IS NOT NULL
+                      AND JSON_UNQUOTE(JSON_EXTRACT(customer, '$.email')) != ''
+                ) AS unique_customers
+            `, { type: QueryTypes.SELECT });
+
+            const currentCustomersCount = Number(total) || 0;
             const previousCustomersCount = 0;
 
             const salesChange = this.calculatePercentageChange(totalOrders, 0);
