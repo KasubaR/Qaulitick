@@ -25,6 +25,26 @@
     <link rel="stylesheet" href="/css/admin/orders.css">
     <!-- Admin Customers Stylesheet -->
     <link rel="stylesheet" href="/css/admin/customers.css">
+    <style>
+        .btn-section {
+            padding: 8px 18px;
+            border: 2px solid #111;
+            background: #fff;
+            color: #111;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        .btn-section.active {
+            background: #111;
+            color: #fff;
+        }
+        .btn-section:hover:not(.active) {
+            background: #f5f5f5;
+        }
+    </style>
 </head>
 <body class="admin-page">
     <!-- ADMIN CUSTOMERS PAGE -->
@@ -52,6 +72,19 @@
 
             <!-- Customers Content -->
             <div class="customers-content">
+
+                <!-- Section Toggle -->
+                <div class="section-toggle" style="display:flex;gap:8px;margin-bottom:20px;">
+                    <button class="btn-section active" id="btnSectionCustomers" onclick="switchSection('customers')">
+                        <i class="fas fa-shopping-cart"></i> Customers (Orders)
+                    </button>
+                    <button class="btn-section" id="btnSectionRegistered" onclick="switchSection('registered')">
+                        <i class="fas fa-user-shield"></i> Registered Users
+                    </button>
+                </div>
+
+                <!-- ===== CUSTOMERS SECTION ===== -->
+                <div id="sectionCustomers">
                 <!-- Statistics Cards -->
                 <div class="customers-stats">
                     <div class="stat-card">
@@ -189,6 +222,71 @@
                         </button>
                     </div>
                 </div>
+                </div><!-- end #sectionCustomers -->
+
+                <!-- ===== REGISTERED USERS SECTION ===== -->
+                <div id="sectionRegistered" style="display:none;">
+                    <div class="stat-card" style="display:inline-flex;align-items:center;gap:12px;padding:16px 24px;margin-bottom:20px;">
+                        <div class="stat-icon total"><i class="fas fa-user-shield"></i></div>
+                        <div class="stat-info">
+                            <div class="stat-label">Total Registered</div>
+                            <div class="stat-value" id="totalRegistered">0</div>
+                        </div>
+                    </div>
+
+                    <!-- Search -->
+                    <div class="customers-toolbar" style="margin-bottom:16px;">
+                        <div class="search-section">
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="registeredSearch" placeholder="Search by name, email, or phone...">
+                                <button class="search-btn" id="registeredSearchBtn">Search</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-card">
+                        <div class="table-header">
+                            <div class="table-info">
+                                <span id="registeredCount">0</span> registered users found
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="admin-table" id="registeredTable">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th width="140">Phone</th>
+                                        <th width="120">Verified</th>
+                                        <th width="140">Joined</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="registeredTableBody">
+                                    <tr>
+                                        <td colspan="5" class="empty-state">
+                                            <i class="fas fa-user-shield"></i>
+                                            <p>No registered users found</p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <!-- Pagination -->
+                        <div class="pagination" id="registeredPagination">
+                            <button class="page-btn" id="regPrevPage" disabled>
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </button>
+                            <div class="page-numbers" id="regPageNumbers">
+                                <span class="page-number active">1</span>
+                            </div>
+                            <button class="page-btn" id="regNextPage">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div><!-- end #sectionRegistered -->
+
             </div>
         </main>
     </div>

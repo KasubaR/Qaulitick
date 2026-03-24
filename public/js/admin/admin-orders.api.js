@@ -167,7 +167,7 @@
      * @param {string} courier
      * @returns {Promise<object>} Updated order
      */
-    async function updateTracking(orderNumber, trackingNumber, courier) {
+    async function updateTracking(orderNumber, trackingNumber, courier, shippingNote) {
         if (!orderNumber) {
             throw new Error('Order number is required to update tracking');
         }
@@ -177,7 +177,7 @@
 
         const data = await apiRequest(`${BASE_URL}/${orderNumber}/tracking`, {
             method: 'PATCH',
-            body: JSON.stringify({ trackingNumber, courier })
+            body: JSON.stringify({ trackingNumber, courier, shippingNote })
         });
 
         return data.order || null;

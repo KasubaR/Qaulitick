@@ -14,6 +14,7 @@ router.get('/:orderNumber/invoice', authenticateAdmin, orderController.generateI
 router.get('/:orderNumber/verify-payment', authenticateAdmin, orderController.verifyOrderPayment);
 router.patch('/:orderNumber/status', authenticateAdmin, orderController.updateOrderStatus);
 router.patch('/:orderNumber/tracking', authenticateAdmin, orderController.updateTracking);
+router.post('/:orderNumber/dispatch', authenticateAdmin, orderController.dispatchOrder);
 router.post('/:orderNumber/notes', authenticateAdmin, orderController.addOrderNote);
 router.post('/:orderNumber/send-invoice', authenticateAdmin, orderController.sendInvoiceEmail);
 router.delete('/:orderNumber', authenticateAdmin, orderController.deleteOrder);

@@ -305,20 +305,11 @@
                                 <button class="status-btn confirm" id="confirmOrderBtn">
                                     <i class="fas fa-check"></i> Confirm Order
                                 </button>
-                                <button class="status-btn pack" id="packOrderBtn">
-                                    <i class="fas fa-box"></i> Mark as Packed
-                                </button>
-                                <button class="status-btn ship" id="shipOrderBtn">
-                                    <i class="fas fa-shipping-fast"></i> Dispatch Order
-                                </button>
                                 <button class="status-btn deliver" id="deliverOrderBtn">
                                     <i class="fas fa-check-circle"></i> Mark Delivered
                                 </button>
                                 <button class="status-btn cancel" id="cancelOrderBtn">
                                     <i class="fas fa-times"></i> Cancel Order
-                                </button>
-                                <button class="status-btn refund" id="refundOrderBtn" disabled title="Refund not yet implemented">
-                                    <i class="fas fa-undo"></i> Initiate Refund
                                 </button>
                             </div>
                         </div>
@@ -336,14 +327,7 @@
                         <div class="shipping-management">
                             <div class="form-group">
                                 <label>Courier/Shipping Company</label>
-                                <select id="courierSelect" class="form-input">
-                                    <option value="">Select Courier</option>
-                                    <option value="dhl">DHL</option>
-                                    <option value="fedex">FedEx</option>
-                                    <option value="ups">UPS</option>
-                                    <option value="local">Local Courier</option>
-                                    <option value="pickup">Store Pickup</option>
-                                </select>
+                                <input type="text" id="courierSelect" class="form-input" placeholder="e.g. DHL, FedEx, Local Courier">
                             </div>
 
                             <div class="form-group">
@@ -352,6 +336,11 @@
                                     <input type="text" id="trackingNumber" class="form-input" placeholder="Enter tracking number">
                                     <button class="btn-primary" id="updateTrackingBtn">Update</button>
                                 </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Note</label>
+                                <textarea id="shippingNote" class="form-input" rows="3" placeholder="Add a shipping note..."></textarea>
                             </div>
 
                             <div class="tracking-info" id="trackingInfo">
@@ -399,8 +388,8 @@
                 <button class="btn-outline" id="printInvoiceBtn">
                     <i class="fas fa-file-pdf"></i> Print Invoice
                 </button>
-                <button class="btn-outline" id="emailInvoiceBtn">
-                    <i class="fas fa-envelope"></i> Email Invoice
+                <button class="btn-primary" id="shipOrderBtn">
+                    <i class="fas fa-shipping-fast"></i> Dispatch Order
                 </button>
                 <button class="btn-outline" id="closeOrderDetailsBtn">Close</button>
             </div>

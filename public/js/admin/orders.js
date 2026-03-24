@@ -307,15 +307,55 @@ function setupStatusModal() {
 // Setup status buttons
 function setupStatusButtons() {
     document.getElementById('confirmOrderBtn')?.addEventListener('click', () => {
-        updateStatus('confirmed');
+        if (currentOrderId) processOrder(currentOrderId);
     });
     
-    document.getElementById('packOrderBtn')?.addEventListener('click', () => {
-        updateStatus('packed');
-    });
     
-    document.getElementById('shipOrderBtn')?.addEventListener('click', () => {
-        openShippingTab();
+    document.getElementById('shipOrderBtn')?.addEventListener('click', async () => {
+        if (!currentOrderId) return;
+
+        const courier        = document.getElementById('courierSelect')?.value.trim() || '';
+        const trackingNumber = document.getElementById('trackingNumber')?.value.trim() || '';
+        const note           = document.getElementById('shippingNote')?.value.trim() || '';
+
+        if (!courier && !trackingNumber) {
+            // Switch to shipping tab so admin can fill in details first
+            openShippingTab();
+            showNotification('Please enter a shipping company and/or tracking number before dispatching.', 'error');
+            return;
+        }
+
+        const confirmed = await showConfirmDialog(
+            `Dispatch order ${currentOrderId}? This will mark it as shipped and notify the customer by email.`,
+            { title: 'Dispatch Order', confirmLabel: 'Dispatch', isDanger: false }
+        );
+        if (!confirmed) return;
+
+        const btn = document.getElementById('shipOrderBtn');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Dispatching...';
+
+        try {
+            const token = '';
+            const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/dispatch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ courier, trackingNumber, note })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.message || 'Failed to dispatch order');
+
+            showNotification('Order dispatched and customer notified by email.', 'success');
+            await loadOrders();
+            await loadOrderDetails(currentOrderId);
+        } catch (err) {
+            console.error(err);
+            showNotification(err.message || 'Failed to dispatch order', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
     });
     
     document.getElementById('deliverOrderBtn')?.addEventListener('click', () => {
@@ -332,7 +372,8 @@ function setupStatusButtons() {
     document.getElementById('updateTrackingBtn')?.addEventListener('click', async () => {
         const trackingNumber = document.getElementById('trackingNumber').value;
         const courier = document.getElementById('courierSelect').value;
-        
+        const shippingNote = document.getElementById('shippingNote')?.value.trim() || '';
+
         if (!currentOrderId) {
             showNotification('No order selected', 'error');
             return;
@@ -344,7 +385,7 @@ function setupStatusButtons() {
         }
         
         try {
-            await AdminOrdersAPI.updateTracking(currentOrderId, trackingNumber.trim(), courier);
+            await AdminOrdersAPI.updateTracking(currentOrderId, trackingNumber.trim(), courier, shippingNote);
             showNotification('Tracking information updated successfully', 'success');
             // Reload order details
             await loadOrderDetails(currentOrderId);
@@ -437,41 +478,6 @@ function setupInvoiceActions() {
         }
     });
     
-    document.getElementById('emailInvoiceBtn')?.addEventListener('click', async () => {
-        if (!currentOrderId) {
-            showNotification('No order selected', 'error');
-            return;
-        }
-        
-        if (!await showConfirmDialog('Send invoice email to customer?', { title: 'Send Invoice', confirmLabel: 'Send', isDanger: false })) {
-            return;
-        }
-        
-        try {
-            const emailBtn = document.getElementById('emailInvoiceBtn');
-            if (emailBtn) {
-                emailBtn.disabled = true;
-                const originalText = emailBtn.innerHTML;
-                emailBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
-                
-                const result = await AdminOrdersAPI.sendInvoiceEmail(currentOrderId);
-                
-                showNotification(`Invoice email sent to ${result.recipient}`, 'success');
-                
-                emailBtn.disabled = false;
-                emailBtn.innerHTML = originalText;
-            }
-        } catch (error) {
-            console.error('Error sending invoice email:', error);
-            showNotification(error.message || 'Failed to send invoice email', 'error');
-            
-            const emailBtn = document.getElementById('emailInvoiceBtn');
-            if (emailBtn) {
-                emailBtn.disabled = false;
-                emailBtn.innerHTML = '<i class="fas fa-envelope"></i> Email Invoice';
-            }
-        }
-    });
 }
 
 // Open order details
@@ -825,6 +831,14 @@ function populateOrderDetails(order) {
     document.getElementById('paymentStatus').textContent = order.paymentStatus || 'pending';
     document.getElementById('transactionId').textContent = order.transactionId || '-';
     
+    // Disable Confirm Order button if order is already confirmed or further along
+    const confirmBtn = document.getElementById('confirmOrderBtn');
+    if (confirmBtn) {
+        const isConfirmed = ['confirmed', 'packed', 'shipped', 'delivered'].includes(order.status);
+        confirmBtn.disabled = isConfirmed;
+        confirmBtn.title = isConfirmed ? `Order is already ${order.status}` : '';
+    }
+
     // Order summary
     document.getElementById('orderSubtotal').textContent = `K${order.totals?.subtotal?.toLocaleString() || '0'}`;
     document.getElementById('orderDiscount').textContent = `-K${order.totals?.discount?.toLocaleString() || '0'}`;
@@ -1009,6 +1023,11 @@ function loadTrackingInfo(order) {
     
     if (courierSelect) {
         courierSelect.value = order.courier || '';
+    }
+
+    const shippingNote = document.getElementById('shippingNote');
+    if (shippingNote) {
+        shippingNote.value = order.shippingNote || '';
     }
 }
 

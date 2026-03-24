@@ -740,6 +740,134 @@ function showNotification(message, type = 'info') {
     }, 3000);
 }
 
+// ── Registered Users Section ─────────────────────────────────────────────────
+
+let regCurrentPage = 1;
+let regTotalPages = 1;
+let regSearch = '';
+
+function switchSection(section) {
+    const custSection = document.getElementById('sectionCustomers');
+    const regSection  = document.getElementById('sectionRegistered');
+    const btnCust     = document.getElementById('btnSectionCustomers');
+    const btnReg      = document.getElementById('btnSectionRegistered');
+
+    if (section === 'registered') {
+        custSection.style.display = 'none';
+        regSection.style.display  = 'block';
+        btnCust.classList.remove('active');
+        btnReg.classList.add('active');
+        loadRegisteredUsers();
+    } else {
+        regSection.style.display  = 'none';
+        custSection.style.display = 'block';
+        btnReg.classList.remove('active');
+        btnCust.classList.add('active');
+    }
+}
+
+async function loadRegisteredUsers() {
+    const tbody = document.getElementById('registeredTableBody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Loading...</td></tr>';
+
+    try {
+        const params = new URLSearchParams({ page: regCurrentPage, limit: 50 });
+        if (regSearch) params.set('search', regSearch);
+
+        const res = await fetch(`/api/admin/registered-users?${params}`, {
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }
+        });
+        if (!res.ok) throw new Error('Failed to fetch');
+        const json = await res.json();
+
+        renderRegisteredUsers(json.data || []);
+        updateRegPagination(json.pagination || {});
+
+        const countEl = document.getElementById('registeredCount');
+        if (countEl) countEl.textContent = json.pagination?.totalCount || 0;
+        const totalEl = document.getElementById('totalRegistered');
+        if (totalEl) totalEl.textContent = json.pagination?.totalCount || 0;
+    } catch (err) {
+        console.error(err);
+        if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="empty-state error"><i class="fas fa-exclamation-triangle"></i><p>Failed to load users.</p></td></tr>';
+    }
+}
+
+function renderRegisteredUsers(users) {
+    const tbody = document.getElementById('registeredTableBody');
+    if (!tbody) return;
+
+    if (!users.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><i class="fas fa-user-shield"></i><p>No registered users found</p></td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = users.map(u => {
+        const verified = u.emailVerifiedAt
+            ? `<span style="color:#2e7d32;font-weight:500;"><i class="fas fa-check-circle"></i> Verified</span>`
+            : `<span style="color:#c62828;"><i class="fas fa-times-circle"></i> Unverified</span>`;
+        return `
+        <tr>
+            <td>${escapeHtml(u.name || '-')}</td>
+            <td><a href="mailto:${escapeHtml(u.email || '')}">${escapeHtml(u.email || '-')}</a></td>
+            <td>${escapeHtml(u.phone || '-')}</td>
+            <td>${verified}</td>
+            <td>${formatDate(u.createdAt)}</td>
+        </tr>`;
+    }).join('');
+}
+
+function updateRegPagination(pagination) {
+    regTotalPages   = pagination.totalPages  || 1;
+    regCurrentPage  = pagination.currentPage || 1;
+
+    const prev    = document.getElementById('regPrevPage');
+    const next    = document.getElementById('regNextPage');
+    const nums    = document.getElementById('regPageNumbers');
+
+    if (prev) prev.disabled = regCurrentPage === 1;
+    if (next) next.disabled = regCurrentPage >= regTotalPages;
+
+    if (nums) {
+        const maxV = 5;
+        let start = Math.max(1, regCurrentPage - Math.floor(maxV / 2));
+        let end   = Math.min(regTotalPages, start + maxV - 1);
+        if (end - start < maxV - 1) start = Math.max(1, end - maxV + 1);
+        const pages = [];
+        for (let i = start; i <= end; i++) pages.push(i);
+        nums.innerHTML = pages.map(p => `
+            <span class="page-number ${p === regCurrentPage ? 'active' : ''}"
+                  onclick="if(${p}!==${regCurrentPage}){regCurrentPage=${p};loadRegisteredUsers();}">
+                ${p}
+            </span>`).join('');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const searchBtn = document.getElementById('registeredSearchBtn');
+    if (searchBtn) searchBtn.addEventListener('click', () => {
+        regSearch = document.getElementById('registeredSearch')?.value.trim() || '';
+        regCurrentPage = 1;
+        loadRegisteredUsers();
+    });
+    const searchInput = document.getElementById('registeredSearch');
+    if (searchInput) searchInput.addEventListener('keypress', e => {
+        if (e.key === 'Enter') {
+            regSearch = searchInput.value.trim();
+            regCurrentPage = 1;
+            loadRegisteredUsers();
+        }
+    });
+    const prevBtn = document.getElementById('regPrevPage');
+    if (prevBtn) prevBtn.addEventListener('click', () => {
+        if (regCurrentPage > 1) { regCurrentPage--; loadRegisteredUsers(); }
+    });
+    const nextBtn = document.getElementById('regNextPage');
+    if (nextBtn) nextBtn.addEventListener('click', () => {
+        if (regCurrentPage < regTotalPages) { regCurrentPage++; loadRegisteredUsers(); }
+    });
+});
+
 // Make functions globally available
 window.openCustomerDetails = openCustomerDetails;
 window.viewCustomerOrders = viewCustomerOrders;
@@ -747,4 +875,5 @@ window.viewOrder = viewOrder;
 window.viewPayment = viewPayment;
 window.loadCustomers = loadCustomers;
 window.exportCustomerData = exportCustomerData;
+window.switchSection = switchSection;
 

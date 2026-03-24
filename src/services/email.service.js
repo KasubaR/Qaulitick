@@ -1206,6 +1206,94 @@ async function sendOrderConfirmationEmail(order) {
     }
 }
 
+/**
+ * Send dispatch / shipping notification to customer.
+ * @param {{ order: object, courier: string, trackingNumber: string, note: string }} params
+ */
+async function sendDispatchEmail({ order, courier, trackingNumber, note }) {
+    const transporter = getTransporter();
+    if (!transporter) {
+        logger.warn('Cannot send dispatch email: transporter not configured');
+        return { success: false, error: 'Email service not configured' };
+    }
+
+    const customerName = esc(order.customer?.name || 'Valued Customer');
+    const orderNumber  = esc(order.orderNumber || '');
+    const safeCourier  = esc(courier || 'our delivery partner');
+    const safeTracking = esc(trackingNumber || '');
+    const noteHtml     = note
+        ? `<p style="margin:16px 0 0;">${esc(note).replace(/\n/g, '<br>')}</p>`
+        : '';
+
+    const trackingBlock = safeTracking
+        ? `<tr><td style="padding:6px 8px;color:#555;">Tracking Number</td><td style="padding:6px 8px;font-weight:bold;">${safeTracking}</td></tr>`
+        : '';
+
+    const html = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body { margin:0; padding:0; background:#f4f4f4; font-family:Arial,sans-serif; color:#333; }
+                .wrapper { max-width:600px; margin:30px auto; background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+                .header { background:linear-gradient(135deg,#FFEEC1 0%,#FFD700 100%); padding:36px 30px; text-align:center; }
+                .header h1 { margin:0; font-size:26px; color:#222; }
+                .header p { margin:6px 0 0; color:#555; font-size:14px; }
+                .body { padding:32px 30px; }
+                .section { background:#fafafa; border-left:4px solid #FFD700; border-radius:4px; padding:18px 20px; margin:20px 0; }
+                .info-table { width:100%; border-collapse:collapse; }
+                .footer { margin-top:30px; padding-top:20px; border-top:1px solid #eee; font-size:12px; color:#999; text-align:center; line-height:1.8; }
+            </style>
+        </head>
+        <body>
+            <div class="wrapper">
+                <div class="header">
+                    <h1>Your Order Is On Its Way 🚚</h1>
+                    <p>Qualitick Collections</p>
+                </div>
+                <div class="body">
+                    <p>Dear ${customerName},</p>
+                    <p>Great news! Your order <strong>#${orderNumber}</strong> has been dispatched and is now on its way to you.</p>
+
+                    <div class="section">
+                        <h3 style="margin:0 0 12px;color:#333;font-size:15px;">Shipping Details</h3>
+                        <table class="info-table">
+                            <tr><td style="padding:6px 8px;color:#555;">Shipping Company</td><td style="padding:6px 8px;font-weight:bold;">${safeCourier}</td></tr>
+                            ${trackingBlock}
+                        </table>
+                        ${noteHtml}
+                    </div>
+
+                    <p>If you have any questions about your delivery, feel free to contact us.</p>
+                    <p>Thank you for shopping with Qualitick Collections!</p>
+                    <div class="footer">
+                        &copy; ${new Date().getFullYear()} Qualitick Collections. All rights reserved.
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
+
+    try {
+        const to = order.customer?.email;
+        if (!to) return { success: false, error: 'No customer email on order' };
+        const info = await transporter.sendMail({
+            from: MAIL_FROM,
+            to,
+            subject: `Your order #${order.orderNumber} has been dispatched — Qualitick Collections`,
+            html
+        });
+        logger.info({ orderNumber: order.orderNumber, messageId: info.messageId }, 'Dispatch email sent');
+        return { success: true, messageId: info.messageId };
+    } catch (error) {
+        logger.error({ err: error, orderNumber: order.orderNumber }, 'Error sending dispatch email');
+        return { success: false, error: error.message };
+    }
+}
+
 module.exports = {
     sendContactNotificationToAdmin,
     sendContactConfirmationToUser,
@@ -1216,6 +1304,7 @@ module.exports = {
     sendCustomerEmailVerification,
     sendCustomerPasswordResetEmail,
     sendOrderConfirmationEmail,
+    sendDispatchEmail,
     verifyTransporter
 };
 

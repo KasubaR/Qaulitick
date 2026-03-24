@@ -183,6 +183,50 @@ class CustomerService {
         }
     }
 
+    async getRegisteredUsers(filters = {}, pagination = {}) {
+        try {
+            const User = require('../models/User.model');
+            const { Op } = require('sequelize');
+            const { search } = filters;
+            const { page = 1, limit = 50 } = pagination;
+
+            const where = {};
+            if (search) {
+                const term = search.trim();
+                where[Op.or] = [
+                    { name: { [Op.like]: `%${term}%` } },
+                    { email: { [Op.like]: `%${term}%` } },
+                    { phone: { [Op.like]: `%${term}%` } }
+                ];
+            }
+
+            const { count, rows } = await User.findAndCountAll({
+                where,
+                order: [['createdAt', 'DESC']],
+                limit,
+                offset: (page - 1) * limit,
+                raw: true
+            });
+
+            const totalPages = Math.max(1, Math.ceil(count / limit));
+
+            return {
+                users: rows,
+                pagination: {
+                    currentPage: page,
+                    totalPages,
+                    totalCount: count,
+                    limit,
+                    hasNextPage: page < totalPages,
+                    hasPreviousPage: page > 1
+                }
+            };
+        } catch (error) {
+            console.error('[Customer Service] Error getting registered users:', error);
+            throw error;
+        }
+    }
+
     async searchCustomers(query, limit = 10) {
         try {
             if (!query || query.trim().length === 0) return [];

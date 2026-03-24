@@ -60,7 +60,8 @@ const Order = sequelize.define('Order', {
         defaultValue: 'pending'
     },
     trackingNumber: { type: DataTypes.STRING(100), allowNull: true },
-    courier: { type: DataTypes.STRING(100), allowNull: true },
+    courier: { type: DataTypes.STRING(200), allowNull: true },
+    shippingNote: { type: DataTypes.TEXT, allowNull: true },
     notes: {
         type: DataTypes.JSON,
         allowNull: true,

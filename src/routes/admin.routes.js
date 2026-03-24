@@ -285,6 +285,11 @@ router.get('/api/admin/customers/:email',
     authenticateAdmin,
     customerController.getCustomerByEmail
 );
+router.get('/api/admin/registered-users',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
+    authenticateAdmin,
+    customerController.getRegisteredUsers
+);
 
 // ============================================
 // Admin Inventory API

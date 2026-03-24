@@ -23,6 +23,8 @@
     <link rel="stylesheet" href="/css/admin/dashboard.css">
     <!-- Admin Payments Stylesheet -->
     <link rel="stylesheet" href="/css/admin/payments.css">
+    <!-- Orders stylesheet (action menu styles) -->
+    <link rel="stylesheet" href="/css/admin/orders.css">
 </head>
 <body class="admin-page">
     <!-- ADMIN PAYMENTS PAGE -->
@@ -184,9 +186,6 @@
                     <button type="button" class="tab-btn active" data-tab="overview">
                         <i class="fas fa-info-circle"></i> Overview
                     </button>
-                    <button type="button" class="tab-btn" data-tab="transaction">
-                        <i class="fas fa-exchange-alt"></i> Transaction Details
-                    </button>
                     <button type="button" class="tab-btn" data-tab="webhook">
                         <i class="fas fa-code"></i> Webhook Data
                     </button>
@@ -298,9 +297,6 @@
                         <div class="payment-actions">
                             <h3>Actions</h3>
                             <div class="action-buttons-group">
-                                <button class="btn-primary" id="verifyPaymentBtn">
-                                    <i class="fas fa-check-circle"></i> Verify Payment
-                                </button>
                                 <button class="btn-outline" id="viewOrderBtn">
                                     <i class="fas fa-shopping-cart"></i> View Order
                                 </button>
@@ -308,42 +304,6 @@
                         </div>
                     </div>
 
-                    <!-- Transaction Details Tab -->
-                    <div class="tab-pane" id="transactionTab">
-                        <div class="transaction-details">
-                            <div class="details-section">
-                                <h3>Bank Transfer Details</h3>
-                                <div class="info-group" id="bankDetailsGroup">
-                                    <div class="info-item">
-                                        <span class="info-label">Bank Name:</span>
-                                        <span class="info-value" id="bankName">-</span>
-                                    </div>
-                                    <div class="info-item">
-                                        <span class="info-label">Account Number:</span>
-                                        <span class="info-value" id="accountNumber">-</span>
-                                    </div>
-                                    <div class="info-item">
-                                        <span class="info-label">Account Name:</span>
-                                        <span class="info-value" id="accountName">-</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="details-section">
-                                <h3>Payment Instructions</h3>
-                                <div class="payment-instructions" id="paymentInstructions">
-                                    <p>-</p>
-                                </div>
-                            </div>
-
-                            <div class="details-section" id="qrCodeSection" style="display: none;">
-                                <h3>QR Code</h3>
-                                <div class="qr-code-container">
-                                    <img id="qrCodeImage" src="" alt="Payment QR Code" style="max-width: 300px;">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
                     <!-- Webhook Data Tab -->
                     <div class="tab-pane" id="webhookTab">
@@ -383,6 +343,23 @@
             <!-- Modal Actions -->
             <div class="modal-actions">
                 <button class="btn-outline" id="closePaymentDetailsBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generic confirm dialog -->
+    <div class="modal" id="confirmModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="confirmModalTitle">Confirm</h2>
+                <button class="modal-close" id="closeConfirmModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmModalMessage"></p>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-outline" id="cancelConfirmBtn">Cancel</button>
+                <button class="btn-danger" id="okConfirmBtn">Confirm</button>
             </div>
         </div>
     </div>

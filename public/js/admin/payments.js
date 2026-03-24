@@ -1,5 +1,33 @@
 // Admin Payments Management JavaScript
 
+/**
+ * Show a styled confirm dialog. Returns a Promise resolving to true/false.
+ */
+function showConfirmDialog(message, { title = 'Confirm', confirmLabel = 'Confirm', isDanger = true } = {}) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirmModal');
+        document.getElementById('confirmModalTitle').textContent = title;
+        document.getElementById('confirmModalMessage').textContent = message;
+        const okBtn = document.getElementById('okConfirmBtn');
+        okBtn.textContent = confirmLabel;
+        okBtn.className = isDanger ? 'btn-danger' : 'btn-primary';
+        modal.style.display = 'flex';
+
+        function onConfirm() { cleanup(); resolve(true); }
+        function onCancel()  { cleanup(); resolve(false); }
+        function cleanup() {
+            modal.style.display = 'none';
+            okBtn.removeEventListener('click', onConfirm);
+            document.getElementById('cancelConfirmBtn').removeEventListener('click', onCancel);
+            document.getElementById('closeConfirmModal').removeEventListener('click', onCancel);
+        }
+
+        okBtn.addEventListener('click', onConfirm);
+        document.getElementById('cancelConfirmBtn').addEventListener('click', onCancel);
+        document.getElementById('closeConfirmModal').addEventListener('click', onCancel);
+    });
+}
+
 let currentPage = 1;
 let totalPages = 1;
 let currentPaymentId = null;
@@ -78,6 +106,9 @@ function setupEventListeners() {
 
     // Action buttons
     setupActionButtons();
+
+    // Action menu (table row)
+    setupActionMenu();
 }
 
 // Setup sidebar
@@ -146,60 +177,6 @@ function setupModals() {
 
 // Setup action buttons
 function setupActionButtons() {
-    // Verify payment
-    document.getElementById('verifyPaymentBtn')?.addEventListener('click', async () => {
-        if (!currentPaymentId) {
-            showNotification('No payment selected', 'error');
-            return;
-        }
-        
-        try {
-            // Get payment details first to get transaction ID
-            const payment = await AdminPaymentsAPI.getPaymentById(currentPaymentId);
-            if (!payment) {
-                showNotification('Payment not found', 'error');
-                return;
-            }
-            
-            const transactionId = payment.transactionId || payment.lencoTransactionId || payment.lencoReference;
-            if (!transactionId) {
-                showNotification('Transaction ID not found', 'error');
-                return;
-            }
-            
-            // Verify payment
-            const verifyBtn = document.getElementById('verifyPaymentBtn');
-            const originalText = verifyBtn.innerHTML;
-            verifyBtn.disabled = true;
-            verifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
-            
-            const result = await AdminPaymentsAPI.verifyPayment(transactionId);
-            
-            verifyBtn.disabled = false;
-            verifyBtn.innerHTML = originalText;
-            
-            if (result.success) {
-                showNotification('Payment verified successfully', 'success');
-                // Reload payment details to show updated status
-                await loadPaymentDetails(currentPaymentId);
-                // Reload payments list to show updated status
-                await loadPayments(getCurrentFilters());
-            } else {
-                showNotification(result.message || 'Payment verification failed', 'error');
-            }
-        } catch (error) {
-            console.error('Error verifying payment:', error);
-            showNotification(error.message || 'Failed to verify payment', 'error');
-            
-            // Re-enable button
-            const verifyBtn = document.getElementById('verifyPaymentBtn');
-            if (verifyBtn) {
-                verifyBtn.disabled = false;
-                verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> Verify Payment';
-            }
-        }
-    });
-    
     // View order
     document.getElementById('viewOrderBtn')?.addEventListener('click', async () => {
         if (!currentPaymentId) {
@@ -377,14 +354,19 @@ function renderPayments(payments) {
     tbody.innerHTML = payments.map(payment => `
         <tr>
             <td>
-                <a href="#" onclick="openPaymentDetails('${payment._id}'); return false;" class="order-link">
+                <a href="#" onclick="openPaymentDetails('${payment.id}'); return false;" class="order-link">
                     ${payment.orderNumber}
                 </a>
             </td>
             <td>
                 <div class="customer-cell">
-                    <div class="customer-name">${payment.customerInfo?.name || 'N/A'}</div>
-                    <div class="customer-contact">${payment.customerInfo?.email || payment.customerInfo?.phone || ''}</div>
+                    ${(() => {
+                        const ci = typeof payment.customerInfo === 'string'
+                            ? (() => { try { return JSON.parse(payment.customerInfo); } catch { return {}; } })()
+                            : (payment.customerInfo || {});
+                        return `<div class="customer-name">${ci.name || 'N/A'}</div>
+                    <div class="customer-contact">${ci.email || ci.phone || ''}</div>`;
+                    })()}
                 </div>
             </td>
             <td>${formatDate(payment.createdAt)}</td>
@@ -400,18 +382,30 @@ function renderPayments(payments) {
                 <span class="transaction-id">${payment.transactionId || payment.lencoTransactionId || '-'}</span>
             </td>
             <td>
-                <div class="action-buttons">
-                    <button class="action-btn view" onclick="openPaymentDetails('${payment._id}')" title="View">
-                        <i class="fas fa-eye"></i>
+                <div class="action-menu-container">
+                    <button class="action-menu-btn" data-payment-id="${payment.id}" title="Actions">
+                        <i class="fas fa-ellipsis-v"></i>
                     </button>
-                    <button class="action-btn verify" onclick="verifyPayment('${payment._id}')" title="Verify">
-                        <i class="fas fa-check-circle"></i>
-                    </button>
-                    ${payment.status === 'failed' ? `
-                    <button class="action-btn retry" onclick="retryPayment('${payment.orderNumber}')" title="Retry Payment">
-                        <i class="fas fa-redo"></i>
-                    </button>
-                    ` : ''}
+                    <div class="action-menu-dropdown" id="paymentActionMenu-${payment.id}" style="display:none;">
+                        <button class="action-menu-item" data-action="view" data-payment-id="${payment.id}">
+                            <i class="fas fa-eye"></i>
+                            <span>View Details</span>
+                        </button>
+                <button class="action-menu-item" data-action="order" data-payment-id="${payment.id}">
+                            <i class="fas fa-shopping-cart"></i>
+                            <span>View Order</span>
+                        </button>
+                        <button class="action-menu-item" data-action="export" data-payment-id="${payment.id}">
+                            <i class="fas fa-download"></i>
+                            <span>Export Data</span>
+                        </button>
+                        ${payment.status === 'failed' ? `
+                        <div class="action-menu-divider"></div>
+                        <button class="action-menu-item danger" data-action="retry" data-order-number="${payment.orderNumber}">
+                            <i class="fas fa-redo"></i>
+                            <span>Retry Payment</span>
+                        </button>` : ''}
+                    </div>
                 </div>
             </td>
         </tr>
@@ -420,10 +414,15 @@ function renderPayments(payments) {
 
 // Populate payment details
 function populatePaymentDetails(payment) {
+    // Parse customerInfo if it came back as a raw JSON string
+    const customerInfo = typeof payment.customerInfo === 'string'
+        ? (() => { try { return JSON.parse(payment.customerInfo); } catch { return {}; } })()
+        : (payment.customerInfo || {});
+
     // Customer info
-    document.getElementById('customerName').textContent = payment.customerInfo?.name || '-';
-    document.getElementById('customerEmail').textContent = payment.customerInfo?.email || '-';
-    document.getElementById('customerPhone').textContent = payment.customerInfo?.phone || '-';
+    document.getElementById('customerName').textContent = customerInfo.name || '-';
+    document.getElementById('customerEmail').textContent = customerInfo.email || '-';
+    document.getElementById('customerPhone').textContent = customerInfo.phone || '-';
     
     // Payment info
     document.getElementById('orderNumber').textContent = payment.orderNumber || '-';
@@ -802,6 +801,93 @@ function showExportFormatDialog() {
             }
         });
     });
+}
+
+// Setup action menu event delegation
+function setupActionMenu() {
+    const table = document.getElementById('paymentsTable');
+    if (!table) return;
+
+    table.addEventListener('click', (e) => {
+        // Menu toggle button
+        const menuBtn = e.target.closest('.action-menu-btn');
+        if (menuBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            const id = menuBtn.getAttribute('data-payment-id');
+            const dropdown = document.getElementById(`paymentActionMenu-${id}`);
+            if (!dropdown) return;
+            // Close all other menus
+            document.querySelectorAll('.action-menu-dropdown').forEach(m => {
+                if (m !== dropdown) m.style.display = 'none';
+            });
+            dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+            return;
+        }
+
+        // Menu item click
+        const menuItem = e.target.closest('.action-menu-item');
+        if (menuItem) {
+            e.preventDefault();
+            e.stopPropagation();
+            const action      = menuItem.getAttribute('data-action');
+            const paymentId   = menuItem.getAttribute('data-payment-id');
+            const orderNumber = menuItem.getAttribute('data-order-number');
+            // Close menu
+            menuItem.closest('.action-menu-dropdown').style.display = 'none';
+
+            switch (action) {
+                case 'view':   openPaymentDetails(paymentId); break;
+                case 'order':  goToOrder(paymentId); break;
+                case 'export': exportPaymentData(paymentId); break;
+                case 'retry':  retryPayment(orderNumber); break;
+            }
+        }
+    });
+
+    // Close menus when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.action-menu-container')) {
+            document.querySelectorAll('.action-menu-dropdown').forEach(m => {
+                m.style.display = 'none';
+            });
+        }
+    });
+}
+
+
+// Navigate to linked order
+async function goToOrder(paymentId) {
+    try {
+        const payment = await AdminPaymentsAPI.getPaymentById(paymentId);
+        if (payment && payment.orderNumber) {
+            window.location.href = `/admin/orders?search=${encodeURIComponent(payment.orderNumber)}`;
+        } else {
+            showNotification('Order number not found for this payment', 'error');
+        }
+    } catch (err) {
+        showNotification('Failed to get payment details', 'error');
+    }
+}
+
+// Export single payment as JSON
+async function exportPaymentData(paymentId) {
+    try {
+        const payment = await AdminPaymentsAPI.getPaymentById(paymentId);
+        if (!payment) { showNotification('Payment not found', 'error'); return; }
+        const blob = new Blob([JSON.stringify(payment, null, 2)], { type: 'application/json' });
+        const url  = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `payment_${(payment.orderNumber || paymentId).replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        showNotification('Payment data exported', 'success');
+    } catch (err) {
+        showNotification('Failed to export payment data', 'error');
+    }
 }
 
 // Make functions globally available

@@ -551,12 +551,49 @@ exports.updateOrderStatus = async (req, res) => {
     }
 };
 
+// Dispatch order — mark as shipped, save tracking info, email customer
+exports.dispatchOrder = async (req, res) => {
+    try {
+        const { orderNumber } = req.params;
+        const { courier, trackingNumber, note } = req.body;
+
+        const order = await Order.findByOrderNumber(orderNumber);
+        if (!order) {
+            return res.status(404).json({ success: false, message: 'Order not found' });
+        }
+
+        // Save tracking info and mark as shipped
+        await order.update({ courier, trackingNumber, shippingNote: note, status: 'shipped' });
+
+        // Add history entry
+        const history = Array.isArray(order.history) ? [...order.history] : [];
+        history.push({ status: 'shipped', notes: 'Order dispatched by admin', updatedBy: 'admin', updatedAt: new Date() });
+        await order.update({ history });
+
+        // Send dispatch email to customer (non-blocking)
+        const emailService = require('../services/email.service');
+        const fresh = await Order.findByOrderNumber(orderNumber);
+        const customer = typeof fresh.customer === 'string' ? JSON.parse(fresh.customer) : (fresh.customer || {});
+        emailService.sendDispatchEmail({
+            order: { ...fresh.toJSON(), customer },
+            courier,
+            trackingNumber,
+            note
+        }).catch(err => logger.error({ err }, 'Dispatch email failed'));
+
+        res.json({ success: true, message: 'Order dispatched successfully' });
+    } catch (error) {
+        logger.error({ err: error }, 'Error dispatching order');
+        res.status(500).json({ success: false, message: 'Failed to dispatch order' });
+    }
+};
+
 // Update tracking information
 exports.updateTracking = async (req, res) => {
     try {
         const { orderNumber } = req.params;
-        const { trackingNumber, courier } = req.body;
-        
+        const { trackingNumber, courier, shippingNote } = req.body;
+
         // Update tracking using Order model
         const order = await Order.findByOrderNumber(orderNumber);
         if (!order) {
@@ -565,8 +602,8 @@ exports.updateTracking = async (req, res) => {
                 message: 'Order not found'
             });
         }
-        
-        await order.updateTracking(trackingNumber, courier);
+
+        await order.update({ trackingNumber, courier, shippingNote });
         
         res.json({
             success: true,

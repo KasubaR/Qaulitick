@@ -130,6 +130,29 @@ exports.getCustomerStats = async (req, res) => {
  * Get customer details by email
  * GET /api/admin/customers/:email
  */
+exports.getRegisteredUsers = async (req, res) => {
+    try {
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(Math.max(1, parseInt(req.query.limit) || 50), 100);
+        const search = req.query.search?.trim() || '';
+
+        const filters = {};
+        if (search) filters.search = search;
+
+        const result = await customerService.getRegisteredUsers(filters, { page, limit });
+
+        res.json({
+            success: true,
+            data: result.users,
+            pagination: result.pagination,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('[Customer Controller] Error getting registered users:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch registered users' });
+    }
+};
+
 exports.getCustomerByEmail = async (req, res) => {
     try {
         const email = req.params.email;

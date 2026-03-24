@@ -137,6 +137,15 @@ app.use('/api', publicApiCors);
 // ============================================
 // Routes
 // ============================================
+// Prevent HTML pages from being cached by the browser
+app.use((req, res, next) => {
+    const isAsset = /\.(js|css|png|jpg|jpeg|webp|svg|ico|woff2|woff|ttf)$/.test(req.path);
+    if (!isAsset) {
+        res.setHeader('Cache-Control', 'no-store');
+    }
+    next();
+});
+
 app.use('/', require('./routes/admin.routes'));
 app.use('/', require('./routes/storefront.routes'));
 
