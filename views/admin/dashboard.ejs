@@ -53,14 +53,13 @@
                         </button>
                         
                         <div class="admin-profile">
-                            <img src="/images/admin-avatar.png" alt="Admin" class="profile-avatar" onerror="this.src='https://ui-avatars.com/api/?name=<%= typeof admin !== 'undefined' && admin ? encodeURIComponent(admin.name || admin.email) : 'Admin' %>&background=FFEEC1&color=000'">
+                            <img src="/images/icons/Qualitick-01.svg" alt="Admin" class="profile-avatar">
                             <div class="profile-info">
                                 <span class="profile-name"><%= typeof admin !== 'undefined' && admin ? (admin.name || 'Admin') : 'Admin' %></span>
                                 <% if (typeof admin !== 'undefined' && admin && admin.email) { %>
                                 <span class="profile-email"><%= admin.email %></span>
                                 <% } %>
                             </div>
-                            <i class="fas fa-chevron-down"></i>
                         </div>
                         
                     </div>
@@ -307,23 +306,6 @@
         <div class="dropdown-footer">
             <a href="/admin/notifications">View all notifications</a>
         </div>
-    </div>
-
-    <!-- Profile Dropdown -->
-    <div class="profile-dropdown" id="profileDropdown" style="display: none;">
-        <a href="/admin/profile" class="dropdown-item">
-            <i class="fas fa-user"></i> My Profile
-        </a>
-        <a href="/admin/settings" class="dropdown-item">
-            <i class="fas fa-cog"></i> Settings
-        </a>
-<div class="dropdown-divider"></div>
-        <form method="POST" action="/admin/logout" style="display:inline">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <button type="submit" class="dropdown-item logout">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </button>
-        </form>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>

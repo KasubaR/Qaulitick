@@ -29,7 +29,7 @@
 /* .section-eyebrow defined globally in main.css */
 
 .section-title-serif {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Satoshi-Variable', 'Satoshi-Regular', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: clamp(1.8rem, 3vw, 2.6rem);
     font-weight: 700;
     line-height: 1.2;
@@ -87,7 +87,7 @@
 }
 
 .hero-title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Satoshi-Variable', 'Satoshi-Regular', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: clamp(2.6rem, 5vw, 4rem);
     font-weight: 700;
     color: #fff;
@@ -219,7 +219,7 @@
 }
 
 .category-title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Satoshi-Variable', 'Satoshi-Regular', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 1.15rem;
     font-weight: 600;
     color: var(--home-dark);
@@ -351,7 +351,7 @@ body {
 }
 
 .featured-empty-title {
-    font-family: 'Playfair Display', Georgia, serif;
+    font-family: 'Satoshi-Variable', 'Satoshi-Regular', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 1.5rem;
     font-weight: 600;
     color: var(--home-dark, #0d0d0d);
@@ -482,7 +482,7 @@ body {
 .flash-icon { font-size: 0.85rem; }
 
 .fs-title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Satoshi-Variable', 'Satoshi-Regular', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: clamp(1.6rem, 2.8vw, 2.2rem);
     font-weight: 700;
     color: var(--home-dark);
@@ -505,7 +505,7 @@ body {
     color: var(--home-text-muted);
 }
 .fs-timer {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Satoshi-Variable', 'Satoshi-Regular', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: clamp(1.4rem, 2.2vw, 1.8rem);
     font-weight: 700;
     color: var(--home-gold);
@@ -607,7 +607,7 @@ body {
     color: var(--home-gold);
 }
 .fs-card-name {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Satoshi-Variable', 'Satoshi-Regular', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 0.95rem;
     font-weight: 700;
     color: var(--home-dark);
@@ -772,7 +772,7 @@ body {
     position: absolute;
     left: 0;
     top: -6px;
-    font-family: 'Playfair Display', serif;
+    font-family: 'Satoshi-Variable', 'Satoshi-Regular', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 2.4rem;
     line-height: 1;
     color: rgba(7, 7, 7, 0.15);
@@ -813,7 +813,7 @@ body {
 }
 .newsletter h3 {
     position: relative;
-    font-family: 'Playfair Display', serif;
+    font-family: 'Satoshi-Variable', 'Satoshi-Regular', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 2.1rem;
     font-weight: 700;
     color: var(--home-dark);

@@ -7,7 +7,8 @@ let currentPage = 1;
 let totalPages = 1;
 let selectedOrders = [];
 let currentOrderId = null;
-let activeFilters = {}; // Filters last applied by an explicit admin action — polling always uses this
+let currentOrderStatus = null;
+let activeFilters = {}; // Filters last applied by explicit admin action
 
 // HTML-escape helper — must wrap every server-returned value interpolated into innerHTML
 function esc(s) {
@@ -50,13 +51,7 @@ function showConfirmDialog(message, { title = 'Confirm', confirmLabel = 'Confirm
     });
 }
 
-// Real-time updates (polling)
-let realTimeInterval = null;
-let lastUpdateTime = null;
 let currentOrdersMap = new Map(); // Track current orders for change detection
-let isPollingActive = false;
-const POLLING_INTERVAL = 15000; // 15 seconds
-
 // Track unread orders for sidebar badge (using shared utility)
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -75,23 +70,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (window.OrdersBadge) {
             window.OrdersBadge.markAsViewed();
         }
-        
-        // Start real-time updates after initial load
-        startRealTimeUpdates();
     });
-});
-
-// Stop polling when page is hidden or unloaded
-document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-        stopRealTimeUpdates();
-    } else {
-        startRealTimeUpdates();
-    }
-});
-
-window.addEventListener('beforeunload', () => {
-    stopRealTimeUpdates();
 });
 
 // Initialize orders page
@@ -151,6 +130,25 @@ function setupEventListeners() {
     if (clearFiltersBtn) {
         clearFiltersBtn.addEventListener('click', clearFilters);
     }
+    
+    // Manual refresh (similar to layby page behavior)
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', async () => {
+            const originalText = refreshBtn.innerHTML;
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+            try {
+                await loadOrders(activeFilters);
+                showNotification('Orders refreshed', 'success');
+            } catch (_) {
+                // loadOrders already shows error notification
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = originalText;
+            }
+        });
+    }
 
     // Bulk actions
     setupBulkActions();
@@ -186,6 +184,7 @@ function setupTabs() {
     
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
+            if (btn.classList.contains('disabled')) return;
             const targetTab = btn.dataset.tab;
             
             // Remove active class from all tabs and panes
@@ -314,6 +313,33 @@ function setupStatusButtons() {
     document.getElementById('shipOrderBtn')?.addEventListener('click', async () => {
         if (!currentOrderId) return;
 
+        if (currentOrderStatus === 'shipped') {
+            const undoDispatch = await showConfirmDialog(
+                `Cancel dispatch for order ${currentOrderId}? This will set the order back to confirmed and unlock shipping updates.`,
+                { title: 'Cancel Dispatch', confirmLabel: 'Cancel Dispatch', isDanger: true }
+            );
+            if (!undoDispatch) return;
+
+            const btn = document.getElementById('shipOrderBtn');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cancelling...';
+
+            try {
+                await AdminOrdersAPI.updateOrderStatus(currentOrderId, 'confirmed', 'Dispatch cancelled by admin');
+                showNotification('Dispatch cancelled. Shipping tab is unlocked.', 'success');
+                await loadOrders();
+                await loadOrderDetails(currentOrderId);
+            } catch (err) {
+                console.error(err);
+                showNotification(err.message || 'Failed to cancel dispatch', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+            return;
+        }
+
         const courier        = document.getElementById('courierSelect')?.value.trim() || '';
         const trackingNumber = document.getElementById('trackingNumber')?.value.trim() || '';
         const note           = document.getElementById('shippingNote')?.value.trim() || '';
@@ -337,10 +363,15 @@ function setupStatusButtons() {
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Dispatching...';
 
         try {
-            const token = '';
-            const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/dispatch`, {
+            const csrfToken = typeof window.getCSRFToken === 'function' ? window.getCSRFToken() : '';
+            const res = await fetch(`/api/admin/orders/${encodeURIComponent(currentOrderId)}/dispatch`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {})
+                },
                 body: JSON.stringify({ courier, trackingNumber, note })
             });
             const data = await res.json();
@@ -369,7 +400,8 @@ function setupStatusButtons() {
     });
     
     // Tracking update
-    document.getElementById('updateTrackingBtn')?.addEventListener('click', async () => {
+    document.getElementById('updateTrackingBtn')?.addEventListener('click', async (e) => {
+        e.preventDefault();
         const trackingNumber = document.getElementById('trackingNumber').value;
         const courier = document.getElementById('courierSelect').value;
         const shippingNote = document.getElementById('shippingNote')?.value.trim() || '';
@@ -384,14 +416,46 @@ function setupStatusButtons() {
             return;
         }
         
+        const updateBtn = document.getElementById('updateTrackingBtn');
+        const originalText = updateBtn ? updateBtn.innerHTML : '';
+        if (updateBtn) {
+            updateBtn.disabled = true;
+            updateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+        }
+
         try {
-            await AdminOrdersAPI.updateTracking(currentOrderId, trackingNumber.trim(), courier, shippingNote);
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const response = await fetch(`/api/admin/orders/${encodeURIComponent(currentOrderId)}/tracking`, {
+                method: 'PATCH',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {})
+                },
+                body: JSON.stringify({
+                    trackingNumber: trackingNumber.trim(),
+                    courier,
+                    shippingNote
+                })
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.success === false) {
+                throw new Error(data.message || 'Failed to update tracking information');
+            }
+
             showNotification('Tracking information updated successfully', 'success');
             // Reload order details
             await loadOrderDetails(currentOrderId);
         } catch (error) {
             console.error('Error updating tracking:', error);
             showNotification(error.message || 'Failed to update tracking information', 'error');
+        } finally {
+            if (updateBtn) {
+                updateBtn.disabled = false;
+                updateBtn.innerHTML = originalText;
+            }
         }
     });
     
@@ -520,6 +584,8 @@ async function updateStatus(newStatus) {
 
 // Open shipping tab
 function openShippingTab() {
+    const shippingTabBtn = document.querySelector('.tab-btn[data-tab="shipping"]');
+    if (shippingTabBtn?.classList.contains('disabled')) return;
     // Switch to shipping tab
     document.querySelectorAll('.tab-btn').forEach(btn => {
         if (btn.dataset.tab === 'shipping') {
@@ -590,41 +656,26 @@ async function clearFilters() {
 }
 
 // Load orders from API
-async function loadOrders(filters = {}, isPollingUpdate = false) {
+async function loadOrders(filters = {}) {
     try {
-        // Add updatedSince filter for polling updates
-        if (isPollingUpdate && lastUpdateTime) {
-            filters.updatedSince = lastUpdateTime;
-        }
-        
         const result = await AdminOrdersAPI.loadOrders(filters);
-        
-        if (isPollingUpdate) {
-            // For polling updates, only update changed orders
-            updateOrdersIfChanged(result.orders);
-        } else {
-            // Full reload - update everything
-            renderOrders(result.orders);
-            updateOrdersCount(result.count);
-            // Store orders for change detection
-            currentOrdersMap.clear();
-            result.orders.forEach(order => {
-                currentOrdersMap.set(order.orderNumber, order);
-            });
-            // Update select all checkbox state
-            updateSelectAllCheckbox();
-        }
-        
-        // Update last update time
-        lastUpdateTime = new Date().toISOString();
+
+        // Full reload - update everything
+        renderOrders(result.orders);
+        updateOrdersCount(result.count);
+        // Store orders for lookup logic (e.g. process guard)
+        currentOrdersMap.clear();
+        result.orders.forEach(order => {
+            currentOrdersMap.set(order.orderNumber, order);
+        });
+        // Update select all checkbox state
+        updateSelectAllCheckbox();
         
         return result;
     } catch (error) {
         console.error('Error loading orders:', error);
-        if (!isPollingUpdate) {
-            showNotification(error.message || 'Failed to load orders', 'error');
-            renderOrders([]);
-        }
+        showNotification(error.message || 'Failed to load orders', 'error');
+        renderOrders([]);
         throw error;
     }
 }
@@ -815,6 +866,7 @@ function setupTableDelegation() {
 
 // Populate order details
 function populateOrderDetails(order) {
+    currentOrderStatus = order?.status || null;
     // Customer info
     document.getElementById('customerName').textContent = order.customer?.name || '-';
     document.getElementById('customerPhone').textContent = order.customer?.phone || '-';
@@ -844,6 +896,54 @@ function populateOrderDetails(order) {
     document.getElementById('orderDiscount').textContent = `-K${order.totals?.discount?.toLocaleString() || '0'}`;
     document.getElementById('orderShipping').textContent = `K${order.totals?.delivery?.toLocaleString() || '0'}`;
     document.getElementById('orderTotal').textContent = `K${order.totals?.total?.toLocaleString() || '0'}`;
+    syncShippingUi(order);
+}
+
+function syncShippingUi(order) {
+    const isDispatched = (order?.status || '').toLowerCase() === 'shipped';
+    const shippingTabBtn = document.querySelector('.tab-btn[data-tab="shipping"]');
+    const shipOrderBtn = document.getElementById('shipOrderBtn');
+    const trackingNumberInput = document.getElementById('trackingNumber');
+    const courierInput = document.getElementById('courierSelect');
+    const shippingNoteInput = document.getElementById('shippingNote');
+    const updateTrackingBtn = document.getElementById('updateTrackingBtn');
+
+    if (shippingTabBtn) {
+        shippingTabBtn.classList.toggle('disabled', isDispatched);
+        shippingTabBtn.setAttribute('aria-disabled', isDispatched ? 'true' : 'false');
+        shippingTabBtn.title = isDispatched ? 'Shipping tab is locked while order is dispatched' : '';
+    }
+
+    if (trackingNumberInput) trackingNumberInput.disabled = isDispatched;
+    if (courierInput) courierInput.disabled = isDispatched;
+    if (shippingNoteInput) shippingNoteInput.disabled = isDispatched;
+    if (updateTrackingBtn) updateTrackingBtn.disabled = isDispatched;
+
+    if (shipOrderBtn) {
+        if (isDispatched) {
+            shipOrderBtn.innerHTML = '<i class="fas fa-undo"></i> Cancel Dispatch';
+            shipOrderBtn.classList.remove('btn-primary');
+            shipOrderBtn.classList.add('btn-danger');
+        } else {
+            shipOrderBtn.innerHTML = '<i class="fas fa-shipping-fast"></i> Dispatch Order';
+            shipOrderBtn.classList.remove('btn-danger');
+            shipOrderBtn.classList.add('btn-primary');
+        }
+    }
+
+    // Keep the cancel action reachable after dispatch by opening the shipping tab once.
+    if (isDispatched) {
+        const shippingPane = document.getElementById('shippingTab');
+        const shippingTabActive = shippingPane?.classList.contains('active');
+        if (!shippingTabActive) {
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            const tabPanes = document.querySelectorAll('.tab-pane');
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabPanes.forEach(p => p.classList.remove('active'));
+            shippingTabBtn?.classList.add('active');
+            shippingPane?.classList.add('active');
+        }
+    }
 }
 
 // Load order items
@@ -1016,6 +1116,7 @@ function loadOrderHistory(history) {
 function loadTrackingInfo(order) {
     const trackingNumberEl = document.getElementById('trackingNumber');
     const courierSelect = document.getElementById('courierSelect');
+    const trackingTimeline = document.getElementById('trackingTimeline');
     
     if (trackingNumberEl) {
         trackingNumberEl.value = order.trackingNumber || '';
@@ -1029,6 +1130,59 @@ function loadTrackingInfo(order) {
     if (shippingNote) {
         shippingNote.value = order.shippingNote || '';
     }
+
+    if (!trackingTimeline) return;
+
+    const timelineEntries = [];
+    const hasLiveTracking = !!(order.trackingNumber || order.courier || order.shippingNote);
+
+    if (hasLiveTracking) {
+        timelineEntries.push({
+            title: 'Current Tracking Details',
+            description: [
+                order.courier ? `Courier: ${esc(order.courier)}` : null,
+                order.trackingNumber ? `Tracking #: ${esc(order.trackingNumber)}` : null,
+                order.shippingNote ? `Note: ${esc(order.shippingNote)}` : null
+            ].filter(Boolean).join('<br>'),
+            date: formatDate(order.updatedAt || order.createdAt),
+            icon: 'fa-truck'
+        });
+    }
+
+    const history = Array.isArray(order.history) ? order.history : [];
+    history
+        .filter(entry => {
+            const status = String(entry?.status || '').toLowerCase();
+            const notes = String(entry?.notes || '').toLowerCase();
+            return status === 'shipped' || status === 'delivered' || status === 'packed' || notes.includes('tracking') || notes.includes('dispatch');
+        })
+        .slice()
+        .reverse()
+        .forEach(entry => {
+            const status = String(entry.status || '').toLowerCase();
+            timelineEntries.push({
+                title: `Status: ${esc(entry.status || 'Updated')}`,
+                description: esc(entry.notes || 'No details'),
+                date: formatDate(entry.updatedAt),
+                icon: status === 'delivered' ? 'fa-check-circle' : 'fa-box'
+            });
+        });
+
+    if (timelineEntries.length === 0) {
+        trackingTimeline.innerHTML = '<p class="empty-state">No tracking information available yet.</p>';
+        return;
+    }
+
+    trackingTimeline.innerHTML = timelineEntries.map(item => `
+        <div class="timeline-item">
+            <div class="timeline-icon"><i class="fas ${item.icon}"></i></div>
+            <div class="timeline-content">
+                <div class="timeline-title">${item.title}</div>
+                <div class="timeline-description">${item.description}</div>
+                <div class="timeline-date">${item.date}</div>
+            </div>
+        </div>
+    `).join('');
 }
 
 // Update orders count
@@ -1059,44 +1213,6 @@ function showNotification(message, type = 'info') {
     setTimeout(() => {
         notification.style.display = 'none';
     }, 3000);
-}
-
-// Real-time updates using polling
-function startRealTimeUpdates() {
-    if (isPollingActive) {
-        return; // Already polling
-    }
-    
-    isPollingActive = true;
-    console.log('[Orders] Starting real-time updates (polling every', POLLING_INTERVAL / 1000, 'seconds)');
-    
-    // Load updates immediately, then set interval
-    loadOrderUpdates();
-    realTimeInterval = setInterval(loadOrderUpdates, POLLING_INTERVAL);
-}
-
-function stopRealTimeUpdates() {
-    if (realTimeInterval) {
-        clearInterval(realTimeInterval);
-        realTimeInterval = null;
-        isPollingActive = false;
-        console.log('[Orders] Stopped real-time updates');
-    }
-}
-
-async function loadOrderUpdates() {
-    // Don't poll if page is hidden
-    if (document.hidden) {
-        return;
-    }
-    
-    try {
-        // Use the last admin-applied filters, not live DOM state
-        await loadOrders(activeFilters, true);
-    } catch (error) {
-        // Silently fail for polling updates to avoid spam
-        console.error('[Orders] Error loading order updates:', error);
-    }
 }
 
 function getCurrentFilters() {
@@ -1210,78 +1326,6 @@ function showExportFormatDialog() {
             }
         });
     });
-}
-
-function updateOrdersIfChanged(updatedOrders) {
-    if (!updatedOrders || updatedOrders.length === 0) {
-        return; // No updates
-    }
-    
-    let hasChanges = false;
-    const newOrders = [];
-    const updatedOrderNumbers = [];
-    
-    updatedOrders.forEach(order => {
-        const existingOrder = currentOrdersMap.get(order.orderNumber);
-        
-        if (!existingOrder) {
-            // New order
-            newOrders.push(order);
-            hasChanges = true;
-        } else {
-            // Check if order was updated
-            const existingUpdated = new Date(existingOrder.updatedAt || existingOrder.createdAt);
-            const newUpdated = new Date(order.updatedAt || order.createdAt);
-            
-            if (newUpdated > existingUpdated || 
-                existingOrder.status !== order.status ||
-                existingOrder.paymentStatus !== order.paymentStatus) {
-                // Order was updated
-                updatedOrderNumbers.push(order.orderNumber);
-                hasChanges = true;
-            }
-        }
-        
-        // Update map
-        currentOrdersMap.set(order.orderNumber, order);
-    });
-    
-    if (hasChanges) {
-        // Reload full orders list using the last admin-applied filters
-        loadOrders(activeFilters, false).then(() => {
-            // Show notifications for new/updated orders
-            if (newOrders.length > 0) {
-                showNotification(`${newOrders.length} new order(s) received`, 'success');
-                
-                // Update sidebar badge when new orders arrive (only if not on orders page)
-                if (window.OrdersBadge && window.location.pathname !== '/admin/orders') {
-                    window.OrdersBadge.refresh();
-                }
-            }
-            
-            if (updatedOrderNumbers.length > 0 && newOrders.length === 0) {
-                // Only show notification if there are updates but no new orders
-                if (updatedOrderNumbers.length === 1) {
-                    const updatedOrder = currentOrdersMap.get(updatedOrderNumbers[0]);
-                    if (updatedOrder && currentOrderId !== updatedOrder.orderNumber) {
-                        showNotification(`Order ${updatedOrder.orderNumber} was updated`, 'info');
-                    }
-                } else {
-                    showNotification(`${updatedOrderNumbers.length} order(s) updated`, 'info');
-                }
-            }
-            
-            // If viewing an updated order, refresh its details
-            if (currentOrderId && updatedOrderNumbers.includes(currentOrderId)) {
-                loadOrderDetails(currentOrderId);
-            }
-            
-            // Update sidebar badge when new orders arrive (only if not on orders page)
-            if (window.OrdersBadge && window.location.pathname !== '/admin/orders') {
-                window.OrdersBadge.refresh();
-            }
-        });
-    }
 }
 
 // Toggle order selection

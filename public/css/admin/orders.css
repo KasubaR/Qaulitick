@@ -330,6 +330,12 @@
     border-bottom-color: var(--admin-gold);
 }
 
+.tab-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .tab-btn i {
     font-size: 14px;
 }

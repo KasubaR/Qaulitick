@@ -25,33 +25,17 @@
             <% } %>
             
             <div class="admin-profile">
-                <img src="/images/admin-avatar.png" alt="Admin" class="profile-avatar" onerror="this.src='https://ui-avatars.com/api/?name=<%= typeof admin !== 'undefined' && admin ? encodeURIComponent(admin.name || admin.email) : 'Admin' %>&background=FFEEC1&color=000'">
+                <img src="/images/icons/Qualitick-01.svg" alt="Admin" class="profile-avatar">
                 <div class="profile-info">
                     <span class="profile-name"><%= typeof admin !== 'undefined' && admin ? (admin.name || 'Admin') : 'Admin' %></span>
                     <% if (typeof admin !== 'undefined' && admin && admin.email) { %>
                     <span class="profile-email"><%= admin.email %></span>
                     <% } %>
                 </div>
-                <i class="fas fa-chevron-down"></i>
             </div>
-            
-            <!-- Logout Button -->
-            <form method="POST" action="/admin/logout" style="display:inline">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <button type="submit" class="icon-btn logout-btn" title="Logout">
-                    <i class="fas fa-sign-out-alt"></i>
-                </button>
-            </form>
         </div>
         <% } else { %>
-        <!-- Simple header with just logout -->
-        <form method="POST" action="/admin/logout" style="display:inline">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <button type="submit" class="btn-secondary logout-btn" title="Logout">
-                <i class="fas fa-sign-out-alt"></i>
-                <span>Logout</span>
-            </button>
-        </form>
+        <!-- Simple header -->
         <% } %>
     </div>
 </header>

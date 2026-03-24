@@ -187,7 +187,7 @@ async function sendContactNotificationToAdmin(submission) {
                 <style>
                     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
                     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                    .header { background: linear-gradient(135deg, #FFEEC1 0%, #FFD700 100%); padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+                    .header { background: #FFD700; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
                     .content { background: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; }
                     .field { margin: 15px 0; }
                     .label { font-weight: bold; color: #555; }
@@ -282,7 +282,7 @@ async function sendContactConfirmationToUser(submission) {
                 <style>
                     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
                     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                    .header { background: linear-gradient(135deg, #FFEEC1 0%, #FFD700 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+                    .header { background: #FFD700; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
                     .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
                     .message { background: white; padding: 20px; border-radius: 4px; margin: 20px 0; border-left: 4px solid #FFD700; }
                     .info-box { background: white; padding: 15px; border-radius: 4px; margin: 15px 0; }
@@ -374,7 +374,7 @@ async function sendInvoiceEmail(order, pdfBuffer, options = {}) {
                 <style>
                     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
                     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                    .header { background: linear-gradient(135deg, #FFEEC1 0%, #FFD700 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+                    .header { background: #FFD700; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
                     .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
                     .order-info { background: white; padding: 20px; border-radius: 4px; margin: 20px 0; border-left: 4px solid #FFD700; }
                     .info-row { display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee; }
@@ -577,7 +577,7 @@ async function sendOrderNotificationToAdmin(order) {
                 <style>
                     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
                     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                    .header { background: linear-gradient(135deg, #FFEEC1 0%, #FFD700 100%); padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+                    .header { background: #FFD700; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
                     .content { background: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; }
                     .order-info { background: white; padding: 20px; border-radius: 4px; margin: 20px 0; border-left: 4px solid #28a745; }
                     .info-row { display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee; }
@@ -745,7 +745,7 @@ async function sendLowStockNotificationToAdmin(product) {
                 <style>
                     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
                     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                    .header { background: linear-gradient(135deg, ${isCritical ? '#ff6b6b' : '#ffa500'} 0%, ${isCritical ? '#dc3545' : '#ff8c00'} 100%); padding: 20px; text-align: center; border-radius: 8px 8px 0 0; color: white; }
+                    .header { background: ${isCritical ? '#dc3545' : '#ff8c00'}; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; color: white; }
                     .content { background: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; }
                     .alert-box { background: white; padding: 20px; border-radius: 4px; margin: 20px 0; border-left: 4px solid ${isCritical ? '#dc3545' : '#ff8c00'}; }
                     .info-row { display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee; }
@@ -758,7 +758,7 @@ async function sendLowStockNotificationToAdmin(product) {
             <body>
                 <div class="container">
                     <div class="header">
-                        <h2 style="margin: 0;">${isCritical ? '⚠️ Out of Stock Alert' : '⚠️ Low Stock Alert'}</h2>
+                        <h2 style="margin: 0;">${isCritical ? 'Out of Stock Alert' : 'Low Stock Alert'}</h2>
                     </div>
                     <div class="content">
                         <p>A product in your inventory ${isCritical ? 'is out of stock' : 'has low stock'}.</p>
@@ -866,7 +866,7 @@ async function sendPaymentNotificationToAdmin(payment, order = null) {
                 <style>
                     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
                     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                    .header { background: linear-gradient(135deg, ${isCompleted ? '#28a745' : isFailed ? '#dc3545' : '#ffc107'} 0%, ${isCompleted ? '#20c997' : isFailed ? '#c82333' : '#ff9800'} 100%); padding: 20px; text-align: center; border-radius: 8px 8px 0 0; color: white; }
+                    .header { background: ${isCompleted ? '#28a745' : isFailed ? '#dc3545' : '#ffc107'}; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; color: white; }
                     .content { background: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; }
                     .payment-info { background: white; padding: 20px; border-radius: 4px; margin: 20px 0; border-left: 4px solid ${isCompleted ? '#28a745' : isFailed ? '#dc3545' : '#ffc107'}; }
                     .info-row { display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee; }
@@ -1104,7 +1104,7 @@ async function sendOrderConfirmationEmail(order) {
                 <style>
                     body { margin: 0; padding: 0; background: #f4f4f4; font-family: Arial, sans-serif; color: #333; }
                     .wrapper { max-width: 600px; margin: 30px auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-                    .header { background: linear-gradient(135deg, #FFEEC1 0%, #FFD700 100%); padding: 36px 30px; text-align: center; }
+                    .header { background: #FFD700; padding: 36px 30px; text-align: center; }
                     .header h1 { margin: 0; font-size: 26px; color: #222; letter-spacing: 0.5px; }
                     .header p { margin: 6px 0 0; color: #555; font-size: 14px; }
                     .body { padding: 32px 30px; }
@@ -1122,7 +1122,7 @@ async function sendOrderConfirmationEmail(order) {
             <body>
                 <div class="wrapper">
                     <div class="header">
-                        <h1>Order Confirmed ✓</h1>
+                        <h1>Order Confirmed</h1>
                         <p>Qualitick Collections</p>
                     </div>
                     <div class="body">
@@ -1238,7 +1238,7 @@ async function sendDispatchEmail({ order, courier, trackingNumber, note }) {
             <style>
                 body { margin:0; padding:0; background:#f4f4f4; font-family:Arial,sans-serif; color:#333; }
                 .wrapper { max-width:600px; margin:30px auto; background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
-                .header { background:linear-gradient(135deg,#FFEEC1 0%,#FFD700 100%); padding:36px 30px; text-align:center; }
+                .header { background:#FFD700; padding:36px 30px; text-align:center; }
                 .header h1 { margin:0; font-size:26px; color:#222; }
                 .header p { margin:6px 0 0; color:#555; font-size:14px; }
                 .body { padding:32px 30px; }
@@ -1250,7 +1250,7 @@ async function sendDispatchEmail({ order, courier, trackingNumber, note }) {
         <body>
             <div class="wrapper">
                 <div class="header">
-                    <h1>Your Order Is On Its Way 🚚</h1>
+                    <h1>Your Order Is On Its Way</h1>
                     <p>Qualitick Collections</p>
                 </div>
                 <div class="body">
