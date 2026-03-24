@@ -14,7 +14,6 @@ const analyticsController = require('../controllers/analytics.controller');
 const dashboardController = require('../controllers/dashboard.controller');
 const customerController = require('../controllers/customer.controller');
 const inventoryController = require('../controllers/inventory.controller');
-const settingsController = require('../controllers/settings.controller');
 const contactController = require('../controllers/contact.controller');
 const adminLaybyController = require('../controllers/admin.layby.controller');
 const reviewAdminController = require('../controllers/review.admin.controller');
@@ -85,10 +84,6 @@ router.get('/admin/layby/:planId', requireAdminAuth, adminLaybyController.render
 
 router.get('/admin/customers', requireAdminAuth, (req, res) => {
     res.render('admin/customers', { title: 'Customers Management | Admin Panel', page: 'admin' });
-});
-
-router.get('/admin/settings', requireAdminAuth, (req, res) => {
-    res.render('admin/settings', { title: 'Settings | Admin Panel', page: 'admin' });
 });
 
 router.get('/admin/inventory', requireAdminAuth, (req, res) => {
@@ -322,37 +317,6 @@ router.get('/api/admin/inventory/export',
 );
 
 // ============================================
-// Admin Settings API
-// ============================================
-router.get('/api/admin/settings',
-    rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
-    authenticateAdmin,
-    settingsController.getSettings
-);
-router.get('/api/admin/settings/notifications',
-    rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
-    authenticateAdmin,
-    settingsController.getNotificationSettings
-);
-router.put('/api/admin/settings/:category',
-    rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
-    authenticateAdmin,
-    csrfTokenValidator(),
-    settingsController.updateSettings
-);
-router.post('/api/admin/settings/test-email',
-    rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
-    authenticateAdmin,
-    csrfTokenValidator(),
-    settingsController.testEmail
-);
-router.post('/api/admin/settings/test-payment',
-    rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
-    authenticateAdmin,
-    csrfTokenValidator(),
-    settingsController.testPayment
-);
-
 // ============================================
 // Admin Contact Submissions API
 // ============================================

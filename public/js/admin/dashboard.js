@@ -145,12 +145,6 @@ function setupEventListeners() {
         console.error('[Dashboard] Sidebar toggle button not found!');
     }
 
-    // Notifications dropdown
-    const notificationsBtn = document.getElementById('notificationsBtn');
-    if (notificationsBtn) {
-        notificationsBtn.addEventListener('click', toggleNotifications);
-    }
-
     // Profile dropdown
     const adminProfile = document.querySelector('.admin-profile');
     if (adminProfile) {
@@ -179,16 +173,7 @@ function setupEventListeners() {
     // Quick action buttons
     setupQuickActions();
 
-    // Search functionality
-    const adminSearch = document.getElementById('adminSearch');
-    if (adminSearch) {
-        adminSearch.addEventListener('input', debounce((e) => {
-            const query = e.target.value.trim();
-            if (query.length > 0) {
-                handleSearch(query);
-            }
-        }, 300));
-    }
+
 }
 
 // Setup sidebar
@@ -247,41 +232,18 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Toggle notifications dropdown
-function toggleNotifications() {
-    const dropdown = document.getElementById('notificationsDropdown');
-    const profileDropdown = document.getElementById('profileDropdown');
-    
-    if (dropdown) {
-        const isVisible = dropdown.style.display !== 'none';
-        dropdown.style.display = isVisible ? 'none' : 'block';
-        
-        // Load notifications when opening dropdown
-        if (!isVisible) {
-            loadNotifications();
-        }
-    }
-    if (profileDropdown) {
-        profileDropdown.style.display = 'none';
-    }
-}
-
 // Toggle profile dropdown
 function toggleProfile() {
     const dropdown = document.getElementById('profileDropdown');
-    const notificationsDropdown = document.getElementById('notificationsDropdown');
-    
+
     if (dropdown) {
         dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
-    }
-    if (notificationsDropdown) {
-        notificationsDropdown.style.display = 'none';
     }
 }
 
 // Close all dropdowns
 function closeDropdowns() {
-    const dropdowns = document.querySelectorAll('.notifications-dropdown, .profile-dropdown');
+    const dropdowns = document.querySelectorAll('.profile-dropdown');
     dropdowns.forEach(dropdown => {
         dropdown.style.display = 'none';
     });
@@ -1130,92 +1092,6 @@ async function loadTopCustomers() {
     }
 }
 
-// Load notifications from API
-async function loadNotifications() {
-    try {
-        // Check if notifications API exists
-        const response = await fetch('/api/admin/notifications');
-        
-        if (!response.ok) {
-            // API doesn't exist yet, show placeholder
-            const list = document.getElementById('notificationsList');
-            if (list) {
-                list.innerHTML = `
-                    <div class="notification-item">
-                        <div class="notification-icon">
-                            <i class="fas fa-info-circle"></i>
-                        </div>
-                        <div class="notification-content">
-                            <p class="notification-text">Notifications feature coming soon</p>
-                        </div>
-                    </div>
-                `;
-            }
-            return;
-        }
-        
-        const result = await response.json();
-        
-        if (!result.success || !result.data) {
-            return;
-        }
-        
-        const notifications = result.data || [];
-        const list = document.getElementById('notificationsList');
-        if (!list) return;
-        
-        if (notifications.length === 0) {
-            list.innerHTML = `
-                <div class="notification-item">
-                    <div class="notification-content">
-                        <p class="notification-text">No new notifications</p>
-                    </div>
-                </div>
-            `;
-            return;
-        }
-        
-        list.innerHTML = notifications.map(notification => `
-            <div class="notification-item ${notification.read ? '' : 'unread'}">
-                <div class="notification-icon">
-                    <i class="fas ${getNotificationIcon(notification.type)}"></i>
-                </div>
-                <div class="notification-content">
-                    <p class="notification-text">${escapeHtml(notification.message || '')}</p>
-                    <span class="notification-time">${formatTimeAgo(notification.createdAt)}</span>
-                </div>
-            </div>
-        `).join('');
-        
-        // Update notification dot
-        const notificationDot = document.getElementById('notificationDot');
-        const unreadCount = notifications.filter(n => !n.read).length;
-        if (notificationDot) {
-            if (unreadCount > 0) {
-                notificationDot.style.display = 'block';
-                notificationDot.textContent = unreadCount > 9 ? '9+' : unreadCount;
-            } else {
-                notificationDot.style.display = 'none';
-            }
-        }
-    } catch (error) {
-        console.error('[Dashboard] Error loading notifications:', error);
-        // Silently fail - notifications are optional
-    }
-}
-
-// Get notification icon based on type
-function getNotificationIcon(type) {
-    const icons = {
-        'order': 'fa-shopping-cart',
-        'payment': 'fa-credit-card',
-        'product': 'fa-box',
-        'customer': 'fa-user',
-        'alert': 'fa-exclamation-triangle',
-        'info': 'fa-info-circle'
-    };
-    return icons[type] || 'fa-bell';
-}
 
 // Format time ago
 function formatTimeAgo(dateString) {
@@ -1527,46 +1403,6 @@ function removeChartError(chartId) {
 window.updateCharts = updateCharts;
 
 // Handle search functionality
-async function handleSearch(query) {
-    try {
-        if (!query || query.trim().length === 0) {
-            return;
-        }
-        
-        const response = await fetch(`/api/admin/dashboard/search?q=${encodeURIComponent(query)}`);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        
-        if (!result.success || !result.data) {
-            return;
-        }
-        
-        const { orders, products, customers } = result.data;
-        
-        // Display search results (you can customize this UI)
-        // For now, navigate to orders page if orders found, otherwise show modal
-        if (orders && orders.length > 0) {
-            // Navigate to orders page with search query
-            window.location.href = `/admin/orders?search=${encodeURIComponent(query)}`;
-        } else if (products && products.length > 0) {
-            // Navigate to products page
-            window.location.href = `/admin/products?search=${encodeURIComponent(query)}`;
-        } else if (customers && customers.length > 0) {
-            // Navigate to customers page
-            window.location.href = `/admin/customers?search=${encodeURIComponent(query)}`;
-        } else {
-            // Show no results message
-            showNotification('No results found', 'info');
-        }
-    } catch (error) {
-        console.error('[Dashboard] Error searching:', error);
-        showNotification('Search failed. Please try again.', 'error');
-    }
-}
 
 // Export dashboard report (CSV/JSON)
 async function exportDashboardReport() {

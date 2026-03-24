@@ -41,17 +41,7 @@
                 </div>
                 
                 <div class="header-right">
-                    <div class="search-box">
-                        <i class="fas fa-search"></i>
-                        <input type="text" placeholder="Search orders, products, customers..." id="adminSearch">
-                    </div>
-                    
                     <div class="header-actions">
-                        <button class="icon-btn" id="notificationsBtn" title="Notifications">
-                            <i class="fas fa-bell"></i>
-                            <span class="notification-dot" id="notificationDot"></span>
-                        </button>
-                        
                         <div class="admin-profile">
                             <img src="/images/icons/Qualitick-01.svg" alt="Admin" class="profile-avatar">
                             <div class="profile-info">
@@ -286,27 +276,6 @@
         </main>
     </div>
 
-    <!-- Notifications Dropdown -->
-    <div class="notifications-dropdown" id="notificationsDropdown" style="display: none;">
-        <div class="dropdown-header">
-            <h4>Notifications</h4>
-            <button class="mark-all-read" id="markAllReadBtn">Mark all as read</button>
-        </div>
-        <div class="notifications-list" id="notificationsList">
-            <div class="notification-item">
-                <div class="notification-icon">
-                    <i class="fas fa-shopping-cart"></i>
-                </div>
-                <div class="notification-content">
-                    <p class="notification-text">New order received</p>
-                    <span class="notification-time">2 minutes ago</span>
-                </div>
-            </div>
-        </div>
-        <div class="dropdown-footer">
-            <a href="/admin/notifications">View all notifications</a>
-        </div>
-    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <script src="/js/admin/auth-utils.js"></script>
