@@ -202,6 +202,15 @@
         img.decoding = "async";
         img.width = 400;
         img.height = 400;
+        if (img.complete) {
+            img.classList.add('loaded');
+        } else {
+            img.addEventListener('load', function () { img.classList.add('loaded'); });
+            img.addEventListener('error', function () {
+                img.src = '/images/placeholder.jpg';
+                img.classList.add('loaded');
+            });
+        }
         mediaLink.appendChild(img);
         imageBox.appendChild(mediaLink);
 
