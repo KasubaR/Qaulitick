@@ -5,9 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Product Management | Admin Panel</title>
     
-    <!-- Google Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -20,15 +17,8 @@
     <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
     <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
     
-    <!-- Professional Admin Styles -->
-    <link rel="stylesheet" href="/css/admin/admin-professional.css">
-    <link rel="stylesheet" href="/css/admin/admin-components.css">
-    <link rel="stylesheet" href="/css/admin/admin-responsive.css">
-    <!-- Admin Dashboard Stylesheet -->
-    <link rel="stylesheet" href="/css/admin/dashboard.css">
-    <!-- Admin Orders Stylesheet (for action menu styles) -->
-    <link rel="stylesheet" href="/css/admin/orders.css">
-    <!-- Admin Products Stylesheet -->
+<!-- Professional Admin Styles -->
+    <link rel="stylesheet" href="/css/admin/admin.css">
     <link rel="stylesheet" href="/css/admin/products.css">
 </head>
 <body class="admin-page">
@@ -49,23 +39,18 @@
                 </div>
                 
                 <div class="header-right">
-                    <button class="btn-primary" id="addProductBtn">
-                        <i class="fas fa-plus"></i> Add Product
-                    </button>
+                    <%- include('../partials/admin-button', { variant: 'primary', id: 'addProductBtn', icon: 'fa-plus', label: 'Add Product' }) %>
                 </div>
             </header>
 
             <!-- Products Content -->
             <div class="products-content">
                 <!-- Search and Filters -->
-                <div class="products-toolbar">
-                    <div class="search-section">
-                        <div class="search-box">
-                            <i class="fas fa-search"></i>
-                            <input type="text" id="productSearch" placeholder="Search products by name, SKU, or brand...">
-                            <button class="search-btn" id="searchBtn">Search</button>
-                        </div>
-                    </div>
+                <div class="orders-toolbar">
+                    <%- include('../partials/admin-search-box', {
+                        inputId: 'productSearch',
+                        placeholder: 'Search products by name, SKU, or brand...'
+                    }) %>
 
                     <div class="filters-section">
                         <div class="filter-group">
@@ -112,9 +97,7 @@
                             </select>
                         </div>
 
-                        <button class="btn-outline" id="clearFiltersBtn">
-                            <i class="fas fa-times"></i> Clear Filters
-                        </button>
+                        <%- include('../partials/admin-button', { id: 'clearFiltersBtn', icon: 'fa-times', label: 'Clear Filters' }) %>
                     </div>
                 </div>
 
@@ -126,12 +109,8 @@
                         </div>
                         <div class="bulk-actions" id="bulkActions" style="display: none;">
                             <span class="bulk-selection-count" id="bulkSelectionCount">0 selected</span>
-                            <button class="btn-outline btn-sm" id="bulkDeleteBtn" title="Delete selected products">
-                                <i class="fas fa-trash"></i> Delete
-                            </button>
-                            <button class="btn-outline btn-sm" id="bulkExportBtn" title="Export selected products">
-                                <i class="fas fa-download"></i> Export
-                            </button>
+                            <%- include('../partials/admin-button', { id: 'bulkDeleteBtn', icon: 'fa-trash', label: 'Delete', extraClass: 'btn-sm', title: 'Delete selected products' }) %>
+                            <%- include('../partials/admin-button', { id: 'bulkExportBtn', icon: 'fa-download', label: 'Export', extraClass: 'btn-sm', title: 'Export selected products' }) %>
                         </div>
                     </div>
 
@@ -155,7 +134,7 @@
                             </thead>
                             <tbody id="productsTableBody">
                                 <tr>
-                                    <td colspan="11" class="empty-state">
+                                    <td colspan="10" class="empty-state">
                                         <i class="fas fa-box-open"></i>
                                         <p>No products found</p>
                                     </td>
@@ -165,17 +144,7 @@
                     </div>
 
                     <!-- Pagination -->
-                    <div class="pagination" id="pagination">
-                        <button class="page-btn" id="prevPage" disabled>
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </button>
-                        <div class="page-numbers" id="pageNumbers">
-                            <span class="page-number active">1</span>
-                        </div>
-                        <button class="page-btn" id="nextPage">
-                            Next <i class="fas fa-chevron-right"></i>
-                        </button>
-                    </div>
+                    <%- include('../partials/admin-pagination', { containerId: 'pagination', prevId: 'prevPage', nextId: 'nextPage' }) %>
                 </div>
             </div>
         </main>
@@ -276,7 +245,7 @@
                                 <p>Click to upload or drag and drop</p>
                                 <p class="upload-hint">JPG, PNG, WebP up to 10MB each (Multiple images allowed, recommended: 3-5 images)</p>
                                 <p class="upload-hint-small">Recommended: 1200x1200px, under 1MB per image</p>
-                                <input type="file" id="productImages" name="images" multiple accept="image/jpeg,image/jpg,image/png,image/webp" style="display: none;">
+                                <input type="file" id="productImages" name="images" multiple accept="image/jpeg,image/jpg,image/png,image/webp" class="product-images-file-input" aria-label="Upload product images">
                             </div>
                             <div class="image-preview-grid" id="imagePreviewGrid">
                                 <!-- Image previews will be added here -->

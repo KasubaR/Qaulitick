@@ -7,16 +7,10 @@
     <% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
         <meta name="csrf-token" content="<%= csrfToken %>">
     <% } %>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
     <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
-    <link rel="stylesheet" href="/css/admin/admin-professional.css">
-    <link rel="stylesheet" href="/css/admin/admin-components.css">
-    <link rel="stylesheet" href="/css/admin/admin-responsive.css">
-    <link rel="stylesheet" href="/css/admin/dashboard.css">
-    <link rel="stylesheet" href="/css/admin/orders.css">
-    <link rel="stylesheet" href="/css/admin/layby.css">
+    <link rel="stylesheet" href="/css/admin/admin.css">
 </head>
 <body class="admin-page">
     <div class="admin-container">
@@ -31,21 +25,18 @@
                     <h1 class="page-title">Layby plans</h1>
                 </div>
                 <div class="header-right">
-                    <button class="btn-outline" id="refreshBtn" type="button">
-                        <i class="fas fa-sync-alt"></i> Refresh
-                    </button>
+                    <%- include('../partials/admin-button', { id: 'refreshBtn', icon: 'fa-sync-alt', label: 'Refresh', buttonType: 'button' }) %>
                 </div>
             </header>
 
             <div class="orders-content">
                 <div class="orders-toolbar">
-                    <div class="search-section">
-                        <div class="search-box">
-                            <i class="fas fa-search"></i>
-                            <input type="text" id="laybySearch" placeholder="Search by order number…" autocomplete="off">
-                            <button class="search-btn" id="searchBtn" type="button">Search</button>
-                        </div>
-                    </div>
+                    <%- include('../partials/admin-search-box', {
+                        inputId: 'laybySearch',
+                        placeholder: 'Search by order number…',
+                        autocomplete: 'off',
+                        buttonType: 'button'
+                    }) %>
                     <div class="filters-section">
                         <div class="filter-group">
                             <label for="filterPlanStatus">Plan status</label>
@@ -56,9 +47,7 @@
                                 <option value="cancelled">Cancelled</option>
                             </select>
                         </div>
-                        <button class="btn-outline" id="clearFiltersBtn" type="button">
-                            <i class="fas fa-times"></i> Clear
-                        </button>
+                        <%- include('../partials/admin-button', { id: 'clearFiltersBtn', icon: 'fa-times', label: 'Clear', buttonType: 'button' }) %>
                     </div>
                 </div>
 
@@ -89,17 +78,8 @@
                             </tbody>
                         </table>
                     </div>
-                    <div class="pagination" id="pagination">
-                        <button class="pagination-btn" id="prevPage" type="button" disabled>
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </button>
-                        <div class="pagination-info">
-                            <span id="pageInfo">Page 1</span>
-                        </div>
-                        <button class="pagination-btn" id="nextPage" type="button" disabled>
-                            Next <i class="fas fa-chevron-right"></i>
-                        </button>
-                    </div>
+                    <!-- Pagination -->
+                    <%- include('../partials/admin-pagination', { containerId: 'pagination', prevId: 'prevPage', nextId: 'nextPage' }) %>
                 </div>
             </div>
         </main>

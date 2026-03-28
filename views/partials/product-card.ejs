@@ -9,30 +9,44 @@
 
     const _discount = Number(product.discount) || 0;
     const _productId = product._id || product.id;
+    const _productUrl = '/product/' + _productId;
 %>
 
 <div class="shop-product-card">
-    <a href="/product/<%= _productId %>" class="product-link">
-        <div class="product-image-wrapper">
-            <% if (_discount > 0) { %>
-                <span class="discount-badge">-<%= _discount %>%</span>
-            <% } %>
-            <% if (product.stockStatus === 'out-of-stock') { %>
-                <div class="out-of-stock-overlay">Out of Stock</div>
-            <% } else if (product.stockStatus === 'low-stock') { %>
-                <div class="low-stock-badge">Only <%= product.stock %> left</div>
-            <% } %>
-            <img
-                src="<%= _firstImage %>"
-                alt="<%= product.model %>"
-                class="product-image"
-                loading="lazy"
-                decoding="async"
-                width="400"
-                height="400"
-            >
+    <div class="product-image-wrapper">
+        <% if (_discount > 0) { %>
+            <span class="discount-badge">-<%= _discount %>%</span>
+        <% } %>
+        <% if (product.stockStatus === 'out-of-stock') { %>
+            <div class="out-of-stock-overlay">Out of Stock</div>
+        <% } else if (product.stockStatus === 'low-stock') { %>
+            <div class="low-stock-badge">Only <%= product.stock %> left</div>
+        <% } %>
+        <div class="product-image">
+            <a href="<%= _productUrl %>" class="product-link product-link--media">
+                <img
+                    src="<%= _firstImage %>"
+                    alt="<%= product.model %>"
+                    loading="lazy"
+                    decoding="async"
+                    width="400"
+                    height="400"
+                >
+            </a>
+            <div class="product-actions">
+                <button
+                    type="button"
+                    class="quick-view-btn"
+                    data-product-id="<%= _productId %>"
+                    aria-label="Quick view: <%= product.model %>"
+                >
+                    <i class="fas fa-eye" aria-hidden="true"></i>
+                </button>
+            </div>
         </div>
+    </div>
 
+    <a href="<%= _productUrl %>" class="product-link product-link--info">
         <div class="product-info">
             <div class="product-brand"><%= product.brand || 'Brand' %></div>
             <h3 class="product-name"><%= product.model %></h3>
@@ -59,4 +73,3 @@
         </div>
     </a>
 </div>
-

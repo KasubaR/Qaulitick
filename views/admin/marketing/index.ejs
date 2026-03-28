@@ -5,9 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Marketing Management | Admin Panel</title>
     
-    <!-- Google Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -15,12 +12,9 @@
     <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
     <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
     
-    <!-- Professional Admin Styles -->
-    <link rel="stylesheet" href="/css/admin/admin-professional.css">
-    <link rel="stylesheet" href="/css/admin/admin-components.css">
-    <link rel="stylesheet" href="/css/admin/admin-responsive.css">
-    <!-- Admin Dashboard Stylesheet -->
-    <link rel="stylesheet" href="/css/admin/dashboard.css">
+<!-- Professional Admin Styles -->
+    <link rel="stylesheet" href="/css/admin/admin.css">
+<!-- Admin Dashboard Stylesheet -->
 </head>
 <body class="admin-page">
 
@@ -57,18 +51,9 @@
                 </a>
                 </div>
 
-                <div class="admin-card">
-                <h2>Quick Stats</h2>
-                <div class="admin-grid">
-                    <div class="stat-card">
-                        <div class="stat-value" id="activeFlashSales">0</div>
-                        <div class="stat-label">Active Flash Sales</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="featuredProductsCount">0</div>
-                        <div class="stat-label">Featured Products</div>
-                    </div>
-                </div>
+                <div class="kpi-grid" style="margin-top: 24px;">
+                    <%- include('../../partials/admin-stat-card', { label: 'Active Flash Sales',  iconVariant: 'flash',    valueId: 'activeFlashSales',     value: '0' }) %>
+                    <%- include('../../partials/admin-stat-card', { label: 'Featured Products',   iconVariant: 'featured', valueId: 'featuredProductsCount', value: '0' }) %>
                 </div>
             </div>
         </main>

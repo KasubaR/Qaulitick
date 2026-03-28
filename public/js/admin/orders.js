@@ -549,7 +549,12 @@ async function openOrderDetails(orderId) {
     currentOrderId = orderId;
     const modal = document.getElementById('orderDetailsModal');
     if (!modal) return;
-    
+
+    // Close any open action menus before showing the overlay
+    document.querySelectorAll('.action-menu-dropdown').forEach(menu => {
+        menu.style.display = 'none';
+    });
+
     document.getElementById('orderDetailsId').textContent = orderId;
     modal.style.display = 'flex';
     
@@ -585,7 +590,6 @@ async function updateStatus(newStatus) {
 // Open shipping tab
 function openShippingTab() {
     const shippingTabBtn = document.querySelector('.tab-btn[data-tab="shipping"]');
-    if (shippingTabBtn?.classList.contains('disabled')) return;
     // Switch to shipping tab
     document.querySelectorAll('.tab-btn').forEach(btn => {
         if (btn.dataset.tab === 'shipping') {
@@ -909,9 +913,9 @@ function syncShippingUi(order) {
     const updateTrackingBtn = document.getElementById('updateTrackingBtn');
 
     if (shippingTabBtn) {
-        shippingTabBtn.classList.toggle('disabled', isDispatched);
-        shippingTabBtn.setAttribute('aria-disabled', isDispatched ? 'true' : 'false');
-        shippingTabBtn.title = isDispatched ? 'Shipping tab is locked while order is dispatched' : '';
+        shippingTabBtn.classList.remove('disabled');
+        shippingTabBtn.removeAttribute('aria-disabled');
+        shippingTabBtn.title = '';
     }
 
     if (trackingNumberInput) trackingNumberInput.disabled = isDispatched;

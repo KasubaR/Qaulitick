@@ -5,9 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard | Qualitick Collections</title>
     
-    <!-- Google Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -15,12 +12,9 @@
     <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
     <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
     
-    <!-- Professional Admin Styles -->
-    <link rel="stylesheet" href="/css/admin/admin-professional.css">
-    <link rel="stylesheet" href="/css/admin/admin-components.css">
-    <link rel="stylesheet" href="/css/admin/admin-responsive.css">
-    <!-- Admin Dashboard Stylesheet -->
-    <link rel="stylesheet" href="/css/admin/dashboard.css">
+<!-- Professional Admin Styles -->
+    <link rel="stylesheet" href="/css/admin/admin.css">
+<!-- Admin Dashboard Stylesheet -->
 </head>
 <body class="admin-page">
 
@@ -60,71 +54,57 @@
             <div class="dashboard-content">
                 <!-- KPI Cards -->
                 <div class="kpi-grid">
-                    <div class="kpi-card">
-                        <div class="kpi-icon sales">
-                            <i class="fas fa-dollar-sign"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <h3 class="kpi-label">Total Sales</h3>
-                            <p class="kpi-value" id="totalSales">K0</p>
-                            <span class="kpi-change positive" id="salesChange">
-                                <i class="fas fa-arrow-up"></i> 0%
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="kpi-card">
-                        <div class="kpi-icon orders">
-                            <i class="fas fa-shopping-bag"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <h3 class="kpi-label">Total Orders</h3>
-                            <p class="kpi-value" id="totalOrders">0</p>
-                            <span class="kpi-change positive" id="ordersChange">
-                                <i class="fas fa-arrow-up"></i> 0%
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="kpi-card">
-                        <div class="kpi-icon customers">
-                            <i class="fas fa-users"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <h3 class="kpi-label">Total Customers</h3>
-                            <p class="kpi-value" id="totalCustomers">0</p>
-                            <span class="kpi-change positive" id="customersChange">
-                                <i class="fas fa-arrow-up"></i> 0%
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="kpi-card">
-                        <div class="kpi-icon products">
-                            <i class="fas fa-box"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <h3 class="kpi-label">Total Products</h3>
-                            <p class="kpi-value" id="totalProducts">0</p>
-                            <span class="kpi-change neutral" id="productsChange">
-                                <i class="fas fa-minus"></i> 0%
-                            </span>
-                        </div>
-                    </div>
-
-
-                    <div class="kpi-card alert">
-                        <div class="kpi-icon alerts">
-                            <i class="fas fa-exclamation-triangle"></i>
-                        </div>
-                        <div class="kpi-content">
-                            <h3 class="kpi-label">Low Stock Alerts</h3>
-                            <p class="kpi-value" id="lowStockCount">0</p>
-                            <span class="kpi-change negative" id="stockChange">
-                                <i class="fas fa-arrow-down"></i> Action Required
-                            </span>
-                        </div>
-                    </div>
+                    <%- include('../partials/admin-stat-card', {
+                        label: 'Total Sales',
+                        iconVariant: 'sales',
+                        valueId: 'totalSales',
+                        value: 'K0',
+                        changeId: 'salesChange',
+                        changeVariant: 'positive',
+                        changeIcon: 'fa-arrow-up',
+                        changeText: '0%'
+                    }) %>
+                    <%- include('../partials/admin-stat-card', {
+                        label: 'Total Orders',
+                        iconVariant: 'orders',
+                        valueId: 'totalOrders',
+                        value: '0',
+                        changeId: 'ordersChange',
+                        changeVariant: 'positive',
+                        changeIcon: 'fa-arrow-up',
+                        changeText: '0%'
+                    }) %>
+                    <%- include('../partials/admin-stat-card', {
+                        label: 'Total Customers',
+                        iconVariant: 'customers',
+                        valueId: 'totalCustomers',
+                        value: '0',
+                        changeId: 'customersChange',
+                        changeVariant: 'positive',
+                        changeIcon: 'fa-arrow-up',
+                        changeText: '0%'
+                    }) %>
+                    <%- include('../partials/admin-stat-card', {
+                        label: 'Total Products',
+                        iconVariant: 'products',
+                        valueId: 'totalProducts',
+                        value: '0',
+                        changeId: 'productsChange',
+                        changeVariant: 'neutral',
+                        changeIcon: 'fa-minus',
+                        changeText: '0%'
+                    }) %>
+                    <%- include('../partials/admin-stat-card', {
+                        label: 'Low Stock Alerts',
+                        iconVariant: 'alerts',
+                        valueId: 'lowStockCount',
+                        value: '0',
+                        cardModifier: 'alert',
+                        changeId: 'stockChange',
+                        changeVariant: 'negative',
+                        changeIcon: 'fa-arrow-down',
+                        changeText: 'Action Required'
+                    }) %>
                 </div>
 
                 <!-- Charts Section -->

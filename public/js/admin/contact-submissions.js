@@ -311,7 +311,7 @@ function updatePagination() {
     const pagination = document.getElementById('pagination');
     const prevPage = document.getElementById('prevPage');
     const nextPage = document.getElementById('nextPage');
-    const pageInfo = document.getElementById('pageInfo');
+    const pageNumbers = document.getElementById('pageNumbers');
 
     if (!pagination) return;
 
@@ -322,14 +322,28 @@ function updatePagination() {
 
     pagination.style.display = 'flex';
 
-    if (prevPage) {
-        prevPage.disabled = currentPage === 1;
-    }
-    if (nextPage) {
-        nextPage.disabled = currentPage === totalPages;
-    }
-    if (pageInfo) {
-        pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+    if (prevPage) prevPage.disabled = currentPage === 1;
+    if (nextPage) nextPage.disabled = currentPage === totalPages;
+
+    if (pageNumbers) {
+        const maxPages = 5;
+        let startPage = Math.max(1, currentPage - Math.floor(maxPages / 2));
+        let endPage = Math.min(totalPages, startPage + maxPages - 1);
+        if (endPage - startPage < maxPages - 1) startPage = Math.max(1, endPage - maxPages + 1);
+        let html = '';
+        for (let i = startPage; i <= endPage; i++) {
+            html += `<span class="page-number ${i === currentPage ? 'active' : ''}" data-page="${i}">${i}</span>`;
+        }
+        pageNumbers.innerHTML = html;
+        pageNumbers.querySelectorAll('.page-number').forEach(el => {
+            el.addEventListener('click', () => {
+                const page = parseInt(el.dataset.page);
+                if (page !== currentPage) {
+                    currentPage = page;
+                    loadSubmissions();
+                }
+            });
+        });
     }
 }
 

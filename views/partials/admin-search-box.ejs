@@ -1,0 +1,20 @@
+<%#
+  Toolbar search row: .search-section > .search-box (matches admin.css).
+
+  Required: inputId, placeholder
+  Optional: buttonId (default searchBtn), buttonLabel (default Search), buttonType (default button),
+            autocomplete — e.g. 'off' to set attribute; omit for no attribute
+#%>
+<%
+  const searchBtnId = typeof buttonId !== 'undefined' && buttonId ? buttonId : 'searchBtn';
+  const searchBtnLabel = typeof buttonLabel !== 'undefined' ? buttonLabel : 'Search';
+  const searchBtnType = typeof buttonType !== 'undefined' ? buttonType : 'button';
+  const hasAutocomplete = typeof autocomplete !== 'undefined' && autocomplete !== '' && autocomplete !== false;
+%>
+<div class="search-section">
+    <div class="search-box">
+        <i class="fas fa-search" aria-hidden="true"></i>
+        <input type="text" id="<%= inputId %>" placeholder="<%= placeholder %>"<% if (hasAutocomplete) { %> autocomplete="<%= autocomplete %>"<% } %>>
+        <button class="search-btn" id="<%= searchBtnId %>" type="<%= searchBtnType %>"><%= searchBtnLabel %></button>
+    </div>
+</div>

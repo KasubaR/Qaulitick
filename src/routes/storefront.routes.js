@@ -11,6 +11,7 @@ const { upload, handleUploadError } = require('../middlewares/upload.middleware'
 const logger = require('../utils/logger');
 
 const productController = require('../controllers/product.controller');
+const marketingController = require('../controllers/marketing.controller');
 const contactController = require('../controllers/contact.controller');
 const paymentController = require('../controllers/payment.controller');
 const customerAuthController = require('../controllers/customer.auth.controller');
@@ -52,6 +53,13 @@ router.get('/api/products/brands',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
     cacheMiddleware(5 * 60 * 1000),
     productController.getBrands
+);
+
+router.get('/api/products/:id(\\d+)',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
+    validateQueryParams,
+    cacheMiddleware(60 * 1000),
+    productController.getProductByIdAPI
 );
 
 // POST /api/products/:id/reviews — public, rate-limited per IP + product
@@ -186,8 +194,18 @@ router.use('/api/payments',
 // ============================================
 // Storefront pages
 // ============================================
-router.get('/', (req, res) => {
-    res.render('home', { title: 'Qualitick Collections | Luxury Watches', page: 'home' });
+router.get('/', async (req, res) => {
+    let flashSale = null;
+    try {
+        flashSale = await marketingController.buildHomeFlashSaleViewModel();
+    } catch (e) {
+        flashSale = null;
+    }
+    res.render('home', {
+        title: 'Qualitick Collections | Luxury Watches',
+        page: 'home',
+        flashSale
+    });
 });
 
 router.get('/shop', productController.renderShop);

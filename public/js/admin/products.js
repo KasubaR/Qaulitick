@@ -1,7 +1,5 @@
 // Admin Products Management JavaScript
 
-// TODO: Implement authentication check
-
 let currentPage = 1;
 let totalPages = 1;
 let currentProductId = null;
@@ -108,6 +106,20 @@ function setupEventListeners() {
         productForm.addEventListener('submit', handleFormSubmit);
     }
 
+    // Auto-disable status when stock reaches 0
+    const stockField = document.getElementById('stock');
+    const statusField = document.getElementById('status');
+    if (stockField && statusField) {
+        stockField.addEventListener('input', () => {
+            if (parseInt(stockField.value, 10) === 0) {
+                statusField.checked = false;
+                statusField.disabled = true;
+            } else {
+                statusField.disabled = false;
+            }
+        });
+    }
+
     // Bulk operations
     setupBulkOperations();
 
@@ -159,8 +171,6 @@ function setupEventListeners() {
                     dropdown.style.display = 'none';
                 }
                 
-                console.log('Menu item clicked:', { action, productId, productName });
-
             switch (action) {
                 case 'view':
                         if (typeof viewProduct === 'function') {
@@ -933,7 +943,9 @@ async function loadProductData(productId) {
         // Populate status checkbox
         const statusCheckbox = document.getElementById('status');
         if (statusCheckbox) {
-            statusCheckbox.checked = product.status === 'active';
+            const stockIsZero = parseInt(product.stock, 10) === 0;
+            statusCheckbox.checked = !stockIsZero && product.status === 'active';
+            statusCheckbox.disabled = stockIsZero;
         }
         
         // Populate images using image management module
@@ -1402,6 +1414,11 @@ async function handleFormSubmit(e) {
             productData.stock = productData.colors.reduce((sum, c) => sum + (parseInt(c.stock, 10) || 0), 0);
             const stockInputSync = document.getElementById('stock');
             if (stockInputSync) stockInputSync.value = String(productData.stock);
+        }
+
+        // Force inactive if stock is 0
+        if (parseInt(productData.stock, 10) === 0) {
+            productData.status = 'inactive';
         }
         
         // Ensure images array exists
@@ -1879,7 +1896,9 @@ async function duplicateProduct(productId) {
         // Populate status checkbox
         const statusCheckbox = document.getElementById('status');
         if (statusCheckbox) {
-            statusCheckbox.checked = productCopy.status;
+            const stockIsZero = parseInt(productCopy.stock, 10) === 0;
+            statusCheckbox.checked = !stockIsZero && !!productCopy.status;
+            statusCheckbox.disabled = stockIsZero;
         }
         
         // Populate images — use the same initializer as the edit flow so every item

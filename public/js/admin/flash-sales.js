@@ -273,13 +273,13 @@
         if (productList) {
             productList.innerHTML = '';
         }
-        modal.classList.add('show');
+        modal.style.display = 'flex';
     }
 
     // Open edit modal (helper, uses data already loaded)
     function openEditFlashSaleModal(id) {
         if (!modal || !form) return;
-        const sale = flashSales.find(s => (s._id || s.id) === id);
+        const sale = flashSales.find(s => String(s._id || s.id) === String(id));
         if (!sale) return;
 
         modalTitle.textContent = 'Edit Flash Sale';
@@ -294,12 +294,12 @@
         document.getElementById('showStockAlert').checked = !!sale.showStockAlert;
         document.getElementById('bannerText').value = sale.bannerText || '';
 
-        modal.classList.add('show');
+        modal.style.display = 'flex';
     }
 
     function closeFlashSaleModal() {
         if (!modal) return;
-        modal.classList.remove('show');
+        modal.style.display = 'none';
     }
 
     async function saveFlashSale(event) {
@@ -361,7 +361,7 @@
     function confirmDeleteFlashSale(id) {
         if (!id) return;
         
-        const sale = flashSales.find(s => (s._id || s.id) === id);
+        const sale = flashSales.find(s => String(s._id || s.id) === String(id));
         const saleName = sale ? (sale.name || 'this flash sale') : 'this flash sale';
         
         const deleteModal = document.getElementById('deleteFlashSaleModal');
@@ -372,7 +372,7 @@
         }
         
         if (deleteModal) {
-            deleteModal.classList.add('show');
+            deleteModal.style.display = 'flex';
             // Store the ID for the confirm button
             deleteModal.dataset.saleId = id;
         }
@@ -382,7 +382,7 @@
     function closeDeleteModal() {
         const deleteModal = document.getElementById('deleteFlashSaleModal');
         if (deleteModal) {
-            deleteModal.classList.remove('show');
+            deleteModal.style.display = 'none';
             deleteModal.dataset.saleId = '';
         }
     }
@@ -478,7 +478,10 @@
         productList.innerHTML = '<span>Searching products...</span>';
 
         try {
-            const response = await fetch(`/api/products/search?q=${encodeURIComponent(trimmedQuery)}`);
+            const response = await fetch(`/api/products/search?q=${encodeURIComponent(trimmedQuery)}`, {
+                credentials: 'same-origin',
+                cache: 'no-store'
+            });
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -555,8 +558,11 @@
         const target = event.target;
         if (!(target instanceof HTMLElement)) return;
 
-        const action = target.getAttribute('data-action');
-        const id = target.getAttribute('data-id');
+        const button = target.closest('[data-action]');
+        if (!button) return;
+
+        const action = button.getAttribute('data-action');
+        const id = button.getAttribute('data-id');
 
         if (!action || !id) return;
 

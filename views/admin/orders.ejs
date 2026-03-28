@@ -6,9 +6,6 @@
     <meta name="csrf-token" content="<%= csrfToken %>">
     <title>Orders Management | Admin Panel</title>
     
-    <!-- Google Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -16,13 +13,8 @@
     <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
     <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
     
-    <!-- Professional Admin Styles -->
-    <link rel="stylesheet" href="/css/admin/admin-professional.css">
-    <link rel="stylesheet" href="/css/admin/admin-components.css">
-    <link rel="stylesheet" href="/css/admin/admin-responsive.css">
-    <!-- Admin Dashboard Stylesheet -->
-    <link rel="stylesheet" href="/css/admin/dashboard.css">
-    <!-- Admin Orders Stylesheet -->
+<!-- Professional Admin Styles -->
+    <link rel="stylesheet" href="/css/admin/admin.css">
     <link rel="stylesheet" href="/css/admin/orders.css">
 </head>
 <body class="admin-page">
@@ -43,12 +35,8 @@
                 </div>
                 
                 <div class="header-right">
-                    <button class="btn-outline" id="refreshBtn" type="button">
-                        <i class="fas fa-sync-alt"></i> Refresh
-                    </button>
-                    <button class="btn-outline" id="exportOrdersBtn">
-                        <i class="fas fa-download"></i> Export
-                    </button>
+                    <%- include('../partials/admin-button', { id: 'refreshBtn', icon: 'fa-sync-alt', label: 'Refresh', buttonType: 'button' }) %>
+                    <%- include('../partials/admin-button', { id: 'exportOrdersBtn', icon: 'fa-download', label: 'Export' }) %>
                 </div>
             </header>
 
@@ -56,13 +44,10 @@
             <div class="orders-content">
                 <!-- Search and Filters -->
                 <div class="orders-toolbar">
-                    <div class="search-section">
-                        <div class="search-box">
-                            <i class="fas fa-search"></i>
-                            <input type="text" id="orderSearch" placeholder="Search by Order ID, customer name, phone, or email...">
-                            <button class="search-btn" id="searchBtn">Search</button>
-                        </div>
-                    </div>
+                    <%- include('../partials/admin-search-box', {
+                        inputId: 'orderSearch',
+                        placeholder: 'Search by Order ID, customer name, phone, or email...'
+                    }) %>
 
                     <div class="filters-section">
                         <div class="filter-group">
@@ -123,9 +108,7 @@
                             </select>
                         </div>
 
-                        <button class="btn-outline" id="clearFiltersBtn">
-                            <i class="fas fa-times"></i> Clear Filters
-                        </button>
+                        <%- include('../partials/admin-button', { id: 'clearFiltersBtn', icon: 'fa-times', label: 'Clear Filters' }) %>
                     </div>
 
                 </div>
@@ -174,17 +157,7 @@
                     </div>
 
                     <!-- Pagination -->
-                    <div class="pagination" id="pagination">
-                        <button class="page-btn" id="prevPage" disabled>
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </button>
-                        <div class="page-numbers" id="pageNumbers">
-                            <span class="page-number active">1</span>
-                        </div>
-                        <button class="page-btn" id="nextPage">
-                            Next <i class="fas fa-chevron-right"></i>
-                        </button>
-                    </div>
+                    <%- include('../partials/admin-pagination', { containerId: 'pagination', prevId: 'prevPage', nextId: 'nextPage' }) %>
                 </div>
             </div>
         </main>

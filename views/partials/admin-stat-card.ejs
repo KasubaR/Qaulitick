@@ -1,0 +1,52 @@
+<%#
+  Reusable dashboard / admin stat (KPI) card. See views/admin/dashboard.ejs for usage.
+
+  Required: label, iconVariant (sales|orders|customers|products|alerts).
+  Optional: value, valueId, cardModifier, changeId, changeVariant, changeIcon, changeText.
+  Omit changeText (or changeId) to hide the change row.
+#%>
+<%
+
+const iconByVariant = {
+  sales: 'fa-dollar-sign',
+  orders: 'fa-shopping-bag',
+  customers: 'fa-users',
+  products: 'fa-box',
+  alerts: 'fa-exclamation-triangle',
+  reviews: 'fa-star',
+  rating: 'fa-star-half-alt',
+  verified: 'fa-check-circle',
+  featured: 'fa-home',
+  active: 'fa-user-check',
+  'new-customer': 'fa-user-plus',
+  registered: 'fa-user-shield',
+  inventory: 'fa-boxes',
+  'out-of-stock': 'fa-times-circle',
+  flash: 'fa-bolt'
+};
+const iconVariantKey = typeof iconVariant === 'string' && iconVariant ? iconVariant : 'sales';
+const faIcon = iconByVariant[iconVariantKey] || 'fa-chart-line';
+
+const changeDir = typeof changeVariant !== 'undefined' && changeVariant ? changeVariant : 'neutral';
+const defaultChangeIcons = { positive: 'fa-arrow-up', negative: 'fa-arrow-down', neutral: 'fa-minus' };
+const faChangeIcon = typeof changeIcon !== 'undefined' && changeIcon ? changeIcon : defaultChangeIcons[changeDir] || 'fa-minus';
+
+const cardClasses = ['kpi-card'];
+if (typeof cardModifier === 'string' && cardModifier.trim()) {
+  cardClasses.push(cardModifier.trim());
+}
+%>
+<div class="<%= cardClasses.join(' ') %>">
+    <div class="kpi-icon <%= iconVariantKey %>">
+        <i class="fas <%= faIcon %>" aria-hidden="true"></i>
+    </div>
+    <div class="kpi-content">
+        <h3 class="kpi-label"><%= label %></h3>
+        <p class="kpi-value"<% if (typeof valueId === 'string' && valueId) { %> id="<%= valueId %>"<% } %>><%= typeof value !== 'undefined' ? value : '—' %></p>
+        <% if (typeof changeId === 'string' && changeId && typeof changeText !== 'undefined') { %>
+        <span class="kpi-change <%= changeDir %>" id="<%= changeId %>">
+            <i class="fas <%= faChangeIcon %>" aria-hidden="true"></i> <%= changeText %>
+        </span>
+        <% } %>
+    </div>
+</div>

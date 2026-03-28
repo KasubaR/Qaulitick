@@ -16,13 +16,32 @@
     // Marketing data (loaded from API)
     let featuredProductsData = [];
     let flashSalesData = [];
+    /** True only when /api/marketing/flash-sales returned success (used to avoid clearing SSR cards on network errors). */
+    let flashSalesApiSucceeded = false;
 
     // Timer intervals
     let flashTimerInterval = null;
     let sliderInterval = null; // Kept for cleanup, but not used for auto-sliding
 
+    // Reveal server-rendered product card images (shop.css sets opacity:0 until .loaded)
+    function revealProductCardImages(container) {
+        const imgs = (container || document).querySelectorAll('.product-image img');
+        imgs.forEach(function (img) {
+            if (img.complete) {
+                img.classList.add('loaded');
+            } else {
+                img.addEventListener('load', function () { img.classList.add('loaded'); });
+                img.addEventListener('error', function () {
+                    img.src = '/images/placeholder.jpg';
+                    img.classList.add('loaded');
+                });
+            }
+        });
+    }
+
     // Initialize home page
     async function initHomePage() {
+        revealProductCardImages();
         await loadMarketingData();
         renderFeaturedProducts();
         renderFlashProducts();
@@ -43,11 +62,12 @@
                 }
             }
 
-            // Load flash sales
+            flashSalesApiSucceeded = false;
             const flashResponse = await fetch('/api/marketing/flash-sales');
             if (flashResponse.ok) {
                 const flashData = await flashResponse.json();
                 if (flashData.success) {
+                    flashSalesApiSucceeded = true;
                     flashSalesData = flashData.flashSales || [];
                 }
             }
@@ -98,47 +118,36 @@
         setupSliderNavigation();
     }
 
-    // Render Flash Sale Products
+    // Flash sale product cards are server-rendered (partials/product-card.ejs). Sync banner + hide if API says sale ended.
     function renderFlashProducts() {
         if (!flashProducts) return;
-        
-        flashProducts.innerHTML = '';
-        
-        // Filter to only show sales with showBanner === true
+
+        if (flashProducts.dataset.ssrFlashCards !== '1') {
+            return;
+        }
+
         const visibleSales = flashSalesData.filter(sale => sale.showBanner);
-        
-        if (visibleSales.length === 0) {
-            // Hide flash sales section if no visible sales
+        if (flashSalesApiSucceeded && visibleSales.length === 0) {
             if (flashSalesSection) {
                 flashSalesSection.classList.add('is-hidden');
+            }
+            flashProducts.innerHTML = '';
+            flashProducts.removeAttribute('data-ssr-flash-cards');
+            if (flashSalesSection) {
+                flashSalesSection.removeAttribute('data-flash-end');
             }
             return;
         }
 
-        // Ensure section is visible when there are visible sales
-        if (flashSalesSection) {
-            flashSalesSection.classList.remove('is-hidden');
-        }
-
-        // Get products from first visible flash sale
         const activeSale = visibleSales[0];
-        
-        // Update banner text if available
         const flashBannerText = document.getElementById('flashBannerText');
         if (flashBannerText && activeSale.bannerText) {
             flashBannerText.textContent = activeSale.bannerText;
         }
-        
-        if (activeSale && activeSale.products && activeSale.products.length > 0) {
-            activeSale.products.forEach(product => {
-                const card = createProductCard(product, true);
-                flashProducts.appendChild(card);
-            });
-        }
     }
 
-    // Create Product Card
-    function createProductCard(product, isFlashSale = false) {
+    // Create Product Card (featured slider only — flash sale uses server-rendered partials/product-card.ejs)
+    function createProductCard(product) {
         const productId = product._id || product.id;
         const productName = product.model || product.name;
 
@@ -157,238 +166,192 @@
         const currentPrice = Number(product.finalPrice || product.price || 0) || 0;
         const originalPrice = Number(product.originalPrice || product.price || 0) || 0;
 
-        // Featured products: reuse the same markup/classes as views/partials/product-card.ejs
-        // so shop.css styling applies on home.
-        if (!isFlashSale) {
-            const link = document.createElement("a");
-            link.href = `/product/${productId}`;
-            link.className = "product-link";
+        // Featured: align with views/partials/product-card.ejs (shop.css + quick view on home).
+        const productUrl = `/product/${productId}`;
+        const card = document.createElement("div");
+        card.className = "shop-product-card product-card";
 
-            const card = document.createElement("div");
-            // Add home slider sizing via home.css while keeping shop.card styling via shop.css classes
-            card.className = "shop-product-card product-card";
+        const imageWrapper = document.createElement("div");
+        imageWrapper.className = "product-image-wrapper";
 
-            const imageWrapper = document.createElement("div");
-            imageWrapper.className = "product-image-wrapper";
-
-            if (productDiscount > 0) {
-                const badge = document.createElement("span");
-                badge.className = "discount-badge";
-                badge.textContent = `-${productDiscount}%`;
-                imageWrapper.appendChild(badge);
-            }
-
-            if (productStock === 0) {
-                const overlay = document.createElement("div");
-                overlay.className = "out-of-stock-overlay";
-                overlay.textContent = "Out of Stock";
-                imageWrapper.appendChild(overlay);
-            }
-
-            const img = document.createElement("img");
-            img.src = productImage;
-            img.alt = productName;
-            img.className = "product-image";
-            img.loading = "lazy";
-            img.decoding = "async";
-            img.width = 400;
-            img.height = 400;
-            imageWrapper.appendChild(img);
-
-            card.appendChild(imageWrapper);
-
-            const productInfo = document.createElement("div");
-            productInfo.className = "product-info";
-
-            const brand = document.createElement("div");
-            brand.className = "product-brand";
-            brand.textContent = product.brand || "Brand";
-            productInfo.appendChild(brand);
-
-            const h3 = document.createElement("h3");
-            h3.className = "product-name";
-            h3.textContent = productName;
-            productInfo.appendChild(h3);
-
-            const ratingDiv = document.createElement("div");
-            ratingDiv.className = "product-rating";
-
-            for (let i = 1; i <= 5; i++) {
-                const star = document.createElement("i");
-                if (i <= Math.floor(productRating)) {
-                    star.className = "fas fa-star";
-                } else if (i === Math.ceil(productRating) && productRating % 1 !== 0) {
-                    star.className = "fas fa-star-half-alt";
-                } else {
-                    star.className = "far fa-star";
-                }
-                ratingDiv.appendChild(star);
-            }
-
-            const ratingValue = document.createElement("span");
-            ratingValue.className = "rating-value";
-            ratingValue.textContent = `(${productRating})`;
-            ratingDiv.appendChild(ratingValue);
-
-            productInfo.appendChild(ratingDiv);
-
-            const priceDiv = document.createElement("div");
-            priceDiv.className = "product-price";
-
-            if (productDiscount > 0) {
-                const originalEl = document.createElement("span");
-                originalEl.className = "original-price";
-                originalEl.textContent = `K${originalPrice.toLocaleString()}`;
-                priceDiv.appendChild(originalEl);
-
-                const currentEl = document.createElement("span");
-                currentEl.className = "current-price";
-                currentEl.dataset.finalPrice = String(currentPrice);
-                currentEl.textContent = `K${currentPrice.toLocaleString()}`;
-                priceDiv.appendChild(currentEl);
-            } else {
-                const currentEl = document.createElement("span");
-                currentEl.className = "current-price";
-                currentEl.dataset.finalPrice = String(currentPrice);
-                currentEl.textContent = `K${currentPrice.toLocaleString()}`;
-                priceDiv.appendChild(currentEl);
-            }
-
-            productInfo.appendChild(priceDiv);
-
-            // Strap meta line (matches shop.ejs)
-            const meta = document.createElement("div");
-            meta.className = "product-meta";
-
-            const strapSpan = document.createElement("span");
-            strapSpan.className = "product-strap";
-
-            const linkIcon = document.createElement("i");
-            linkIcon.className = "fas fa-link";
-            strapSpan.appendChild(linkIcon);
-
-            const strapText = document.createTextNode(` ${product.strapType || "N/A"}`);
-            strapSpan.appendChild(strapText);
-
-            meta.appendChild(strapSpan);
-            productInfo.appendChild(meta);
-
-            card.appendChild(productInfo);
-            link.appendChild(card);
-            return link;
+        if (productDiscount > 0) {
+            const badge = document.createElement("span");
+            badge.className = "discount-badge";
+            badge.textContent = `-${productDiscount}%`;
+            imageWrapper.appendChild(badge);
         }
 
-        // Flash sale product card — uses fs-card CSS classes from home.css
-        const link = document.createElement("a");
-        link.href = `/product/${productId}`;
-        link.className = "fs-card";
+        if (productStock === 0) {
+            const overlay = document.createElement("div");
+            overlay.className = "out-of-stock-overlay";
+            overlay.textContent = "Out of Stock";
+            imageWrapper.appendChild(overlay);
+        }
 
-        // Image wrap + badge
-        const imageWrap = document.createElement("div");
-        imageWrap.className = "fs-card-image-wrap";
+        const imageBox = document.createElement("div");
+        imageBox.className = "product-image";
+
+        const mediaLink = document.createElement("a");
+        mediaLink.href = productUrl;
+        mediaLink.className = "product-link product-link--media";
 
         const img = document.createElement("img");
         img.src = productImage;
         img.alt = productName;
         img.loading = "lazy";
-        imageWrap.appendChild(img);
+        img.decoding = "async";
+        img.width = 400;
+        img.height = 400;
+        mediaLink.appendChild(img);
+        imageBox.appendChild(mediaLink);
 
-        const badge = document.createElement("span");
-        badge.className = "fs-card-badge";
-        badge.textContent = "Flash Sale";
-        imageWrap.appendChild(badge);
+        const productActions = document.createElement("div");
+        productActions.className = "product-actions";
+        const quickViewBtn = document.createElement("button");
+        quickViewBtn.type = "button";
+        quickViewBtn.className = "quick-view-btn";
+        quickViewBtn.setAttribute("data-product-id", String(productId));
+        quickViewBtn.setAttribute("aria-label", "Quick view: " + productName);
+        quickViewBtn.innerHTML = '<i class="fas fa-eye" aria-hidden="true"></i>';
+        productActions.appendChild(quickViewBtn);
+        imageBox.appendChild(productActions);
 
-        link.appendChild(imageWrap);
+        imageWrapper.appendChild(imageBox);
+        card.appendChild(imageWrapper);
 
-        // Body
-        const body = document.createElement("div");
-        body.className = "fs-card-body";
+        const infoLink = document.createElement("a");
+        infoLink.href = productUrl;
+        infoLink.className = "product-link product-link--info";
 
-        const brandEl = document.createElement("div");
-        brandEl.className = "fs-card-brand";
-        brandEl.textContent = product.brand || "";
-        body.appendChild(brandEl);
+        const productInfo = document.createElement("div");
+        productInfo.className = "product-info";
 
-        const nameEl = document.createElement("div");
-        nameEl.className = "fs-card-name";
-        nameEl.textContent = productName;
-        body.appendChild(nameEl);
+        const brand = document.createElement("div");
+        brand.className = "product-brand";
+        brand.textContent = product.brand || "Brand";
+        productInfo.appendChild(brand);
 
-        const pricesEl = document.createElement("div");
-        pricesEl.className = "fs-card-prices";
+        const h3 = document.createElement("h3");
+        h3.className = "product-name";
+        h3.textContent = productName;
+        productInfo.appendChild(h3);
 
-        const priceEl = document.createElement("span");
-        priceEl.className = "fs-card-price";
-        priceEl.textContent = `K${(currentPrice || 0).toLocaleString()}`;
-        pricesEl.appendChild(priceEl);
-
-        if (originalPrice && originalPrice > currentPrice) {
-            const origEl = document.createElement("span");
-            origEl.className = "fs-card-original";
-            origEl.textContent = `K${originalPrice.toLocaleString()}`;
-            pricesEl.appendChild(origEl);
-        }
-        body.appendChild(pricesEl);
-
-        const button = document.createElement("button");
-        button.className = "fs-card-btn";
-        button.textContent = "Add to Cart";
-        button.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (window.addToCart) {
-                window.addToCart(productName, currentPrice || 0, product.id || product._id);
+        const ratingDiv = document.createElement("div");
+        ratingDiv.className = "product-rating";
+        for (let i = 1; i <= 5; i++) {
+            const star = document.createElement("i");
+            if (i <= Math.floor(productRating)) {
+                star.className = "fas fa-star";
+            } else if (i === Math.ceil(productRating) && productRating % 1 !== 0) {
+                star.className = "fas fa-star-half-alt";
+            } else {
+                star.className = "far fa-star";
             }
-        });
-        body.appendChild(button);
+            ratingDiv.appendChild(star);
+        }
+        const ratingValue = document.createElement("span");
+        ratingValue.className = "rating-value";
+        ratingValue.textContent = `(${productRating})`;
+        ratingDiv.appendChild(ratingValue);
+        productInfo.appendChild(ratingDiv);
 
-        link.appendChild(body);
-        return link;
+        const priceDiv = document.createElement("div");
+        priceDiv.className = "product-price";
+        if (productDiscount > 0) {
+            const originalEl = document.createElement("span");
+            originalEl.className = "original-price";
+            originalEl.textContent = `K${originalPrice.toLocaleString()}`;
+            priceDiv.appendChild(originalEl);
+            const currentEl = document.createElement("span");
+            currentEl.className = "current-price";
+            currentEl.dataset.finalPrice = String(currentPrice);
+            currentEl.textContent = `K${currentPrice.toLocaleString()}`;
+            priceDiv.appendChild(currentEl);
+        } else {
+            const currentEl = document.createElement("span");
+            currentEl.className = "current-price";
+            currentEl.dataset.finalPrice = String(currentPrice);
+            currentEl.textContent = `K${currentPrice.toLocaleString()}`;
+            priceDiv.appendChild(currentEl);
+        }
+        productInfo.appendChild(priceDiv);
+
+        const meta = document.createElement("div");
+        meta.className = "product-meta";
+        const strapSpan = document.createElement("span");
+        strapSpan.className = "product-strap";
+        const linkIcon = document.createElement("i");
+        linkIcon.className = "fas fa-link";
+        strapSpan.appendChild(linkIcon);
+        strapSpan.appendChild(document.createTextNode(` ${product.strapType || "N/A"}`));
+        meta.appendChild(strapSpan);
+        productInfo.appendChild(meta);
+
+        infoLink.appendChild(productInfo);
+        card.appendChild(infoLink);
+        return card;
+    }
+
+    function getActiveFlashEndDate() {
+        const visibleSales = flashSalesData.filter(sale => sale.showBanner);
+        if (visibleSales.length > 0 && visibleSales[0].endDate) {
+            return new Date(visibleSales[0].endDate);
+        }
+        const iso = flashSalesSection && flashSalesSection.dataset.flashEnd;
+        if (iso && flashProducts && flashProducts.dataset.ssrFlashCards === '1') {
+            const d = new Date(iso);
+            if (!Number.isNaN(d.getTime())) return d;
+        }
+        return null;
     }
 
     // Timer Functions
     function initTimers() {
         clearInterval(flashTimerInterval);
-        
-        // Only show timer for flash sales with showBanner === true
-        const visibleSales = flashSalesData.filter(sale => sale.showBanner);
-        if (flashTimer && visibleSales.length > 0) {
+
+        const endTime = getActiveFlashEndDate();
+        const sectionVisible = flashSalesSection && !flashSalesSection.classList.contains('is-hidden');
+        if (flashTimer && endTime && sectionVisible) {
             updateFlashTimer();
             flashTimerInterval = setInterval(updateFlashTimer, 1000);
         }
     }
 
     function updateFlashTimer() {
-        // Only show timer for flash sales with showBanner === true
-        const visibleSales = flashSalesData.filter(sale => sale.showBanner);
-        if (!flashTimer || visibleSales.length === 0) return;
-        
-        const activeSale = visibleSales[0];
-        if (!activeSale) return;
+        const endTime = getActiveFlashEndDate();
+        if (!flashTimer || !endTime) return;
 
         const now = new Date();
-        const endTime = new Date(activeSale.endDate);
         const timeLeft = endTime - now;
 
         if (timeLeft <= 0) {
             flashTimer.textContent = '00:00:00';
             clearInterval(flashTimerInterval);
 
-            // Hide flash sales section when sale has ended
             if (flashSalesSection) {
                 flashSalesSection.classList.add('is-hidden');
+                flashSalesSection.removeAttribute('data-flash-end');
             }
             if (flashProducts) {
                 flashProducts.innerHTML = '';
+                flashProducts.removeAttribute('data-ssr-flash-cards');
             }
             return;
         }
 
-        const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+        // Full breakdown: days + time remaining today (was wrongly using only % 24h as "hours", so 8d 1h showed as ~01:26:00)
+        const msDay = 1000 * 60 * 60 * 24;
+        const msHour = 1000 * 60 * 60;
+        const msMin = 1000 * 60;
+        const days = Math.floor(timeLeft / msDay);
+        const remD = timeLeft % msDay;
+        const hours = Math.floor(remD / msHour);
+        const remH = remD % msHour;
+        const minutes = Math.floor(remH / msMin);
+        const seconds = Math.floor((remH % msMin) / 1000);
 
-        flashTimer.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        const hms = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        flashTimer.textContent = days > 0 ? `${days}d ${hms}` : hms;
     }
 
     // Setup Featured Products (no auto-sliding)
@@ -468,9 +431,7 @@
             flashTimerInterval = null;
             sliderInterval = null;
         } else {
-            // Only show timer for flash sales with showBanner === true
-            const visibleSales = flashSalesData.filter(sale => sale.showBanner);
-            if (flashTimer && visibleSales.length > 0) {
+            if (flashTimer && getActiveFlashEndDate() && flashSalesSection && !flashSalesSection.classList.contains('is-hidden')) {
                 initTimers();
             }
         }

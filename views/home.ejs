@@ -71,8 +71,9 @@
         </div>
     </section>
 
-    <!-- FLASH SALES -->
-    <section id="flashSalesSection" class="flash-sales-section">
+    <!-- FLASH SALES (cards: views/partials/product-card.ejs, same as shop) -->
+    <% const _flash = typeof flashSale !== 'undefined' && flashSale && Array.isArray(flashSale.products) ? flashSale : null; %>
+    <section id="flashSalesSection" class="flash-sales-section<%= !_flash || _flash.products.length === 0 ? ' is-hidden' : '' %>"<% if (_flash && _flash.endDate) { %> data-flash-end="<%= new Date(_flash.endDate).toISOString() %>"<% } %>>
         <div class="fs-container">
 
             <!-- Top band: eyebrow + countdown -->
@@ -95,11 +96,17 @@
                 <div class="fs-progress-track">
                     <div class="progress fs-progress-fill gradient-flow"></div>
                 </div>
-                <p class="fs-urgency-text" id="flashBannerText">Limited stock available! 60% of items already sold.</p>
+                <p class="fs-urgency-text" id="flashBannerText"><%= _flash && _flash.bannerText ? _flash.bannerText : 'Limited stock available! Shop before time runs out.' %></p>
             </div>
 
-            <!-- Product cards -->
-            <div class="fs-products" id="flashProducts"></div>
+            <!-- Product cards (server-rendered shop partial) -->
+            <div class="fs-products fs-products--shop-cards" id="flashProducts"<% if (_flash && _flash.products.length) { %> data-ssr-flash-cards="1"<% } %>>
+                <% if (_flash && _flash.products.length) { %>
+                    <% _flash.products.forEach(function (product) { %>
+                        <%- include('partials/product-card', { product }) %>
+                    <% }); %>
+                <% } %>
+            </div>
 
         </div>
     </section>

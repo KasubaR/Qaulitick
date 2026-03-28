@@ -721,22 +721,15 @@ function showNoProductsMessage(message, showFilterOptions = true, isError = fals
 }
 
 function createProductCard(product) {
-    // Create link wrapper for the entire card
-    const link = document.createElement('a');
-    link.href = `/product/${product._id || product.id}`; // ✅ Use _id (fallback to id for compatibility)
-    link.className = 'product-card-link';
-    link.style.textDecoration = 'none';
-    link.style.color = 'inherit';
-    link.style.display = 'block';
+    const productId = product._id || product.id;
+    const productUrl = `/product/${productId}`;
 
     const card = document.createElement('div');
     card.className = 'shop-product-card';
 
-    // Product image wrapper (position: relative — badges must be inside this)
     const productImageWrapper = document.createElement('div');
     productImageWrapper.className = 'product-image-wrapper';
 
-    // Discount badge — only when a real discount exists (originalPrice > price)
     if (product.originalPrice && product.originalPrice > product.price) {
         const discountBadge = document.createElement('span');
         discountBadge.className = 'discount-badge';
@@ -744,7 +737,6 @@ function createProductCard(product) {
         productImageWrapper.appendChild(discountBadge);
     }
 
-    // Stock overlay / badge — inside the image wrapper so absolute positioning works
     if (product.stock === 'out-of-stock') {
         const outOfStockOverlay = document.createElement('div');
         outOfStockOverlay.className = 'out-of-stock-overlay';
@@ -757,9 +749,12 @@ function createProductCard(product) {
         productImageWrapper.appendChild(lowStockBadge);
     }
 
-    // Product image container
     const productImage = document.createElement('div');
     productImage.className = 'product-image';
+
+    const mediaLink = document.createElement('a');
+    mediaLink.href = productUrl;
+    mediaLink.className = 'product-link product-link--media';
 
     const img = document.createElement('img');
     img.src = product.image;
@@ -769,58 +764,60 @@ function createProductCard(product) {
     img.width = 400;
     img.height = 400;
     img.style.cssText = 'aspect-ratio: 1 / 1; object-fit: cover;';
-    
-    // Add loaded class when image loads to make it visible
+
     if (img.complete) {
         img.classList.add('loaded');
     } else {
-        img.addEventListener('load', () => {
-            img.classList.add('loaded');
-        });
+        img.addEventListener('load', () => img.classList.add('loaded'));
         img.addEventListener('error', () => {
-            // Fallback to placeholder on error
             img.src = '/images/placeholder.jpg';
             img.classList.add('loaded');
         });
     }
-    
-    productImage.appendChild(img);
 
-    // Product actions
+    mediaLink.appendChild(img);
+    productImage.appendChild(mediaLink);
+
     const productActions = document.createElement('div');
     productActions.className = 'product-actions';
-
+    const quickViewBtn = document.createElement('button');
+    quickViewBtn.type = 'button';
+    quickViewBtn.className = 'quick-view-btn';
+    quickViewBtn.setAttribute('data-product-id', String(productId));
+    quickViewBtn.setAttribute('aria-label', 'Quick view: ' + (product.name || 'Product'));
+    quickViewBtn.innerHTML = '<i class="fas fa-eye" aria-hidden="true"></i>';
+    productActions.appendChild(quickViewBtn);
     productImage.appendChild(productActions);
+
     productImageWrapper.appendChild(productImage);
     card.appendChild(productImageWrapper);
 
-    // Product info container
+    const infoLink = document.createElement('a');
+    infoLink.href = productUrl;
+    infoLink.className = 'product-link product-link--info';
+
     const productInfo = document.createElement('div');
     productInfo.className = 'product-info';
 
-    // Brand
     const brandDiv = document.createElement('div');
     brandDiv.className = 'product-brand';
-    brandDiv.textContent = product.brand.toUpperCase();
+    brandDiv.textContent = (product.brand || '').toUpperCase();
     productInfo.appendChild(brandDiv);
 
-    // Product name
     const productName = document.createElement('h3');
     productName.className = 'product-name';
     productName.textContent = product.name;
     productInfo.appendChild(productName);
 
-    // Rating
     const ratingDiv = document.createElement('div');
     ratingDiv.className = 'product-rating';
     ratingDiv.innerHTML = getStarRating(product.rating);
-    const ratingCount = document.createElement('span');
-    ratingCount.className = 'rating-count';
-    ratingCount.textContent = `(${product.reviews})`;
-    ratingDiv.appendChild(ratingCount);
+    const ratingValue = document.createElement('span');
+    ratingValue.className = 'rating-value';
+    ratingValue.textContent = `(${product.rating || 0})`;
+    ratingDiv.appendChild(ratingValue);
     productInfo.appendChild(ratingDiv);
 
-    // Price
     const priceDiv = document.createElement('div');
     priceDiv.className = 'product-price';
     if (product.originalPrice && product.originalPrice > product.price) {
@@ -829,21 +826,16 @@ function createProductCard(product) {
         originalPriceSpan.textContent = `K${product.originalPrice.toLocaleString()}`;
         priceDiv.appendChild(originalPriceSpan);
     }
-    const currentPrice = document.createElement('span');
-    currentPrice.className = 'current-price';
-    currentPrice.textContent = `K${product.price.toLocaleString()}`;
-    priceDiv.appendChild(currentPrice);
+    const currentPriceEl = document.createElement('span');
+    currentPriceEl.className = 'current-price';
+    currentPriceEl.textContent = `K${product.price.toLocaleString()}`;
+    priceDiv.appendChild(currentPriceEl);
     productInfo.appendChild(priceDiv);
 
-    // Stock
-    const stockDiv = document.createElement('div');
-    stockDiv.className = 'product-stock';
-    stockDiv.textContent = `${product.stockQuantity} units available`;
-    productInfo.appendChild(stockDiv);
+    infoLink.appendChild(productInfo);
+    card.appendChild(infoLink);
 
-    card.appendChild(productInfo);
-    link.appendChild(card);
-    return link;
+    return card;
 }
 
 function setupEventListeners() {

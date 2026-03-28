@@ -1,0 +1,48 @@
+<%#
+  Reusable admin pagination component.
+
+  Required:
+    containerId  — id for the outer .pagination div (e.g. 'pagination', 'reviewsPagination')
+    prevId       — id for the Previous button
+    nextId       — id for the Next button
+
+  Optional:
+    variant        : 'pages' | 'simple'  (default: 'pages')
+                       'pages'  — page numbers (.page-number) + prev/next (.pagination-btn)
+                       'simple' — "Page X of Y" (.pagination-info) + prev/next (.pagination-btn)
+    pageNumbersId  : id for the .page-numbers wrapper   (pages variant only,  default: 'pageNumbers')
+    pageInfoId     : id for the info <span>             (simple variant only, default: containerId + 'Info')
+    pageInfoText   : initial text for the info span     (simple variant only, default: 'Page 1 of 1')
+    hidden         : true | false — start with display:none  (default: false)
+    extraClass     : additional CSS class(es) appended to the .pagination div
+#%>
+<%
+  const _variant       = (typeof variant === 'string' && variant === 'simple') ? 'simple' : 'pages';
+  const _pageNumbersId = (typeof pageNumbersId === 'string' && pageNumbersId) ? pageNumbersId : 'pageNumbers';
+  const _pageInfoId    = (typeof pageInfoId === 'string' && pageInfoId)
+                           ? pageInfoId
+                           : containerId + 'Info';
+  const _pageInfoText  = (typeof pageInfoText === 'string' && pageInfoText) ? pageInfoText : 'Page 1 of 1';
+  const _hidden        = typeof hidden === 'boolean' ? hidden : false;
+  const _extraClass    = (typeof extraClass === 'string' && extraClass.trim()) ? ' ' + extraClass.trim() : '';
+
+%>
+<div class="pagination<%= _extraClass %>" id="<%= containerId %>"<% if (_hidden) { %> style="display:none;"<% } %>>
+  <button class="pagination-btn" id="<%= prevId %>" type="button" disabled>
+    <i class="fas fa-chevron-left" aria-hidden="true"></i> Previous
+  </button>
+
+  <% if (_variant === 'pages') { %>
+  <div class="page-numbers" id="<%= _pageNumbersId %>">
+    <span class="page-number active">1</span>
+  </div>
+  <% } else { %>
+  <div class="pagination-info">
+    <span id="<%= _pageInfoId %>"><%= _pageInfoText %></span>
+  </div>
+  <% } %>
+
+  <button class="pagination-btn" id="<%= nextId %>" type="button">
+    Next <i class="fas fa-chevron-right" aria-hidden="true"></i>
+  </button>
+</div>

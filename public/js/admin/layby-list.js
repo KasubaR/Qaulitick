@@ -88,9 +88,9 @@ function renderPlans(plans) {
 async function loadPlans() {
     const body = document.getElementById('laybyBody');
     const countEl = document.getElementById('laybyCount');
-    const pageInfo = document.getElementById('pageInfo');
     const prevBtn = document.getElementById('prevPage');
     const nextBtn = document.getElementById('nextPage');
+    const pageNumbers = document.getElementById('pageNumbers');
 
     if (body) {
         body.innerHTML = '<tr><td colspan="8" class="empty-state">Loading…</td></tr>';
@@ -108,9 +108,26 @@ async function loadPlans() {
         totalPages = data.totalPages || 1;
 
         if (countEl) countEl.textContent = String(data.total != null ? data.total : plans.length);
-        if (pageInfo) pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
         if (prevBtn) prevBtn.disabled = currentPage <= 1;
         if (nextBtn) nextBtn.disabled = currentPage >= totalPages;
+
+        if (pageNumbers) {
+            const maxPages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxPages / 2));
+            let endPage = Math.min(totalPages, startPage + maxPages - 1);
+            if (endPage - startPage < maxPages - 1) startPage = Math.max(1, endPage - maxPages + 1);
+            let html = '';
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<span class="page-number ${i === currentPage ? 'active' : ''}" data-page="${i}">${i}</span>`;
+            }
+            pageNumbers.innerHTML = html;
+            pageNumbers.querySelectorAll('.page-number').forEach(el => {
+                el.addEventListener('click', () => {
+                    const page = parseInt(el.dataset.page);
+                    if (page !== currentPage) { currentPage = page; loadPlans(); }
+                });
+            });
+        }
 
         renderPlans(plans);
     } catch (e) {

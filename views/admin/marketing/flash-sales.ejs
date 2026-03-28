@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Flash Sales Management | Admin Panel</title>
 
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
@@ -13,12 +12,8 @@
 
     <% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
         <meta name="csrf-token" content="<%= csrfToken %>">
-    <% } %>
-
-    <link rel="stylesheet" href="/css/admin/admin-professional.css">
-    <link rel="stylesheet" href="/css/admin/admin-components.css">
-    <link rel="stylesheet" href="/css/admin/admin-responsive.css">
-    <link rel="stylesheet" href="/css/admin/dashboard.css">
+<% } %>
+    <link rel="stylesheet" href="/css/admin/admin.css">
     <link rel="stylesheet" href="/css/admin/flash-sales.css">
 </head>
 <body class="admin-page">
@@ -173,7 +168,7 @@
 </div>
 
 <!-- ── Delete Confirmation Modal ────────────────────────────────────── -->
-<div id="deleteFlashSaleModal" class="modal">
+<div id="deleteFlashSaleModal" class="modal" style="display: none;">
     <div class="modal-content">
         <div class="modal-header">
             <h2>Delete Flash Sale</h2>
@@ -200,7 +195,7 @@
 </div>
 
 <!-- ── Create / Edit Flash Sale Modal ───────────────────────────────── -->
-<div id="flashSaleModal" class="modal">
+<div id="flashSaleModal" class="modal" style="display: none;">
     <div class="modal-content fs-modal-content">
         <div class="modal-header">
             <div class="fs-modal-title">
@@ -213,6 +208,7 @@
         </div>
 
         <form id="flashSaleForm" onsubmit="saveFlashSale(event)">
+            <div class="modal-body">
             <div class="fs-form-grid">
 
                 <!-- Left column: sale details + settings -->
@@ -285,6 +281,7 @@
             </div>
 
             <input type="hidden" id="flashSaleId">
+            </div><!-- /.modal-body -->
 
             <div class="modal-actions">
                 <button type="button" class="btn-outline" onclick="closeFlashSaleModal()">Cancel</button>

@@ -1,0 +1,23 @@
+<%#
+  Reusable admin action button. Always includes base .btn (layout, padding, flex)
+  plus btn-primary, btn-outline, or search-btn from admin.css.
+
+  Required: id, label (string; can be empty for icon-only)
+  Optional:
+    variant: 'primary' | 'outline' | 'search' (default outline)
+    icon: Font Awesome icon class fragment, e.g. fa-times (renders as fas fa-times)
+    extraClass: e.g. btn-sm (appended to base class)
+    title: native tooltip
+    buttonType: button | submit (default button)
+    ariaLabel: if set, aria-label on the button (use for icon-only)
+#%>
+<%
+  const v = typeof variant === 'string' && variant ? variant : 'outline';
+  const baseClass = v === 'primary' ? 'btn-primary' : v === 'search' ? 'search-btn' : 'btn-outline';
+  const extra = typeof extraClass === 'string' && extraClass.trim() ? ' ' + extraClass.trim() : '';
+  const t = typeof buttonType !== 'undefined' ? buttonType : 'button';
+  const showIcon = typeof icon === 'string' && icon.trim();
+%>
+<button type="<%= t %>" class="btn <%= baseClass %><%= extra %>" id="<%= id %>"<% if (typeof title === 'string' && title) { %> title="<%= title %>"<% } %><% if (typeof ariaLabel === 'string' && ariaLabel) { %> aria-label="<%= ariaLabel %>"<% } %>>
+<% if (showIcon) { %><i class="fas <%= icon.trim() %>" aria-hidden="true"></i><% if (label) { %> <% } %><% } %><%= label %>
+</button>

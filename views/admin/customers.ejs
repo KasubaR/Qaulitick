@@ -5,9 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Customers Management | Admin Panel</title>
     
-    <!-- Google Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -16,35 +13,8 @@
     <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
     
     <!-- Professional Admin Styles -->
-    <link rel="stylesheet" href="/css/admin/admin-professional.css">
-    <link rel="stylesheet" href="/css/admin/admin-components.css">
-    <link rel="stylesheet" href="/css/admin/admin-responsive.css">
-    <!-- Admin Dashboard Stylesheet -->
-    <link rel="stylesheet" href="/css/admin/dashboard.css">
-    <!-- Admin Orders Stylesheet (for action menu styles) -->
-    <link rel="stylesheet" href="/css/admin/orders.css">
-    <!-- Admin Customers Stylesheet -->
+    <link rel="stylesheet" href="/css/admin/admin.css">
     <link rel="stylesheet" href="/css/admin/customers.css">
-    <style>
-        .btn-section {
-            padding: 8px 18px;
-            border: 2px solid #111;
-            background: #fff;
-            color: #111;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background 0.2s, color 0.2s;
-        }
-        .btn-section.active {
-            background: #111;
-            color: #fff;
-        }
-        .btn-section:hover:not(.active) {
-            background: #f5f5f5;
-        }
-    </style>
 </head>
 <body class="admin-page">
     <!-- ADMIN CUSTOMERS PAGE -->
@@ -64,9 +34,7 @@
                 </div>
                 
                 <div class="header-right">
-                    <button class="btn-outline" id="exportCustomersBtn">
-                        <i class="fas fa-download"></i> Export
-                    </button>
+                    <%- include('../partials/admin-button', { id: 'exportCustomersBtn', icon: 'fa-download', label: 'Export' }) %>
                 </div>
             </header>
 
@@ -86,57 +54,19 @@
                 <!-- ===== CUSTOMERS SECTION ===== -->
                 <div id="sectionCustomers">
                 <!-- Statistics Cards -->
-                <div class="customers-stats">
-                    <div class="stat-card">
-                        <div class="stat-icon total">
-                            <i class="fas fa-users"></i>
-                        </div>
-                        <div class="stat-info">
-                            <div class="stat-label">Total Customers</div>
-                            <div class="stat-value" id="totalCustomers">0</div>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon active">
-                            <i class="fas fa-user-check"></i>
-                        </div>
-                        <div class="stat-info">
-                            <div class="stat-label">Active Customers</div>
-                            <div class="stat-value" id="activeCustomers">0</div>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon new">
-                            <i class="fas fa-user-plus"></i>
-                        </div>
-                        <div class="stat-info">
-                            <div class="stat-label">New This Month</div>
-                            <div class="stat-value" id="newCustomers">0</div>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon revenue">
-                            <i class="fas fa-dollar-sign"></i>
-                        </div>
-                        <div class="stat-info">
-                            <div class="stat-label">Total Revenue</div>
-                            <div class="stat-value" id="totalRevenue">K0</div>
-                        </div>
-                    </div>
+                <div class="kpi-grid">
+                    <%- include('../partials/admin-stat-card', { label: 'Total Customers',  iconVariant: 'customers',     valueId: 'totalCustomers',  value: '0' }) %>
+                    <%- include('../partials/admin-stat-card', { label: 'Active Customers', iconVariant: 'active',        valueId: 'activeCustomers', value: '0' }) %>
+                    <%- include('../partials/admin-stat-card', { label: 'New This Month',   iconVariant: 'new-customer',  valueId: 'newCustomers',    value: '0' }) %>
+                    <%- include('../partials/admin-stat-card', { label: 'Total Revenue',    iconVariant: 'sales',         valueId: 'totalRevenue',    value: 'K0' }) %>
                 </div>
 
                 <!-- Search and Filters -->
-                <div class="customers-toolbar">
-                    <div class="search-section">
-                        <div class="search-box">
-                            <i class="fas fa-search"></i>
-                            <input type="text" id="customerSearch" placeholder="Search by name, email, or phone...">
-                            <button class="search-btn" id="searchBtn">Search</button>
-                        </div>
-                    </div>
+                <div class="orders-toolbar">
+                    <%- include('../partials/admin-search-box', {
+                        inputId: 'customerSearch',
+                        placeholder: 'Search by name, email, or phone...'
+                    }) %>
 
                     <div class="filters-section">
                         <div class="filter-group">
@@ -171,9 +101,7 @@
                             </select>
                         </div>
 
-                        <button class="btn-outline" id="clearFiltersBtn">
-                            <i class="fas fa-times"></i> Clear Filters
-                        </button>
+                        <%- include('../partials/admin-button', { id: 'clearFiltersBtn', icon: 'fa-times', label: 'Clear Filters' }) %>
                     </div>
                 </div>
 
@@ -210,39 +138,23 @@
                     </div>
 
                     <!-- Pagination -->
-                    <div class="pagination" id="pagination">
-                        <button class="page-btn" id="prevPage" disabled>
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </button>
-                        <div class="page-numbers" id="pageNumbers">
-                            <span class="page-number active">1</span>
-                        </div>
-                        <button class="page-btn" id="nextPage">
-                            Next <i class="fas fa-chevron-right"></i>
-                        </button>
-                    </div>
+                    <%- include('../partials/admin-pagination', { containerId: 'pagination', prevId: 'prevPage', nextId: 'nextPage' }) %>
                 </div>
                 </div><!-- end #sectionCustomers -->
 
                 <!-- ===== REGISTERED USERS SECTION ===== -->
                 <div id="sectionRegistered" style="display:none;">
-                    <div class="stat-card" style="display:inline-flex;align-items:center;gap:12px;padding:16px 24px;margin-bottom:20px;">
-                        <div class="stat-icon total"><i class="fas fa-user-shield"></i></div>
-                        <div class="stat-info">
-                            <div class="stat-label">Total Registered</div>
-                            <div class="stat-value" id="totalRegistered">0</div>
-                        </div>
+                    <div class="kpi-grid" style="grid-template-columns: minmax(200px, 320px); margin-bottom: 20px;">
+                        <%- include('../partials/admin-stat-card', { label: 'Total Registered', iconVariant: 'registered', valueId: 'totalRegistered', value: '0' }) %>
                     </div>
 
                     <!-- Search -->
-                    <div class="customers-toolbar" style="margin-bottom:16px;">
-                        <div class="search-section">
-                            <div class="search-box">
-                                <i class="fas fa-search"></i>
-                                <input type="text" id="registeredSearch" placeholder="Search by name, email, or phone...">
-                                <button class="search-btn" id="registeredSearchBtn">Search</button>
-                            </div>
-                        </div>
+                    <div class="orders-toolbar">
+                        <%- include('../partials/admin-search-box', {
+                            inputId: 'registeredSearch',
+                            placeholder: 'Search by name, email, or phone...',
+                            buttonId: 'registeredSearchBtn'
+                        }) %>
                     </div>
 
                     <div class="table-card">
@@ -273,17 +185,7 @@
                             </table>
                         </div>
                         <!-- Pagination -->
-                        <div class="pagination" id="registeredPagination">
-                            <button class="page-btn" id="regPrevPage" disabled>
-                                <i class="fas fa-chevron-left"></i> Previous
-                            </button>
-                            <div class="page-numbers" id="regPageNumbers">
-                                <span class="page-number active">1</span>
-                            </div>
-                            <button class="page-btn" id="regNextPage">
-                                Next <i class="fas fa-chevron-right"></i>
-                            </button>
-                        </div>
+                        <%- include('../partials/admin-pagination', { containerId: 'registeredPagination', prevId: 'regPrevPage', nextId: 'regNextPage', pageNumbersId: 'regPageNumbers' }) %>
                     </div>
                 </div><!-- end #sectionRegistered -->
 

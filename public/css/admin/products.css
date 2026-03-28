@@ -1,123 +1,52 @@
-/* Admin Products Management Styles */
+/* Admin Products — table, modals, color variants (load after admin.css) */
 
-.products-content {
-    padding: 30px;
+/* Map legacy variable names used in this file to the current admin theme */
+body.admin-page {
+    --admin-bg-card: var(--surface);
+    --admin-border: var(--border);
+    --admin-gold: var(--gold);
+    --admin-gold-medium: var(--gold-medium);
+    --admin-input-bg: var(--surface-2);
+    --admin-text: var(--text);
+    --admin-text-primary: var(--text);
+    --admin-text-secondary: var(--text-muted);
+    --admin-text-muted: var(--text-muted);
+    --admin-yellow: var(--gold);
+    --admin-black: var(--text);
+    --admin-black-medium: var(--surface-2);
 }
 
-/* Toolbar */
-.products-toolbar {
-    background: var(--admin-bg-card);
-    border: 1px solid var(--admin-border);
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 20px;
+.products-content .table-info span {
+    color: var(--gold);
+    font-weight: 700;
 }
 
-.search-section {
-    margin-bottom: 20px;
-}
-
-.search-box {
+/* List toolbar uses .orders-toolbar from admin.css; price filters are product-only */
+.products-content .price-range {
     display: flex;
     align-items: center;
     gap: 10px;
-    position: relative;
-}
-
-.search-box i {
-    position: absolute;
-    left: 15px;
-    color: #666;
-    z-index: 1;
-}
-
-.search-box input {
-    flex: 1;
-    padding: 12px 15px 12px 40px;
-    background: #0a0a0a;
-    border: 1px solid var(--admin-border);
-    border-radius: 8px;
-    color: #fff;
-    font-size: 14px;
-}
-
-.search-box input:focus {
-    outline: none;
-    border-color: var(--admin-gold);
-}
-
-.search-btn {
-    padding: 12px 24px;
-    background: var(--gold-gradient-horizontal);
-    color: #000;
-    border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.2s;
-}
-
-.search-btn:hover {
-    transform: translateY(-2px);
-}
-
-.filters-section {
-    display: flex;
     flex-wrap: wrap;
-    gap: 15px;
-    align-items: flex-end;
-    padding-top: 20px;
-    border-top: 1px solid var(--admin-border);
 }
 
-.filter-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+.products-content .price-range span {
+    color: var(--text-muted);
+    font-size: 0.85rem;
 }
 
-.filter-group label {
-    font-size: 12px;
-    color: #aaa;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.filter-select {
-    padding: 10px 12px;
-    background: #0a0a0a;
-    border: 1px solid var(--admin-border);
-    border-radius: 8px;
-    color: #fff;
-    font-size: 14px;
-    min-width: 150px;
-    cursor: pointer;
-}
-
-.filter-select:focus {
-    outline: none;
-    border-color: var(--admin-gold);
-}
-
-.price-range {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.price-input {
+.products-content .price-input {
     width: 100px;
-    padding: 10px 12px;
-    background: #0a0a0a;
-    border: 1px solid var(--admin-border);
-    border-radius: 8px;
-    color: #fff;
-    font-size: 14px;
+    padding: 9px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 0.875rem;
 }
 
-.price-input:focus {
+.products-content .price-input:focus {
     outline: none;
-    border-color: var(--admin-gold);
+    border-color: var(--gold);
 }
 
 .bulk-actions-section {
@@ -126,32 +55,12 @@
     margin-left: auto;
 }
 
-/* Table */
-.table-card {
-    background: var(--admin-bg-card);
-    border: 1px solid var(--admin-border);
-    border-radius: 12px;
-    padding: 20px;
+/* Table shell comes from admin.css — no extra padding */
+.products-content .table-card {
+    padding: 0;
 }
 
-.table-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    padding: 15px 20px;
-    border-bottom: 1px solid var(--admin-border);
-}
-
-.table-info {
-    font-size: 14px;
-    color: #aaa;
-}
-
-.table-info span {
-    color: var(--admin-gold);
-    font-weight: 600;
-}
+/* .table-header / .table-info — admin.css */
 
 .checkbox-label {
     display: flex;
@@ -185,12 +94,12 @@
 
 .product-name {
     font-weight: 600;
-    color: #fff;
+    color: var(--text);
 }
 
 .product-sku {
     font-size: 12px;
-    color: #666;
+    color: var(--text-muted);
 }
 
 .action-buttons {
@@ -203,7 +112,7 @@
     height: 32px;
     border: 1px solid var(--admin-border);
     background: transparent;
-    color: #fff;
+    color: var(--text);
     border-radius: 6px;
     cursor: pointer;
     display: flex;
@@ -233,72 +142,23 @@
     color: #28a745;
 }
 
-/* Pagination */
-.pagination {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 10px;
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid var(--admin-border);
-}
-
-.page-btn {
-    padding: 8px 16px;
-    background: transparent;
-    border: 1px solid var(--admin-border);
-    color: #fff;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.3s;
-}
-
-.page-btn:hover:not(:disabled) {
-    background: rgba(255, 238, 193, 0.1);
-    border-color: var(--admin-gold);
-}
-
-.page-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.page-numbers {
-    display: flex;
-    gap: 5px;
-}
-
-.page-number {
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--admin-border);
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.3s;
-    font-size: 14px;
-}
-
-.page-number:hover {
-    background: rgba(255, 238, 193, 0.1);
-    border-color: var(--admin-gold);
-}
-
-.page-number.active {
-    background: var(--admin-gold);
-    color: #000;
-    border-color: var(--admin-gold);
-}
+/* Pagination: shared rules in admin.css (admin-pagination.ejs) */
 
 /* Modal Styles */
 .modal-content.large {
-    max-width: 900px;
-    width: 95%;
-    max-height: 90vh;
-    overflow-y: auto;
+    max-width: 1140px;
+    width: 96%;
+    max-height: 96vh;
+    overflow: hidden; /* keep header/actions pinned; form scrolls internally */
+}
+
+.modal-content.large .product-form {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 22px 22px 0;
 }
 
 .modal-header {
@@ -334,6 +194,7 @@
     gap: 10px;
     margin-bottom: 25px;
     border-bottom: 2px solid var(--admin-border);
+    flex-shrink: 0;
 }
 
 .tab-btn {
@@ -341,7 +202,7 @@
     background: transparent;
     border: none;
     border-bottom: 3px solid transparent;
-    color: #aaa;
+    color: var(--text-muted);
     cursor: pointer;
     font-size: 14px;
     font-weight: 500;
@@ -361,7 +222,10 @@
 }
 
 .tab-content {
-    min-height: 400px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px; /* small offset so scrollbar doesn't overlap content */
 }
 
 .tab-pane {
@@ -394,7 +258,7 @@
 .form-group label {
     font-size: 14px;
     font-weight: 500;
-    color: #fff;
+    color: var(--text);
 }
 
 .required {
@@ -403,10 +267,10 @@
 
 .form-input {
     padding: 12px 15px;
-    background: #0a0a0a;
+    background: var(--surface-2);
     border: 1px solid var(--admin-border);
     border-radius: 8px;
-    color: #fff;
+    color: var(--text);
     font-size: 14px;
     transition: border-color 0.3s;
 }
@@ -418,7 +282,7 @@
 
 .form-hint {
     font-size: 12px;
-    color: #666;
+    color: var(--text-muted);
     margin-top: 5px;
 }
 
@@ -433,14 +297,14 @@
     padding: 10px 14px;
     margin-bottom: 18px;
     font-size: 12px;
-    color: #888;
+    color: var(--text-muted);
     line-height: 1.5;
 }
 .seo-tip-box i { color: var(--admin-gold); margin-top: 2px; flex-shrink: 0; }
 
 .field-optional {
     font-size: 11px;
-    color: #666;
+    color: var(--text-muted);
     font-weight: 400;
     margin-left: 4px;
 }
@@ -456,7 +320,7 @@
 
 .char-counter {
     font-size: 11px;
-    color: #888;
+    color: var(--text-muted);
     white-space: nowrap;
     flex-shrink: 0;
     font-variant-numeric: tabular-nums;
@@ -465,7 +329,7 @@
 .form-hint-example {
     display: block;
     font-size: 11px;
-    color: #666;
+    color: var(--text-muted);
     margin-top: 5px;
     font-style: normal;
 }
@@ -476,7 +340,7 @@
 .form-input.stock-input-derived {
     cursor: not-allowed;
     opacity: 0.92;
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--surface-3);
 }
 
 .stock-quantity-hint {
@@ -490,13 +354,13 @@
     border: 1px solid var(--admin-border);
     border-radius: 6px;
     overflow: hidden;
-    background: var(--admin-input-bg, #1a1a1a);
+    background: var(--surface-2);
 }
 .slug-prefix {
     padding: 0 10px;
     font-size: 12px;
-    color: #666;
-    background: rgba(255,255,255,0.04);
+    color: var(--text-muted);
+    background: var(--surface-3);
     border-right: 1px solid var(--admin-border);
     white-space: nowrap;
     line-height: 38px;
@@ -598,14 +462,14 @@
 .color-variant-field-label {
     font-size: 13px;
     font-weight: 600;
-    color: var(--admin-text, #e8e8e8);
+    color: var(--text);
 }
 
 .color-variant-field-hint {
     margin: 0 0 6px;
     font-size: 11px;
     line-height: 1.4;
-    color: #888;
+    color: var(--text-muted);
 }
 
 .color-field-wrap .form-input.color-name-input,
@@ -629,7 +493,7 @@
     justify-content: center;
     flex-shrink: 0;
     transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
-    background: rgba(0, 0, 0, 0.25);
+    background: rgba(175, 144, 68, 0.06);
 }
 
 .color-image-upload:hover {
@@ -777,20 +641,33 @@
 }
 
 .sku-input-group .btn-outline.small:hover {
-    background: var(--admin-yellow);
-    color: var(--admin-black);
-    border-color: var(--admin-yellow);
+    background: var(--gold);
+    color: #fff;
+    border-color: var(--gold);
 }
 
 /* Image Upload */
 .image-upload-area {
+    position: relative;
     border: 2px dashed var(--admin-border);
     border-radius: 12px;
     padding: 40px;
     text-align: center;
     cursor: pointer;
     transition: all 0.3s;
-    background: rgba(255, 238, 193, 0.02);
+    background: rgba(175, 144, 68, 0.04);
+}
+
+.product-images-file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .image-upload-area:hover {
@@ -806,18 +683,18 @@
 
 .image-upload-area p {
     margin: 5px 0;
-    color: #fff;
+    color: var(--text);
 }
 
 .upload-hint {
     font-size: 12px;
-    color: #666;
+    color: var(--text-muted);
     margin: 5px 0;
 }
 
 .upload-hint-small {
     font-size: 11px;
-    color: #888;
+    color: var(--text-muted);
     margin-top: 5px;
     font-style: italic;
 }
@@ -834,7 +711,7 @@
     border-radius: 8px;
     overflow: hidden;
     border: 2px solid var(--admin-border);
-    background: var(--admin-black-medium);
+    background: var(--surface-2);
     cursor: move; /* Indicate draggable */
     transition: transform 0.2s, box-shadow 0.2s;
 }
@@ -947,85 +824,20 @@
     color: var(--admin-text-muted);
 }
 
-
-/* Buttons - Ensure btn-primary is visible */
-body.admin-page .btn-primary,
-.btn-primary {
-    background: var(--gradient-primary, linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%));
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-}
-
-body.admin-page .btn-primary:hover,
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-}
-
-.btn-outline {
-    padding: 10px 20px;
-    background: transparent;
-    border: 1px solid var(--admin-border);
-    color: #fff;
-    border-radius: 8px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.btn-outline:hover {
-    background: rgba(255, 238, 193, 0.1);
-    border-color: var(--admin-gold);
-}
-
-.btn-outline.small {
-    padding: 8px 16px;
-    font-size: 13px;
-}
-
-.btn-outline:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.btn-danger {
-    padding: 12px 24px;
-    background: #ff4444;
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.btn-danger:hover {
-    background: #cc0000;
-}
-
 .modal-actions {
     display: flex;
     justify-content: flex-end;
     gap: 15px;
-    margin-top: 25px;
-    padding-top: 25px;
+    margin-top: auto;
+    padding: 16px 22px;
     border-top: 1px solid var(--admin-border);
+    flex-shrink: 0;
+}
+
+/* Compact outline buttons in product modal (SKU / add color) */
+.btn-outline.small {
+    padding: 8px 16px;
+    font-size: 13px;
 }
 
 /* Responsive */
@@ -1176,18 +988,12 @@ body.admin-page .btn-primary:hover,
     transform: scale(1.1);
 }
 
-/* Bulk Operations */
-.bulk-actions {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
+/* Bulk Operations (layout from admin.css .bulk-actions) */
 .bulk-selection-count {
-    color: var(--admin-gold);
-    font-size: 14px;
-    font-weight: 500;
-    margin-right: 10px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-right: 8px;
 }
 
 .bulk-actions .btn-sm {

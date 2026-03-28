@@ -6,9 +6,6 @@
     <meta name="csrf-token" content="<%= csrfToken %>">
     <title>Reviews | Admin Panel</title>
 
-    <!-- Google Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -16,12 +13,8 @@
     <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
     <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
 
-    <!-- Admin Styles -->
-    <link rel="stylesheet" href="/css/admin/admin-professional.css">
-    <link rel="stylesheet" href="/css/admin/admin-components.css">
-    <link rel="stylesheet" href="/css/admin/admin-responsive.css">
-    <link rel="stylesheet" href="/css/admin/dashboard.css">
-    <link rel="stylesheet" href="/css/admin/orders.css">
+<!-- Admin Styles -->
+    <link rel="stylesheet" href="/css/admin/admin.css">
 
     <style>
         /* ── Stats row ─────────────────────────────────────── */
@@ -32,105 +25,23 @@
             padding: 24px 30px 0;
         }
 
-        .review-stat-card {
-            background: var(--admin-bg-card);
-            border: 1px solid var(--admin-border);
-            border-radius: 12px;
-            padding: 16px 20px;
-            display: flex;
-            align-items: center;
-            gap: 14px;
-        }
-
-        .review-stat-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            flex-shrink: 0;
-        }
-
-        .review-stat-icon.yellow  { background: rgba(255,215,0,.12);  color: var(--admin-yellow); }
-        .review-stat-icon.orange  { background: rgba(255,165,0,.12);  color: #FFA500; }
-        .review-stat-icon.green   { background: rgba(34,197,94,.12);  color: #22C55E; }
-        .review-stat-icon.purple  { background: rgba(168,85,247,.12); color: #A855F7; }
-
-        .review-stat-info { min-width: 0; }
-
-        .review-stat-value {
-            font-size: 22px;
-            font-weight: 700;
-            color: #fff;
-            line-height: 1;
-        }
-
-        .review-stat-label {
-            font-size: 12px;
-            color: #888;
-            margin-top: 4px;
-            white-space: nowrap;
-        }
-
         /* ── Toolbar ────────────────────────────────────────── */
         .reviews-content { padding: 20px 30px 30px; }
-
-        .reviews-toolbar {
-            background: var(--admin-bg-card);
-            border: 1px solid var(--admin-border);
-            border-radius: 12px;
-            padding: 16px 20px;
-            margin-bottom: 20px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            align-items: flex-end;
-        }
-
-        .toolbar-group { display: flex; flex-direction: column; gap: 5px; }
-
-        .toolbar-group label {
-            font-size: 11px;
-            color: #888;
-            text-transform: uppercase;
-            letter-spacing: .5px;
-        }
-
-        .filter-select,
-        .filter-input {
-            background: #0a0a0a;
-            border: 1px solid var(--admin-border);
-            border-radius: 8px;
-            color: #fff;
-            font-size: 13px;
-            padding: 8px 12px;
-            font-family: inherit;
-            min-width: 140px;
-        }
-
-        .filter-select:focus,
-        .filter-input:focus {
-            outline: none;
-            border-color: var(--admin-yellow);
-        }
-
-        .filter-input { min-width: 220px; }
 
         .filter-tabs {
             display: flex;
             gap: 0;
-            border: 1px solid var(--admin-border);
+            border: 1px solid #ddd;
             border-radius: 8px;
             overflow: hidden;
         }
 
         .filter-tab {
-            background: #0a0a0a;
+            background: #fff;
             border: none;
-            color: #888;
+            color: #1a1a1a;
             font-size: 13px;
+            font-weight: 500;
             padding: 8px 14px;
             cursor: pointer;
             font-family: inherit;
@@ -138,15 +49,18 @@
             white-space: nowrap;
         }
 
-        .filter-tab:not(:last-child) { border-right: 1px solid var(--admin-border); }
+        .filter-tab:not(:last-child) { border-right: 1px solid #ddd; }
 
-        .filter-tab.active,
-        .filter-tab:hover {
-            background: rgba(255,215,0,.1);
-            color: var(--admin-yellow);
+        .filter-tab.active {
+            background: var(--admin-yellow);
+            color: #000;
+            font-weight: 700;
         }
 
-        .toolbar-spacer { flex: 1; }
+        .filter-tab:hover:not(.active) {
+            background: rgba(255, 215, 0, 0.12);
+            color: #1a1a1a;
+        }
 
         /* ── Table extras ───────────────────────────────────── */
         .star-cell { color: var(--admin-yellow); font-size: 13px; white-space: nowrap; }
@@ -390,88 +304,52 @@
                 <h1 class="page-title">Reviews</h1>
             </div>
             <div class="header-right">
-                <button class="btn-outline" id="refreshReviewsBtn">
-                    <i class="fas fa-sync-alt"></i> Refresh
-                </button>
+                <%- include('../partials/admin-button', { id: 'refreshReviewsBtn', icon: 'fa-sync-alt', label: 'Refresh', buttonType: 'button' }) %>
             </div>
         </header>
 
         <!-- Stats row -->
         <div class="reviews-stats">
-            <div class="review-stat-card">
-                <div class="review-stat-icon yellow"><i class="fas fa-star"></i></div>
-                <div class="review-stat-info">
-                    <div class="review-stat-value" id="statTotal">—</div>
-                    <div class="review-stat-label">Total Reviews</div>
-                </div>
-            </div>
-            <div class="review-stat-card">
-                <div class="review-stat-icon orange"><i class="fas fa-star-half-alt"></i></div>
-                <div class="review-stat-info">
-                    <div class="review-stat-value" id="statAvgRating">—</div>
-                    <div class="review-stat-label">Average Rating</div>
-                </div>
-            </div>
-            <div class="review-stat-card">
-                <div class="review-stat-icon green"><i class="fas fa-check-circle"></i></div>
-                <div class="review-stat-info">
-                    <div class="review-stat-value" id="statVerified">—</div>
-                    <div class="review-stat-label">Verified Reviews</div>
-                </div>
-            </div>
-            <div class="review-stat-card">
-                <div class="review-stat-icon purple"><i class="fas fa-home"></i></div>
-                <div class="review-stat-info">
-                    <div class="review-stat-value" id="statFeatured">—</div>
-                    <div class="review-stat-label">On Homepage (max 6)</div>
-                </div>
-            </div>
+            <%- include('../partials/admin-stat-card', { label: 'Total Reviews',   iconVariant: 'reviews',  valueId: 'statTotal' }) %>
+            <%- include('../partials/admin-stat-card', { label: 'Average Rating',  iconVariant: 'rating',   valueId: 'statAvgRating' }) %>
+            <%- include('../partials/admin-stat-card', { label: 'Verified Reviews',iconVariant: 'verified', valueId: 'statVerified' }) %>
+            <%- include('../partials/admin-stat-card', { label: 'On Homepage (max 6)', iconVariant: 'featured', valueId: 'statFeatured' }) %>
         </div>
 
         <!-- Content -->
         <div class="reviews-content">
 
             <!-- Toolbar -->
-            <div class="reviews-toolbar">
-                <!-- Quick filter tabs -->
-                <div class="toolbar-group">
-                    <label>Show</label>
-                    <div class="filter-tabs">
-                        <button class="filter-tab active" data-filter="all">All</button>
-                        <button class="filter-tab" data-filter="verified">Verified</button>
-                        <button class="filter-tab" data-filter="featured">On Homepage</button>
+            <div class="orders-toolbar">
+                <%- include('../partials/admin-search-box', {
+                    inputId: 'reviewSearch',
+                    placeholder: 'Search by reviewer name or product…'
+                }) %>
+
+                <div class="filters-section">
+                    <div class="filter-group">
+                        <label>Show</label>
+                        <div class="filter-tabs">
+                            <button class="filter-tab active" data-filter="all">All</button>
+                            <button class="filter-tab" data-filter="verified">Verified</button>
+                            <button class="filter-tab" data-filter="featured">On Homepage</button>
+                        </div>
                     </div>
+
+                    <div class="filter-group">
+                        <label>Rating</label>
+                        <select id="ratingFilter" class="filter-select">
+                            <option value="">All Ratings</option>
+                            <option value="5">★★★★★ 5 stars</option>
+                            <option value="4">★★★★☆ 4 stars</option>
+                            <option value="3">★★★☆☆ 3 stars</option>
+                            <option value="2">★★☆☆☆ 2 stars</option>
+                            <option value="1">★☆☆☆☆ 1 star</option>
+                        </select>
+                    </div>
+
+                    <%- include('../partials/admin-button', { id: 'clearReviewFiltersBtn', icon: 'fa-times', label: 'Clear Filters' }) %>
                 </div>
-
-                <!-- Rating filter -->
-                <div class="toolbar-group">
-                    <label>Rating</label>
-                    <select id="ratingFilter" class="filter-select">
-                        <option value="">All Ratings</option>
-                        <option value="5">★★★★★ 5 stars</option>
-                        <option value="4">★★★★☆ 4 stars</option>
-                        <option value="3">★★★☆☆ 3 stars</option>
-                        <option value="2">★★☆☆☆ 2 stars</option>
-                        <option value="1">★☆☆☆☆ 1 star</option>
-                    </select>
-                </div>
-
-                <!-- Search -->
-                <div class="toolbar-group">
-                    <label>Search</label>
-                    <input
-                        type="text"
-                        id="reviewSearch"
-                        class="filter-input"
-                        placeholder="Reviewer name or product…"
-                    >
-                </div>
-
-                <div class="toolbar-spacer"></div>
-
-                <button class="btn-outline" id="clearReviewFiltersBtn" style="align-self:flex-end;">
-                    <i class="fas fa-times"></i> Clear
-                </button>
             </div>
 
             <!-- Table card -->
@@ -508,17 +386,7 @@
                 </div>
 
                 <!-- Pagination -->
-                <div class="pagination" id="reviewsPagination" style="display:none;">
-                    <button class="pagination-btn" id="reviewsPrevPage" disabled>
-                        <i class="fas fa-chevron-left"></i> Previous
-                    </button>
-                    <div class="pagination-info">
-                        <span id="reviewsPageInfo">Page 1 of 1</span>
-                    </div>
-                    <button class="pagination-btn" id="reviewsNextPage" disabled>
-                        Next <i class="fas fa-chevron-right"></i>
-                    </button>
-                </div>
+                <%- include('../partials/admin-pagination', { containerId: 'reviewsPagination', prevId: 'reviewsPrevPage', nextId: 'reviewsNextPage', pageNumbersId: 'reviewsPageNumbers', hidden: true }) %>
             </div>
 
         </div><!-- /.reviews-content -->
@@ -589,7 +457,7 @@
     const pagination     = document.getElementById('reviewsPagination');
     const prevBtn        = document.getElementById('reviewsPrevPage');
     const nextBtn        = document.getElementById('reviewsNextPage');
-    const pageInfo       = document.getElementById('reviewsPageInfo');
+    const pageNumbers    = document.getElementById('reviewsPageNumbers');
     const ratingFilter   = document.getElementById('ratingFilter');
     const searchInput    = document.getElementById('reviewSearch');
     const filterTabs     = document.querySelectorAll('.filter-tab');
@@ -773,9 +641,25 @@
             return;
         }
         pagination.style.display = 'flex';
-        pageInfo.textContent = `Page ${state.page} of ${state.totalPages}`;
         prevBtn.disabled = state.page <= 1;
         nextBtn.disabled = state.page >= state.totalPages;
+        if (pageNumbers) {
+            const maxPages = 5;
+            let startPage = Math.max(1, state.page - Math.floor(maxPages / 2));
+            let endPage = Math.min(state.totalPages, startPage + maxPages - 1);
+            if (endPage - startPage < maxPages - 1) startPage = Math.max(1, endPage - maxPages + 1);
+            let html = '';
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<span class="page-number ${i === state.page ? 'active' : ''}" data-page="${i}">${i}</span>`;
+            }
+            pageNumbers.innerHTML = html;
+            pageNumbers.querySelectorAll('.page-number').forEach(el => {
+                el.addEventListener('click', () => {
+                    const page = parseInt(el.dataset.page);
+                    if (page !== state.page) { state.page = page; loadReviews(); }
+                });
+            });
+        }
     }
 
     // ── Detail modal ───────────────────────────────────────

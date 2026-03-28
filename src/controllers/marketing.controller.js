@@ -3,8 +3,88 @@ const flashSaleService = require('../services/flashSale.service');
 const productService = require('../services/product.service');
 const featuredProductService = require('../services/featuredProduct.service');
 const { calculateFinalPrice, calculateSavings } = require('../utils/price.utils');
+const { getStockStatus } = require('../utils/stock.utils');
 const Settings = require('../models/Settings.model');
 const Product = require('../models/Product.model');
+
+/** Normalize product fields expected by views/partials/product-card.ejs */
+function normalizeProductCardFields(productObj) {
+    const out = { ...productObj };
+    if (typeof out.images === 'string') {
+        try {
+            out.images = JSON.parse(out.images);
+        } catch {
+            out.images = [];
+        }
+    }
+    if (!Array.isArray(out.images)) out.images = [];
+    if (out.id != null && out._id == null) out._id = out.id;
+    return out;
+}
+
+/**
+ * First active banner flash sale + priced products for home.ejs (server-rendered product cards).
+ * Mirrors getActiveFlashSales product shaping so the shop partial shows correct flash prices.
+ */
+async function buildHomeFlashSaleViewModel() {
+    try {
+        const activeSales = await flashSaleService.getActiveFlashSales();
+        for (const sale of activeSales) {
+            const saleObj = sale.toJSON();
+            const saleDiscount = Number(saleObj.discount) || 0;
+            const rawIds = saleObj.productIds;
+            const productIds = Array.isArray(rawIds)
+                ? rawIds
+                : (typeof rawIds === 'string'
+                    ? (() => {
+                          try {
+                              return JSON.parse(rawIds);
+                          } catch {
+                              return [];
+                          }
+                      })()
+                    : []);
+
+            const products = [];
+            for (const productId of productIds) {
+                try {
+                    const product = await productService.getProductById(productId);
+                    if (!product) continue;
+                    const productObj = normalizeProductCardFields(product.toJSON());
+                    const stock = Number(productObj.stock) || 0;
+                    if (stock <= 0) continue;
+                    const currentPrice = Number(productObj.price) || 0;
+                    const availableStock = Math.max(0, stock - (Number(productObj.reservedStock) || 0));
+                    const stockStatus = getStockStatus(availableStock, productObj.lowStockThreshold);
+                    products.push({
+                        ...productObj,
+                        originalPrice: currentPrice,
+                        finalPrice: calculateFinalPrice(currentPrice, saleDiscount),
+                        discount: saleDiscount,
+                        price: currentPrice,
+                        stockStatus
+                    });
+                } catch (err) {
+                    console.error(`[Marketing] Home flash product ${productId}:`, err.message);
+                }
+            }
+
+            if (products.length === 0) continue;
+
+            return {
+                endDate: saleObj.endDate,
+                bannerText: saleObj.bannerText || '',
+                products
+            };
+        }
+        return null;
+    } catch (e) {
+        console.error('[Marketing] buildHomeFlashSaleViewModel:', e);
+        return null;
+    }
+}
+
+exports.buildHomeFlashSaleViewModel = buildHomeFlashSaleViewModel;
 
 // Attach correct price fields to a normalised product plain object.
 function withPrices(productObj) {

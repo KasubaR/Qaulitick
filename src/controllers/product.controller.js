@@ -695,9 +695,16 @@ exports.renderShop = async (req, res) => {
  */
 exports.searchProducts = async (req, res) => {
     try {
-        const searchQuery = req.query.q;
-        
-        if (!searchQuery || searchQuery.trim().length === 0) {
+        let searchQuery = req.query.q;
+        if (Array.isArray(searchQuery)) {
+            searchQuery = searchQuery[0];
+        }
+        if (typeof searchQuery !== 'string') {
+            searchQuery = '';
+        }
+        searchQuery = searchQuery.trim();
+
+        if (!searchQuery) {
             return res.status(400).json({
                 success: false,
                 message: 'Search query is required'

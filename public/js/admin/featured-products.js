@@ -709,3 +709,14 @@ window.handleImageError = handleImageError;
 window.cleanupDeletedProducts = cleanupDeletedProducts;
 window.cleanupInactiveProducts = cleanupInactiveProducts;
 
+// Wire up header buttons
+document.addEventListener('DOMContentLoaded', function () {
+    const el = (id) => document.getElementById(id);
+    const addBtn = el('addProductBtn');
+    const cleanupDeletedBtn = el('cleanupDeletedBtn');
+    const cleanupInactiveBtn = el('cleanupInactiveBtn');
+    if (addBtn) addBtn.addEventListener('click', openAddProductModal);
+    if (cleanupDeletedBtn) cleanupDeletedBtn.addEventListener('click', cleanupDeletedProducts);
+    if (cleanupInactiveBtn) cleanupInactiveBtn.addEventListener('click', cleanupInactiveProducts);
+});
+

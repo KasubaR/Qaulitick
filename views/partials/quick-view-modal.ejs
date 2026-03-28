@@ -1,0 +1,46 @@
+<div id="quickViewModal" class="modal quick-view-modal" role="dialog" aria-modal="true" aria-labelledby="qvTitle" hidden>
+    <div class="modal-content quick-view-modal-content">
+        <button type="button" class="close-modal" id="quickViewClose" aria-label="Close quick view">&times;</button>
+        <div class="quick-view-inner" id="quickViewInner">
+            <p class="quick-view-loading-msg" id="quickViewLoading">Loading…</p>
+            <div class="quick-view-content" id="quickViewBody" hidden>
+                <div class="quick-view-image">
+                    <img id="qvImage" src="" alt="">
+                </div>
+                <div class="quick-view-details">
+                    <h2 id="qvTitle"></h2>
+                    <div class="quick-view-brand" id="qvBrand"></div>
+                    <div class="quick-view-rating" id="qvRating" aria-label="Product rating"></div>
+                    <div class="quick-view-price" id="qvPriceRow"></div>
+                    <div class="qv-variant-section" id="qvColorSection" hidden>
+                        <label class="qv-variant-label" for="qvColorSelect">Color</label>
+                        <div class="qv-color-select-wrap">
+                            <select id="qvColorSelect" class="qv-color-select" autocomplete="off">
+                                <option value="">Select a color</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="qv-variant-section">
+                        <label class="qv-variant-label" for="qvQtyInput">Quantity</label>
+                        <div class="qv-qty-controls">
+                            <button type="button" class="qv-qty-btn" id="qvQtyDec" aria-label="Decrease quantity">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <input type="number" id="qvQtyInput" class="qv-qty-input" value="1" min="1" max="99" readonly autocomplete="off">
+                            <button type="button" class="qv-qty-btn" id="qvQtyInc" aria-label="Increase quantity">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="quick-view-actions">
+                        <button type="button" class="qv-add-to-cart large" id="qvAddToCart">
+                            <i class="fas fa-shopping-cart" aria-hidden="true"></i> Add to cart
+                        </button>
+                        <a href="#" class="qv-full-details large" id="qvFullDetails">Full details <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+                    </div>
+                </div>
+            </div>
+            <p class="quick-view-error-msg" id="quickViewError" hidden></p>
+        </div>
+    </div>
+</div>

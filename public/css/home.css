@@ -510,6 +510,8 @@ body {
     font-weight: 700;
     color: var(--home-gold);
     letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
     background: rgba(175, 144, 68, 0.07);
     border: 1px solid rgba(175, 144, 68, 0.22);
     border-radius: 8px;
@@ -547,7 +549,16 @@ body {
     gap: 24px;
 }
 
-/* Flash sale product card */
+/* Shop partial cards inside flash strip (same markup as /shop) */
+.fs-products.fs-products--shop-cards {
+    align-items: start;
+}
+
+.fs-products.fs-products--shop-cards > .shop-product-card {
+    min-width: 0;
+}
+
+/* Legacy flash-only card (no longer used on home; kept if referenced elsewhere) */
 .fs-card {
     background: var(--home-cream);
     border: 1px solid rgba(175, 144, 68, 0.18);

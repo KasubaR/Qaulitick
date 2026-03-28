@@ -1,19 +1,20 @@
 /* Admin Login Page Styles */
 
 :root {
-    --login-bg-primary: #0f172a;
-    --login-bg-secondary: #1e293b;
-    --login-border: #334155;
-    --login-gold: #f59e0b;
-    --login-gold-light: #fbbf24;
-    --login-text-primary: #f1f5f9;
-    --login-text-secondary: #cbd5e1;
-    --login-error: #ef4444;
-    --login-success: #10b981;
+    /* Match public/css/main.css */
+    --login-bg-primary: #f9f9f9;
+    --login-bg-secondary: #ffffff;
+    --login-border: rgba(0, 0, 0, 0.08);
+    --login-gold: #af9044;
+    --login-gold-light: #d4a93a;
+    --login-text-primary: #070707;
+    --login-text-secondary: rgba(44, 38, 24, 0.72);
+    --login-error: #b91c1c;
+    --login-success: #15803d;
 }
 
 .login-page {
-    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    font-family: 'Satoshi-Variable', 'Satoshi-Regular', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background: var(--login-bg-primary);
     color: var(--login-text-primary);
     min-height: 100vh;
@@ -35,11 +36,11 @@
 
 /* Login Card */
 .login-card {
-    background: linear-gradient(135deg, var(--login-bg-secondary) 0%, #0f172a 100%);
+    background: var(--login-bg-secondary);
     border: 1px solid var(--login-border);
     border-radius: 16px;
     padding: 28px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
     backdrop-filter: blur(10px);
     animation: slideUp 0.5s ease-out;
     box-sizing: border-box;
@@ -111,8 +112,8 @@
 }
 
 .alert-error {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    background: rgba(185, 28, 28, 0.08);
+    border: 1px solid rgba(185, 28, 28, 0.3);
     color: var(--login-error);
 }
 
@@ -181,7 +182,7 @@
 .form-input {
     width: 100%;
     padding: 12px 14px;
-    background: rgba(15, 23, 42, 0.5);
+    background: #f3f3f1;
     border: 1px solid var(--login-border);
     border-radius: 10px;
     color: var(--login-text-primary);
@@ -194,8 +195,8 @@
 .form-input:focus {
     outline: none;
     border-color: var(--login-gold);
-    background: rgba(15, 23, 42, 0.7);
-    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(175, 144, 68, 0.15);
 }
 
 .form-input::placeholder {
@@ -205,7 +206,7 @@
 
 .form-input.error {
     border-color: var(--login-error);
-    background: rgba(239, 68, 68, 0.05);
+    background: rgba(185, 28, 28, 0.06);
 }
 
 /* Password Input Wrapper */
@@ -252,7 +253,7 @@
     width: 100%;
     padding: 16px;
     background: linear-gradient(135deg, var(--login-gold) 0%, var(--login-gold-light) 100%);
-    color: #000;
+    color: #fff;
     border: none;
     border-radius: 10px;
     font-size: 16px;
@@ -263,11 +264,12 @@
     margin-top: 8px;
     position: relative;
     overflow: hidden;
+    box-shadow: 0 4px 20px rgba(175, 144, 68, 0.35);
 }
 
 .btn-login:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3);
+    box-shadow: 0 8px 28px rgba(175, 144, 68, 0.45);
 }
 
 .btn-login:active:not(:disabled) {
@@ -315,7 +317,7 @@
 }
 
 .footer-link:hover {
-    color: var(--login-gold);
+    color: var(--login-gold-light);
 }
 
 .footer-link i {
@@ -337,7 +339,7 @@
 .bg-shape {
     position: absolute;
     border-radius: 50%;
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 191, 36, 0.05) 100%);
+    background: linear-gradient(135deg, rgba(175, 144, 68, 0.12) 0%, rgba(212, 169, 58, 0.06) 100%);
     filter: blur(60px);
     animation: float 20s infinite ease-in-out;
 }

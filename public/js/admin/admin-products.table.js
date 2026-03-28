@@ -16,7 +16,7 @@
         if (!Array.isArray(products) || products.length === 0) {
             tbody.innerHTML = [
                 '<tr>',
-                '    <td colspan="11" class="empty-state">',
+                '    <td colspan="10" class="empty-state">',
                 '        <i class="fas fa-box-open"></i>',
                 '        <p>No products found</p>',
                 '    </td>',
@@ -66,8 +66,8 @@
                 '    <td>' + discount + '%</td>',
                 '    <td>' + stock + '</td>',
                 '    <td>',
-                '        <span class="status-badge ' + (status === 'active' ? 'delivered' : 'cancelled') + '">',
-                '            ' + status + '',
+                '        <span class="badge ' + (status === 'active' ? 'badge-approved' : 'badge-rejected') + '">',
+                String(status),
                 '        </span>',
                 '    </td>',
                 '    <td>' + formattedDate + '</td>',

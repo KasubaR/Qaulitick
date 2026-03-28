@@ -5,9 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analytics Dashboard | Qualitick Collections</title>
     
-    <!-- Google Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -16,12 +13,7 @@
     <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
     
     <!-- Professional Admin Styles -->
-    <link rel="stylesheet" href="/css/admin/admin-professional.css">
-    <link rel="stylesheet" href="/css/admin/admin-components.css">
-    <link rel="stylesheet" href="/css/admin/admin-responsive.css">
-    <!-- Admin Dashboard Stylesheet (for sidebar consistency) -->
-    <link rel="stylesheet" href="/css/admin/dashboard.css">
-    <!-- Analytics Dashboard Stylesheet -->
+    <link rel="stylesheet" href="/css/admin/admin.css">
     <link rel="stylesheet" href="/css/admin/analytics.css">
 </head>
 <body class="admin-page">
@@ -32,7 +24,7 @@
         <%- include('../partials/admin-sidebar', { activePage: 'analytics' }) %>
 
         <!-- Main Content -->
-        <main class="admin-main">
+        <main class="admin-main analytics-page">
             <!-- Header -->
             <header class="admin-header">
                 <div class="header-left">
@@ -84,7 +76,7 @@
                     </div>
                     <div class="modal-footer">
                         <button class="btn-secondary" id="cancelDateBtn">Cancel</button>
-                        <button class="btn-primary" id="applyDateBtn">Apply</button>
+                        <%- include('../partials/admin-button', { variant: 'primary', id: 'applyDateBtn', label: 'Apply' }) %>
                     </div>
                 </div>
             </div>
@@ -117,7 +109,7 @@
                 </div>
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <div class="stat-icon stat-icon--users">
                             <i class="fas fa-users"></i>
                         </div>
                         <div class="stat-content">
@@ -127,7 +119,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <div class="stat-icon stat-icon--views">
                             <i class="fas fa-eye"></i>
                         </div>
                         <div class="stat-content">
@@ -137,7 +129,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                        <div class="stat-icon stat-icon--sessions">
                             <i class="fas fa-shopping-cart"></i>
                         </div>
                         <div class="stat-content">
@@ -147,7 +139,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                        <div class="stat-icon stat-icon--bounce">
                             <i class="fas fa-percentage"></i>
                         </div>
                         <div class="stat-content">
@@ -169,8 +161,8 @@
                         <div class="chart-header">
                             <h3>Users & Sessions Over Time</h3>
                             <div class="chart-legend">
-                                <span class="legend-item"><span class="legend-color" style="background: #667eea;"></span> Users</span>
-                                <span class="legend-item"><span class="legend-color" style="background: #f5576c;"></span> Sessions</span>
+                                <span class="legend-item"><span class="legend-color legend-color--users"></span> Users</span>
+                                <span class="legend-item"><span class="legend-color legend-color--sessions"></span> Sessions</span>
                             </div>
                         </div>
                         <div class="chart-container">
@@ -258,7 +250,7 @@
                 </div>
                 <div class="conversion-grid">
                     <div class="conversion-card">
-                        <div class="conversion-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <div class="conversion-icon conversion-icon--cart">
                             <i class="fas fa-cart-plus"></i>
                         </div>
                         <div class="conversion-content">
@@ -268,7 +260,7 @@
                         </div>
                     </div>
                     <div class="conversion-card">
-                        <div class="conversion-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <div class="conversion-icon conversion-icon--checkout">
                             <i class="fas fa-shopping-bag"></i>
                         </div>
                         <div class="conversion-content">
@@ -278,7 +270,7 @@
                         </div>
                     </div>
                     <div class="conversion-card">
-                        <div class="conversion-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                        <div class="conversion-icon conversion-icon--purchase">
                             <i class="fas fa-check-circle"></i>
                         </div>
                         <div class="conversion-content">

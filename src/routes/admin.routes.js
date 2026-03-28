@@ -111,6 +111,13 @@ router.get('/admin/reviews', requireAdminAuth, (req, res) => {
 // ============================================
 // Admin Product API
 // ============================================
+
+// Must be declared before /:id to prevent "search" being treated as an ID
+router.get('/api/products/search',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
+    productController.searchProducts
+);
+
 router.get('/api/products/export',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }),
     authenticateAdmin,
@@ -147,42 +154,42 @@ router.delete('/api/products/bulk',
     productController.bulkDeleteProducts
 );
 
-// :id routes must come after static segments
-router.get('/api/products/:id',
+// :id must be numeric only — otherwise "search", "export", etc. match :id and break those routes
+router.get('/api/products/:id(\\d+)',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
     authenticateAdmin,
     productController.getProductByIdAPI
 );
 
-router.put('/api/products/:id',
+router.put('/api/products/:id(\\d+)',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }),
     authenticateAdmin,
     csrfTokenValidator(),
     productController.updateProduct
 );
 
-router.delete('/api/products/:id',
+router.delete('/api/products/:id(\\d+)',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }),
     authenticateAdmin,
     csrfTokenValidator(),
     productController.deleteProduct
 );
 
-router.put('/api/products/:id/images/reorder',
+router.put('/api/products/:id(\\d+)/images/reorder',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }),
     authenticateAdmin,
     csrfTokenValidator(),
     productController.reorderProductImages
 );
 
-router.put('/api/products/:id/images/primary',
+router.put('/api/products/:id(\\d+)/images/primary',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }),
     authenticateAdmin,
     csrfTokenValidator(),
     productController.setPrimaryImage
 );
 
-router.delete('/api/products/:id/images/:imageId',
+router.delete('/api/products/:id(\\d+)/images/:imageId',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }),
     authenticateAdmin,
     csrfTokenValidator(),

@@ -30,6 +30,7 @@
             {
                 method: method,
                 headers: defaultHeaders,
+                credentials: 'include',
                 // Bypass browser cache — admin panel must always see current DB state,
                 // not a stale response cached by Cache-Control: public, max-age=300
                 cache: 'no-store'

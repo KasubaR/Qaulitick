@@ -5,9 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventory Management | Admin Panel</title>
     
-    <!-- Google Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -16,14 +13,7 @@
     <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
     
     <!-- Professional Admin Styles -->
-    <link rel="stylesheet" href="/css/admin/admin-professional.css">
-    <link rel="stylesheet" href="/css/admin/admin-components.css">
-    <link rel="stylesheet" href="/css/admin/admin-responsive.css">
-    <!-- Admin Dashboard Stylesheet -->
-    <link rel="stylesheet" href="/css/admin/dashboard.css">
-    <!-- Admin Orders Stylesheet (for action menu styles) -->
-    <link rel="stylesheet" href="/css/admin/orders.css">
-    <!-- Admin Inventory Stylesheet -->
+    <link rel="stylesheet" href="/css/admin/admin.css">
     <link rel="stylesheet" href="/css/admin/inventory.css">
 </head>
 <body class="admin-page">
@@ -44,76 +34,27 @@
                 </div>
                 
                 <div class="header-right">
-                    <button class="btn-outline" id="exportInventoryBtn">
-                        <i class="fas fa-download"></i> Export
-                    </button>
+                    <%- include('../partials/admin-button', { id: 'exportInventoryBtn', icon: 'fa-download', label: 'Export' }) %>
                 </div>
             </header>
 
             <!-- Inventory Content -->
             <div class="inventory-content">
                 <!-- Statistics Cards -->
-                <div class="inventory-stats">
-                    <div class="stat-card">
-                        <div class="stat-icon total">
-                            <i class="fas fa-boxes"></i>
-                        </div>
-                        <div class="stat-info">
-                            <div class="stat-label">Total Products</div>
-                            <div class="stat-value" id="totalProducts">0</div>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon in-stock">
-                            <i class="fas fa-check-circle"></i>
-                        </div>
-                        <div class="stat-info">
-                            <div class="stat-label">In Stock</div>
-                            <div class="stat-value" id="inStockCount">0</div>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon low-stock">
-                            <i class="fas fa-exclamation-triangle"></i>
-                        </div>
-                        <div class="stat-info">
-                            <div class="stat-label">Low Stock</div>
-                            <div class="stat-value" id="lowStockCount">0</div>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon out-of-stock">
-                            <i class="fas fa-times-circle"></i>
-                        </div>
-                        <div class="stat-info">
-                            <div class="stat-label">Out of Stock</div>
-                            <div class="stat-value" id="outOfStockCount">0</div>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon total-value">
-                            <i class="fas fa-dollar-sign"></i>
-                        </div>
-                        <div class="stat-info">
-                            <div class="stat-label">Total Inventory Value</div>
-                            <div class="stat-value" id="totalValue">K0</div>
-                        </div>
-                    </div>
+                <div class="kpi-grid">
+                    <%- include('../partials/admin-stat-card', { label: 'Total Products',        iconVariant: 'inventory',    valueId: 'totalProducts',   value: '0' }) %>
+                    <%- include('../partials/admin-stat-card', { label: 'In Stock',              iconVariant: 'verified',     valueId: 'inStockCount',    value: '0' }) %>
+                    <%- include('../partials/admin-stat-card', { label: 'Low Stock',             iconVariant: 'alerts',       valueId: 'lowStockCount',   value: '0' }) %>
+                    <%- include('../partials/admin-stat-card', { label: 'Out of Stock',          iconVariant: 'out-of-stock', valueId: 'outOfStockCount', value: '0' }) %>
+                    <%- include('../partials/admin-stat-card', { label: 'Total Inventory Value', iconVariant: 'sales',        valueId: 'totalValue',      value: 'K0' }) %>
                 </div>
 
                 <!-- Search and Filters -->
-                <div class="inventory-toolbar">
-                    <div class="search-section">
-                        <div class="search-box">
-                            <i class="fas fa-search"></i>
-                            <input type="text" id="inventorySearch" placeholder="Search by product name, SKU, or brand...">
-                            <button class="search-btn" id="searchBtn">Search</button>
-                        </div>
-                    </div>
+                <div class="orders-toolbar">
+                    <%- include('../partials/admin-search-box', {
+                        inputId: 'inventorySearch',
+                        placeholder: 'Search by product name, SKU, or brand...'
+                    }) %>
 
                     <div class="filters-section">
                         <div class="filter-group">
@@ -158,9 +99,7 @@
                             </select>
                         </div>
 
-                        <button class="btn-outline" id="clearFiltersBtn">
-                            <i class="fas fa-times"></i> Clear Filters
-                        </button>
+                        <%- include('../partials/admin-button', { id: 'clearFiltersBtn', icon: 'fa-times', label: 'Clear Filters' }) %>
                     </div>
                 </div>
 
@@ -200,17 +139,7 @@
                     </div>
 
                     <!-- Pagination -->
-                    <div class="pagination" id="pagination">
-                        <button class="page-btn" id="prevPage" disabled>
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </button>
-                        <div class="page-numbers" id="pageNumbers">
-                            <span class="page-number active">1</span>
-                        </div>
-                        <button class="page-btn" id="nextPage">
-                            Next <i class="fas fa-chevron-right"></i>
-                        </button>
-                    </div>
+                    <%- include('../partials/admin-pagination', { containerId: 'pagination', prevId: 'prevPage', nextId: 'nextPage' }) %>
                 </div>
             </div>
         </main>
