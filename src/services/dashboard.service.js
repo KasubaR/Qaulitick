@@ -23,7 +23,9 @@ class DashboardService {
             const [
                 totalOrders,
                 totalProducts,
-                lowStockCount
+                lowStockCount,
+                revenueResult,
+                laybyResult
             ] = await Promise.all([
                 Order.count({
                     where: {
@@ -38,10 +40,24 @@ class DashboardService {
                         stock: { [Op.gt]: 0, [Op.lte]: 10 },
                         status: 'active'
                     }
-                })
+                }),
+                sequelize.query(`
+                    SELECT
+                        COALESCE(SUM(JSON_EXTRACT(totals, '$.total')), 0) AS revenue
+                    FROM orders
+                    WHERE status IN ('paid', 'confirmed', 'processing', 'packed', 'shipped', 'delivered')
+                      AND paymentStatus = 'completed'
+                `, { type: QueryTypes.SELECT }),
+                sequelize.query(`
+                    SELECT COALESCE(SUM(amount), 0) AS laybyRevenue
+                    FROM layby_payments
+                    WHERE status = 'paid'
+                `, { type: QueryTypes.SELECT })
             ]);
 
-            const currentRevenueValue = 0;
+            const orderRevenue = Number(revenueResult[0]?.revenue) || 0;
+            const laybyRevenue = Number(laybyResult[0]?.laybyRevenue) || 0;
+            const currentRevenueValue = orderRevenue + laybyRevenue;
             const previousRevenueValue = 0;
 
             // Unique customer emails only after payment is completed on at least one order
@@ -68,13 +84,13 @@ class DashboardService {
             const currentCustomersCount = Number(total) || 0;
             const previousCustomersCount = 0;
 
-            const salesChange = this.calculatePercentageChange(totalOrders, 0);
-            const revenueChange = this.calculatePercentageChange(currentRevenueValue, previousRevenueValue);
+            const salesChange = this.calculatePercentageChange(currentRevenueValue, previousRevenueValue);
+            const revenueChange = salesChange;
             const customersChange = this.calculatePercentageChange(currentCustomersCount, previousCustomersCount);
-            const ordersChange = salesChange;
+            const ordersChange = this.calculatePercentageChange(totalOrders, 0);
 
             return {
-                totalSales: totalOrders,
+                totalSales: currentRevenueValue,
                 totalOrders: totalOrders,
                 totalCustomers: currentCustomersCount,
                 totalProducts: totalProducts,
