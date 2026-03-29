@@ -577,6 +577,18 @@ body.shop-page {
     transition: 0.3s;
     border: 1px solid rgba(175, 144, 68, 0.18);
     position: relative;
+    display: flex;
+    flex-direction: column;
+}
+.shop-product-card .product-link--info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+.shop-product-card .product-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 .shop-product-card:hover {

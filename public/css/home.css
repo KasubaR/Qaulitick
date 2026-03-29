@@ -425,6 +425,11 @@ body {
 .product-card:hover img { transform: scale(1.05); }
 .product-info { padding: 20px; }
 .product-info h3 { font-size: 18px; margin-bottom: 8px; color: var(--home-dark); }
+/* Fix clamp height for 18px font-size (18 * 1.4 * 2 = ~51px) */
+.product-card .product-name {
+    font-size: 18px;
+    height: 51px;
+}
 
 .price {
     background: var(--gold-gradient-horizontal);
