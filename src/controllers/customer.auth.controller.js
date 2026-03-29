@@ -508,12 +508,30 @@ exports.verifyEmail = async (req, res) => {
             });
         }
 
-        res.render('account/verify-email-result', {
-            title: 'Email verified | Qualitick Collections',
-            page: 'account',
-            accountSection: 'verify',
-            success: true,
-            message: 'Your email is verified. You can use layby at checkout when logged in.'
+        // Auto-login the user after successful verification
+        req.session.regenerate((regErr) => {
+            if (regErr) {
+                logger.error({ err: regErr }, 'session regenerate after email verify failed');
+                // Verification succeeded — redirect to login with a success message even if session fails
+                return res.redirect('/login?message=' + encodeURIComponent(
+                    'Email verified! You can now sign in.'
+                ));
+            }
+
+            req.session.userId = result.user.id;
+            req.session.csrfToken = crypto.randomBytes(32).toString('hex');
+
+            req.session.save((saveErr) => {
+                if (saveErr) {
+                    logger.error({ err: saveErr }, 'session save after email verify failed');
+                    return res.redirect('/login?message=' + encodeURIComponent(
+                        'Email verified! You can now sign in.'
+                    ));
+                }
+                return res.redirect('/account?message=' + encodeURIComponent(
+                    'Your email is verified. Welcome to Qualitick Collections!'
+                ));
+            });
         });
     } catch (error) {
         logger.error({ err: error, op: 'verifyEmail' }, 'verifyEmail failed');

@@ -325,7 +325,10 @@ router.post('/logout',
     csrfTokenValidator(),
     customerAuthController.handleLogout
 );
-router.get('/verify-email', customerAuthController.verifyEmail);
+router.get('/verify-email',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }),
+    customerAuthController.verifyEmail
+);
 router.post('/resend-verification',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 5 }),
     csrfTokenValidator(),

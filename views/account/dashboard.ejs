@@ -13,6 +13,9 @@
 
     <%- include('./_subnav') %>
 
+    <% if (typeof message !== 'undefined' && message) { %>
+        <div class="account-alert account-alert--success" role="status"><%= message %></div>
+    <% } %>
     <% if (typeof emailVerified !== 'undefined' && !emailVerified) { %>
         <div class="account-alert account-alert--info" role="status">
             Verify your email to use <strong>layby</strong> at checkout. Check your inbox for the verification link.

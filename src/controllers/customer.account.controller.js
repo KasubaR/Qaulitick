@@ -10,7 +10,8 @@ exports.renderDashboard = (req, res) => {
         page: 'account',
         accountSection: 'dashboard',
         customer: u,
-        emailVerified: !!u.emailVerifiedAt
+        emailVerified: !!u.emailVerifiedAt,
+        message: typeof req.query.message === 'string' ? req.query.message : null
     });
 };
 
