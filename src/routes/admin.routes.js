@@ -268,6 +268,11 @@ router.get('/api/admin/dashboard/search',
     authenticateAdmin,
     dashboardController.searchDashboard
 );
+router.get('/api/admin/dashboard/layby-overview',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
+    authenticateAdmin,
+    dashboardController.getLaybyOverview
+);
 
 // ============================================
 // Admin Customer API

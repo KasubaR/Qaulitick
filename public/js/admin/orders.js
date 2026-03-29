@@ -63,14 +63,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     initializeOrdersPage();
     setupEventListeners();
-    
+
+    // Mark orders as viewed immediately — don't wait for the API call
+    // so the badge clears even if loadOrders() fails
+    if (window.OrdersBadge) {
+        window.OrdersBadge.markAsViewed();
+    }
+
     // Load orders from API
-    loadOrders().then(() => {
-        // Mark all current orders as viewed (user is on orders page)
-        if (window.OrdersBadge) {
-            window.OrdersBadge.markAsViewed();
-        }
-    });
+    loadOrders();
 });
 
 // Initialize orders page

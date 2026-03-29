@@ -44,15 +44,24 @@ class DashboardService {
             const currentRevenueValue = 0;
             const previousRevenueValue = 0;
 
-            // Count unique customers by email across registered users and guest orders
+            // Unique customer emails only after payment is completed on at least one order
+            // (order.customer JSON and/or linked users row — UNION dedupes same address)
             const [{ total }] = await sequelize.query(`
                 SELECT COUNT(*) AS total FROM (
-                    SELECT LOWER(email) AS email FROM users
-                    UNION
                     SELECT LOWER(JSON_UNQUOTE(JSON_EXTRACT(customer, '$.email'))) AS email
                     FROM orders
-                    WHERE JSON_UNQUOTE(JSON_EXTRACT(customer, '$.email')) IS NOT NULL
-                      AND JSON_UNQUOTE(JSON_EXTRACT(customer, '$.email')) != ''
+                    WHERE paymentStatus = 'completed'
+                      AND status NOT IN ('cancelled', 'payment_failed')
+                      AND JSON_UNQUOTE(JSON_EXTRACT(customer, '$.email')) IS NOT NULL
+                      AND TRIM(JSON_UNQUOTE(JSON_EXTRACT(customer, '$.email'))) != ''
+                    UNION
+                    SELECT LOWER(u.email) AS email
+                    FROM orders o
+                    INNER JOIN users u ON u.id = o.userId
+                    WHERE o.paymentStatus = 'completed'
+                      AND o.status NOT IN ('cancelled', 'payment_failed')
+                      AND u.email IS NOT NULL
+                      AND TRIM(u.email) != ''
                 ) AS unique_customers
             `, { type: QueryTypes.SELECT });
 
@@ -195,6 +204,32 @@ class DashboardService {
             console.error('[Dashboard Service] Error getting order summary:', error);
             throw error;
         }
+    }
+
+    /**
+     * Get layby overview stats for dashboard
+     * @returns {Promise<Object>} { active, overdue, completed, outstandingBalance }
+     */
+    async getLaybyOverview() {
+        const LaybyPlan = require('../models/LaybyPlan.model');
+        const now = new Date();
+
+        const [active, overdue, completed, outstandingRows] = await Promise.all([
+            LaybyPlan.count({ where: { status: 'active' } }),
+            LaybyPlan.count({ where: { status: 'active', nextDueAt: { [Op.lt]: now } } }),
+            LaybyPlan.count({ where: { status: 'completed' } }),
+            LaybyPlan.findAll({
+                attributes: ['balanceRemaining'],
+                where: { status: 'active' },
+                raw: true
+            })
+        ]);
+
+        const outstandingBalance = outstandingRows.reduce(
+            (sum, r) => sum + parseFloat(r.balanceRemaining || 0), 0
+        );
+
+        return { active, overdue, completed, outstandingBalance };
     }
 
     /**

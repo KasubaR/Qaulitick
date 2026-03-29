@@ -107,6 +107,52 @@
                     }) %>
                 </div>
 
+                <!-- Layby Overview -->
+                <div class="table-card layby-overview-section">
+                    <div class="card-header">
+                        <h3><i class="fas fa-layer-group layby-overview-title-icon" aria-hidden="true"></i>Layby Overview</h3>
+                        <a href="/admin/layby" class="view-all-link">View All</a>
+                    </div>
+                    <div class="layby-stat-grid">
+                        <div class="layby-stat-card">
+                            <div class="layby-stat-icon layby-icon-outstanding">
+                                <i class="fas fa-wallet"></i>
+                            </div>
+                            <div class="layby-stat-info">
+                                <span class="layby-stat-label">Outstanding Payments</span>
+                                <span class="layby-stat-value" id="laybyOutstanding">K0.00</span>
+                            </div>
+                        </div>
+                        <div class="layby-stat-card">
+                            <div class="layby-stat-icon layby-icon-overdue">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="layby-stat-info">
+                                <span class="layby-stat-label">Overdue</span>
+                                <span class="layby-stat-value" id="laybyOverdue">0</span>
+                            </div>
+                        </div>
+                        <div class="layby-stat-card">
+                            <div class="layby-stat-icon layby-icon-completed">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="layby-stat-info">
+                                <span class="layby-stat-label">Completed</span>
+                                <span class="layby-stat-value" id="laybyCompleted">0</span>
+                            </div>
+                        </div>
+                        <div class="layby-stat-card">
+                            <div class="layby-stat-icon layby-icon-active">
+                                <i class="fas fa-shopping-bag"></i>
+                            </div>
+                            <div class="layby-stat-info">
+                                <span class="layby-stat-label">Active Layby Orders</span>
+                                <span class="layby-stat-value" id="laybyActive">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Charts Section -->
                 <div class="charts-grid">
                     <div class="chart-card">

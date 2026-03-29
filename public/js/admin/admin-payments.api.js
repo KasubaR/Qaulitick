@@ -11,17 +11,28 @@
      * @returns {Promise<any>} Parsed JSON response
      */
     async function apiRequest(url, options = {}) {
-        const defaultHeaders = {
-            'Content-Type': 'application/json'
+        const method = (options.method || 'GET').toUpperCase();
+        const stateChangingMethods = ['POST', 'PUT', 'DELETE', 'PATCH'];
+
+        const headers = {
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
         };
 
-        const config = Object.assign(
-            {
-                method: 'GET',
-                headers: defaultHeaders
-            },
-            options
-        );
+        if (stateChangingMethods.includes(method)) {
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+            if (csrfToken) {
+                headers['X-CSRF-Token'] = csrfToken;
+            }
+        }
+
+        const config = {
+            ...options,
+            method,
+            credentials: 'include',
+            headers: { ...headers, ...(options.headers || {}) }
+        };
 
         try {
             const response = await fetch(url, config);
@@ -107,6 +118,20 @@
     }
 
     /**
+     * Delete a payment by primary key id (admin)
+     * @param {number|string} paymentId
+     */
+    async function deletePayment(paymentId) {
+        const id = parseInt(String(paymentId), 10);
+        if (!Number.isFinite(id) || id < 1) {
+            throw new Error('Invalid payment ID');
+        }
+        return apiRequest(`${BASE_URL}/${id}`, {
+            method: 'DELETE'
+        });
+    }
+
+    /**
      * Verify payment status with Lenco
      * @param {string} transactionId - Payment transaction ID
      * @returns {Promise<object>} Verification result
@@ -127,6 +152,7 @@
     window.AdminPaymentsAPI = {
         loadPayments: loadPayments,
         getPaymentById: getPaymentById,
+        deletePayment: deletePayment,
         verifyPayment: verifyPayment
     };
 })(window);

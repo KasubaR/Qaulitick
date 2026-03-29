@@ -46,7 +46,10 @@ router.post('/retry/:orderNumber', paymentController.retryPayment);
 // Cancel a pending payment by transaction ID (must come before /:id to avoid route conflict)
 router.patch('/cancel/:transactionId', paymentController.cancelPayment);
 
-// Get payment by ID (admin) - MUST be last to avoid matching other routes
+// Delete payment record (admin)
+router.delete('/:id', authenticateAdmin, paymentController.deletePayment);
+
+// Get payment by ID (admin) — register after other /:id methods that share this path pattern
 router.get('/:id', authenticateAdmin, paymentController.getPaymentById);
 
 /**

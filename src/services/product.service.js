@@ -1,5 +1,14 @@
 const { Op } = require('sequelize');
+const { sequelize } = require('../config/mysql');
 const Product = require('../models/Product.model');
+
+/** Match text inside JSON columns (arrays/objects) by casting to string — plain LIKE on JSON path is unreliable. */
+function jsonDocLike(column, term) {
+    return sequelize.where(
+        sequelize.fn('CAST', sequelize.col(column), sequelize.literal('CHAR(16384)')),
+        { [Op.like]: term }
+    );
+}
 
 /**
  * Product Service — Sequelize implementation
@@ -86,15 +95,19 @@ class ProductService {
         try {
             const { limit = 20, skip = 0 } = options;
             const term = `%${searchQuery.trim()}%`;
+            const textOr = [
+                { model: { [Op.like]: term } },
+                { brand: { [Op.like]: term } },
+                { sku: { [Op.like]: term } },
+                { description: { [Op.like]: term } },
+                jsonDocLike('colors', term),
+                jsonDocLike('strapOptions', term),
+                jsonDocLike('images', term)
+            ];
             return await Product.findAll({
                 where: {
                     status: 'active',
-                    [Op.or]: [
-                        { model:       { [Op.like]: term } },
-                        { brand:       { [Op.like]: term } },
-                        { sku:         { [Op.like]: term } },
-                        { description: { [Op.like]: term } }
-                    ]
+                    [Op.or]: textOr
                 },
                 order: [['createdAt', 'DESC']],
                 limit,
@@ -109,15 +122,19 @@ class ProductService {
     async countSearchResults(searchQuery) {
         try {
             const term = `%${searchQuery.trim()}%`;
+            const textOr = [
+                { model: { [Op.like]: term } },
+                { brand: { [Op.like]: term } },
+                { sku: { [Op.like]: term } },
+                { description: { [Op.like]: term } },
+                jsonDocLike('colors', term),
+                jsonDocLike('strapOptions', term),
+                jsonDocLike('images', term)
+            ];
             return await Product.count({
                 where: {
                     status: 'active',
-                    [Op.or]: [
-                        { model:       { [Op.like]: term } },
-                        { brand:       { [Op.like]: term } },
-                        { sku:         { [Op.like]: term } },
-                        { description: { [Op.like]: term } }
-                    ]
+                    [Op.or]: textOr
                 }
             });
         } catch (error) {

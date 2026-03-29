@@ -430,30 +430,29 @@ exports.getAllOrders = async (req, res) => {
             }
         }
 
-        // Text search: orderNumber prefix or customer email/name (JSON column)
+        // Text search: orderNumber or customer email/name/phone (JSON — must JSON_UNQUOTE for LIKE in MySQL)
+        const jsonCustomerLike = (path, term) =>
+            sequelize.where(
+                sequelize.fn(
+                    'JSON_UNQUOTE',
+                    sequelize.fn(
+                        'JSON_EXTRACT',
+                        sequelize.col('customer'),
+                        sequelize.literal(`'$.${path}'`)
+                    )
+                ),
+                { [Op.like]: `%${term}%` }
+            );
+
         const searchClauses = [];
         if (search) {
             searchClauses.push({ orderNumber: { [Op.like]: `%${search}%` } });
-            searchClauses.push(
-                sequelize.where(
-                    sequelize.fn('JSON_EXTRACT', sequelize.col('customer'), '$.email'),
-                    { [Op.like]: `%${search}%` }
-                )
-            );
-            searchClauses.push(
-                sequelize.where(
-                    sequelize.fn('JSON_EXTRACT', sequelize.col('customer'), '$.name'),
-                    { [Op.like]: `%${search}%` }
-                )
-            );
+            searchClauses.push(jsonCustomerLike('email', search));
+            searchClauses.push(jsonCustomerLike('name', search));
+            searchClauses.push(jsonCustomerLike('phone', search));
         }
         if (email) {
-            searchClauses.push(
-                sequelize.where(
-                    sequelize.fn('JSON_EXTRACT', sequelize.col('customer'), '$.email'),
-                    { [Op.like]: `%${email}%` }
-                )
-            );
+            searchClauses.push(jsonCustomerLike('email', email));
         }
         if (searchClauses.length) {
             where[Op.or] = searchClauses;

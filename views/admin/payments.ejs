@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<%= csrfToken %>">
     <title>Payments Management | Admin Panel</title>
     
     <!-- Font Awesome for Icons -->
@@ -43,7 +44,7 @@
             <!-- Payments Content -->
             <div class="payments-content">
                 <!-- Search and Filters -->
-                <div class="payments-toolbar">
+                <div class="admin-toolbar">
                     <%- include('../partials/admin-search-box', {
                         inputId: 'paymentSearch',
                         placeholder: 'Search by Order ID, Transaction ID, customer name, or email...'
@@ -274,6 +275,9 @@
                             <div class="action-buttons-group">
                                 <button class="btn-outline" id="viewOrderBtn">
                                     <i class="fas fa-shopping-cart"></i> View Order
+                                </button>
+                                <button type="button" class="btn-danger" id="deletePaymentModalBtn">
+                                    <i class="fas fa-trash"></i> Delete payment
                                 </button>
                             </div>
                         </div>

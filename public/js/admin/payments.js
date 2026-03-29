@@ -196,7 +196,14 @@ function setupActionButtons() {
             showNotification('Failed to get payment details', 'error');
         }
     });
-    
+
+    document.getElementById('deletePaymentModalBtn')?.addEventListener('click', async () => {
+        if (!currentPaymentId) {
+            showNotification('No payment selected', 'error');
+            return;
+        }
+        await deletePaymentById(currentPaymentId, { closeModalOnSuccess: true });
+    });
 }
 
 // Handle search
@@ -399,6 +406,11 @@ function renderPayments(payments) {
                             <i class="fas fa-download"></i>
                             <span>Export Data</span>
                         </button>
+                        <div class="action-menu-divider"></div>
+                        <button class="action-menu-item danger" data-action="delete" data-payment-id="${payment.id}">
+                            <i class="fas fa-trash"></i>
+                            <span>Delete</span>
+                        </button>
                         ${payment.status === 'failed' ? `
                         <div class="action-menu-divider"></div>
                         <button class="action-menu-item danger" data-action="retry" data-order-number="${payment.orderNumber}">
@@ -512,6 +524,37 @@ function getPaymentStatusClass(status) {
 function verifyPayment(paymentId) {
     openPaymentDetails(paymentId);
     // Verification is triggered from the modal button
+}
+
+/**
+ * Permanently delete a payment (admin). Does not change the linked order's payment status.
+ * @param {string|number} paymentId
+ * @param {{ closeModalOnSuccess?: boolean }} [opts]
+ */
+async function deletePaymentById(paymentId, opts = {}) {
+    const idStr = String(paymentId);
+    const confirmed = await showConfirmDialog(
+        'This permanently removes the payment record from the database. The linked order will not automatically revert to unpaid—update the order separately if needed.',
+        {
+            title: 'Delete payment?',
+            confirmLabel: 'Delete',
+            isDanger: true
+        }
+    );
+    if (!confirmed) {
+        return;
+    }
+    try {
+        await AdminPaymentsAPI.deletePayment(idStr);
+        showNotification('Payment deleted', 'success');
+        if (opts.closeModalOnSuccess) {
+            closePaymentDetails();
+        }
+        await loadPayments(getCurrentFilters());
+    } catch (error) {
+        console.error('Error deleting payment:', error);
+        showNotification(error.message || 'Failed to delete payment', 'error');
+    }
 }
 
 // Retry failed payment
@@ -840,6 +883,7 @@ function setupActionMenu() {
                 case 'view':   openPaymentDetails(paymentId); break;
                 case 'order':  goToOrder(paymentId); break;
                 case 'export': exportPaymentData(paymentId); break;
+                case 'delete': deletePaymentById(paymentId); break;
                 case 'retry':  retryPayment(orderNumber); break;
             }
         }

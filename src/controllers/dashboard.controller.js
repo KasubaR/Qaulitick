@@ -8,6 +8,7 @@
 const dashboardService = require('../services/dashboard.service');
 const Order = require('../models/Order.model');
 const Product = require('../models/Product.model');
+const { sequelize } = require('../config/mysql');
 const { Op, fn, col, where, literal } = require('sequelize');
 
 /**
@@ -298,13 +299,26 @@ exports.searchDashboard = async (req, res) => {
                 limit: 10
             }),
 
-            // Search products by model, brand, or SKU
+            // Search products: string columns + JSON (colors, straps, images)
             Product.findAll({
                 where: {
                     [Op.or]: [
                         { model: { [Op.like]: like } },
                         { brand: { [Op.like]: like } },
-                        { sku: { [Op.like]: like } }
+                        { sku: { [Op.like]: like } },
+                        { description: { [Op.like]: like } },
+                        sequelize.where(
+                            fn('CAST', col('colors'), literal('CHAR(16384)')),
+                            { [Op.like]: like }
+                        ),
+                        sequelize.where(
+                            fn('CAST', col('strapOptions'), literal('CHAR(16384)')),
+                            { [Op.like]: like }
+                        ),
+                        sequelize.where(
+                            fn('CAST', col('images'), literal('CHAR(16384)')),
+                            { [Op.like]: like }
+                        )
                     ],
                     status: 'active'
                 },
@@ -377,6 +391,20 @@ exports.searchDashboard = async (req, res) => {
             success: false,
             message: 'Failed to perform search'
         });
+    }
+};
+
+/**
+ * Get layby overview stats
+ * GET /api/admin/dashboard/layby-overview
+ */
+exports.getLaybyOverview = async (req, res) => {
+    try {
+        const data = await dashboardService.getLaybyOverview();
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('[Dashboard Controller] Error getting layby overview:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch layby overview' });
     }
 };
 

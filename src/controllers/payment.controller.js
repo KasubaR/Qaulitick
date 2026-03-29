@@ -1,5 +1,6 @@
 // Payment Controller
 const { Op } = require('sequelize');
+const { sequelize } = require('../config/mysql');
 const Payment = require('../models/Payment.model');
 const Order = require('../models/Order.model');
 const lencoService = require('../services/lenco.service');
@@ -1391,17 +1392,33 @@ exports.retryPayment = async (req, res) => {
  * Build Sequelize where clause from filters
  */
 function buildPaymentQuery(filters) {
-    const { Op } = require('sequelize');
     const { orderNumber, status, paymentMethod, provider, startDate, endDate, search } = filters;
 
     const where = {};
 
     if (search) {
+        const term = `%${search}%`;
+        const customerInfoLike = (path) =>
+            sequelize.where(
+                sequelize.fn(
+                    'JSON_UNQUOTE',
+                    sequelize.fn(
+                        'JSON_EXTRACT',
+                        sequelize.col('customerInfo'),
+                        sequelize.literal(`'$.${path}'`)
+                    )
+                ),
+                { [Op.like]: term }
+            );
+
         where[Op.or] = [
-            { orderNumber:         { [Op.like]: `%${search}%` } },
-            { transactionId:       { [Op.like]: `%${search}%` } },
-            { lencoTransactionId:  { [Op.like]: `%${search}%` } },
-            { lencoReference:      { [Op.like]: `%${search}%` } }
+            { orderNumber: { [Op.like]: term } },
+            { transactionId: { [Op.like]: term } },
+            { lencoTransactionId: { [Op.like]: term } },
+            { lencoReference: { [Op.like]: term } },
+            customerInfoLike('name'),
+            customerInfoLike('email'),
+            customerInfoLike('phone')
         ];
     }
 
@@ -1554,6 +1571,44 @@ exports.getPaymentById = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to fetch payment',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+/**
+ * Delete a payment row (admin). Layby installment links use ON DELETE SET NULL.
+ * DELETE /api/payments/:id
+ */
+exports.deletePayment = async (req, res) => {
+    try {
+        const id = parseInt(String(req.params.id), 10);
+        if (!Number.isFinite(id) || id < 1) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid payment ID'
+            });
+        }
+
+        const payment = await Payment.findByPk(id);
+        if (!payment) {
+            return res.status(404).json({
+                success: false,
+                message: 'Payment not found'
+            });
+        }
+
+        await payment.destroy();
+
+        res.json({
+            success: true,
+            message: 'Payment deleted'
+        });
+    } catch (error) {
+        logger.error({ err: error.message }, '[Payment Controller] deletePayment failed');
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete payment',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }

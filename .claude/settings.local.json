@@ -15,7 +15,8 @@
       "Bash(node -e \"const { sequelize } = require\\(''''./src/config/mysql''''\\); const { DataTypes } = require\\(''''sequelize''''\\); const Order = require\\(''''./src/models/Order.model''''\\); Order.findByOrderNumber\\(''''ORD-000007''''\\).then\\(o => { console.log\\(''''totals type:'''', typeof o.totals\\); console.log\\(''''totals:'''', JSON.stringify\\(o.totals\\)\\); process.exit\\(0\\); }\\).catch\\(e => { console.error\\(e.message\\); process.exit\\(1\\); }\\);\")",
       "Bash(find /c/Users/Admin/Desktop/qualitick-collections -type f -name *.model.js -o -name *.controller.js -o -name *.service.js -o -name *.routes.js)",
       "Bash(find /c/Users/Admin/Desktop/qualitick-collections/views -type f -name *.ejs)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(python -c \":*)"
     ]
   }
 }

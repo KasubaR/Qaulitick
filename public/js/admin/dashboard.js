@@ -96,6 +96,10 @@ async function loadDashboardData() {
         updateOrderSummary().catch(err => {
             console.error('[Dashboard] Order summary failed:', err);
             return null;
+        }),
+        loadLaybyOverview().catch(err => {
+            console.error('[Dashboard] Layby overview failed:', err);
+            return null;
         })
     ];
     
@@ -1158,17 +1162,6 @@ async function updateOrderSummary() {
                 cancelledOrdersEl.style.opacity = '1';
             }
             
-            // Update order badge if exists (from orders-badge.js)
-            const newOrdersBadge = document.getElementById('newOrdersBadge');
-            if (newOrdersBadge) {
-                if (summary.new > 0) {
-                    newOrdersBadge.textContent = summary.new;
-                    newOrdersBadge.style.display = 'inline-block';
-                } else {
-                    newOrdersBadge.style.display = 'none';
-                }
-            }
-            
             // Update lastUpdateTime if timestamp is provided
             if (result.timestamp) {
                 lastUpdateTime = new Date(result.timestamp);
@@ -1187,6 +1180,30 @@ async function updateOrderSummary() {
             showError(`Failed to load order summary: ${errorMsg}`, 5000);
         }
         // Graceful degradation: continue with other data loads
+    }
+}
+
+// Load layby overview stats
+async function loadLaybyOverview() {
+    try {
+        const response = await fetchWithTimeout('/api/admin/dashboard/layby-overview', {}, 10000);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const result = await response.json();
+        if (!result.success || !result.data) throw new Error('Invalid response format');
+
+        const { active, overdue, completed, outstandingBalance } = result.data;
+
+        const outstandingEl = document.getElementById('laybyOutstanding');
+        const overdueEl = document.getElementById('laybyOverdue');
+        const completedEl = document.getElementById('laybyCompleted');
+        const activeEl = document.getElementById('laybyActive');
+
+        if (outstandingEl) outstandingEl.textContent = `K${Number(outstandingBalance).toLocaleString('en-ZM', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        if (overdueEl) overdueEl.textContent = (overdue || 0).toLocaleString();
+        if (completedEl) completedEl.textContent = (completed || 0).toLocaleString();
+        if (activeEl) activeEl.textContent = (active || 0).toLocaleString();
+    } catch (error) {
+        console.error('[Dashboard] Error loading layby overview:', error);
     }
 }
 

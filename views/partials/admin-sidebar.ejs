@@ -10,6 +10,10 @@
             <i class="fas fa-chart-line"></i>
             <span>Dashboard</span>
         </a>
+        <a href="/admin/payments" class="nav-item <%= typeof activePage !== 'undefined' && activePage === 'payments' ? 'active' : '' %>">
+            <i class="fas fa-credit-card"></i>
+            <span>Payments</span>
+        </a>
         <a href="/admin/products" class="nav-item <%= typeof activePage !== 'undefined' && activePage === 'products' ? 'active' : '' %>">
             <i class="fas fa-box"></i>
             <span>Products</span>
@@ -38,10 +42,6 @@
         <a href="/admin/inventory" class="nav-item <%= typeof activePage !== 'undefined' && activePage === 'inventory' ? 'active' : '' %>">
             <i class="fas fa-warehouse"></i>
             <span>Inventory</span>
-        </a>
-        <a href="/admin/payments" class="nav-item <%= typeof activePage !== 'undefined' && activePage === 'payments' ? 'active' : '' %>">
-            <i class="fas fa-credit-card"></i>
-            <span>Payments</span>
         </a>
         <a href="/admin/marketing" class="nav-item <%= (typeof activePage !== 'undefined' && activePage === 'marketing') || (typeof activeSubPage !== 'undefined' && ['flash-sales', 'featured-products'].includes(activeSubPage)) ? 'active' : '' %>">
             <i class="fas fa-bullhorn"></i>

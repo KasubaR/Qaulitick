@@ -153,7 +153,7 @@ body {
     gap: 18px;
     padding: 28px 36px;
     border-bottom: 1px solid rgba(175,144,68,0.1);
-    background: #FFFBF3;
+    background: #fff;
 }
 
 .tc-section-icon {
@@ -231,6 +231,58 @@ body {
     font-weight: 600;
 }
 
+.tc-list--cross li i {
+    color: #c0392b;
+}
+
+.tc-list--numbered {
+    counter-reset: tc-counter;
+    list-style: none;
+    padding: 0;
+    margin: 16px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.tc-list--numbered li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 0.95rem;
+    color: #5a5040;
+    counter-increment: tc-counter;
+}
+
+.tc-list--numbered li::before {
+    content: counter(tc-counter);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--gold);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.tc-subheading {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #2c2618;
+    margin: 24px 0 4px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.tc-subheading:first-child {
+    margin-top: 8px;
+}
+
 /* ── PAYMENT PLAN CARDS ── */
 .tc-plan-grid {
     display: grid;
@@ -305,25 +357,21 @@ body {
 
 /* ── CONTACT SECTION ── */
 .tc-section-contact .tc-section-header {
-    background: #070707;
-    border-bottom-color: rgba(175,144,68,0.15);
+    background: #fff;
+    border-bottom-color: rgba(175,144,68,0.1);
 }
 
 .tc-section-contact .tc-section-header h2 {
-    color: #fff;
+    color: #070707;
 }
 
 .tc-section-contact .tc-section-body {
-    background: #070707;
+    background: #fff;
     border-radius: 0 0 18px 18px;
 }
 
 .tc-section-contact .tc-section-body p {
-    color: rgba(255,255,255,0.55);
-}
-
-.tc-section-contact .tc-section:hover {
-    border-color: rgba(175,144,68,0.35);
+    color: #5a5040;
 }
 
 .tc-link {
