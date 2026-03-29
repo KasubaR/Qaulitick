@@ -47,7 +47,7 @@ exports.addToCart = async (req, res) => {
         const productObj = product.toJSON();
         const requestedQuantity = Math.max(1, parseInt(quantity) || 1);
 
-        // Sellable = physical stock − reserved (pending orders) ∩ color cap when applicable
+        // Sellable = product stock ∩ color variant cap when applicable
         const availableStock = getSellableUnitsForLine(productObj, color || null);
 
         // Validate stock availability
@@ -154,8 +154,6 @@ exports.updateCartItem = async (req, res) => {
 exports.removeFromCart = async (req, res) => {
     try {
         const { itemId } = req.params;
-        
-        // In production, you might want to release reserved stock here
         
         res.json({
             success: true,

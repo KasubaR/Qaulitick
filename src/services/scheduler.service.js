@@ -15,12 +15,12 @@ const PENDING_TTL_MS     = 10 * 60 * 1000; // 10 minutes for pending orders
 const PROCESSING_TTL_MS  = 30 * 60 * 1000; // 30 minutes for processing orders (gateway timeout)
 
 /**
- * Release stock reservations for orders that never received payment.
+ * Mark stale unpaid orders expired and restore color-variant JSON stock (decremented at checkout).
  * Targets:
  *   - paymentStatus = 'pending'    older than PENDING_TTL_MS   (10 min)
  *   - paymentStatus = 'processing' older than PROCESSING_TTL_MS (30 min)
  */
-async function releaseExpiredReservations() {
+async function expireStaleUnpaidOrders() {
     const pendingCutoff    = new Date(Date.now() - PENDING_TTL_MS);
     const processingCutoff = new Date(Date.now() - PROCESSING_TTL_MS);
 
@@ -35,7 +35,7 @@ async function releaseExpiredReservations() {
 
     if (expiredOrders.length === 0) return;
 
-    console.log(`[Scheduler] Releasing reservations for ${expiredOrders.length} expired order(s)...`);
+    console.log(`[Scheduler] Expiring ${expiredOrders.length} stale unpaid order(s)...`);
 
     for (const order of expiredOrders) {
         try {
@@ -46,13 +46,6 @@ async function releaseExpiredReservations() {
                 const qty = parseInt(item.quantity) || 1;
                 const productId = parseInt(item.productId, 10);
 
-                // Release product-level reservation
-                await Product.update(
-                    { reservedStock: sequelize.literal(`GREATEST(0, reservedStock - ${qty})`) },
-                    { where: { id: productId, reservedStock: { [Op.gt]: 0 } } }
-                );
-
-                // Restore color-specific stock that was decremented at order creation
                 if (item.selectedColor) {
                     const product = await Product.findByPk(productId);
                     if (product) {
@@ -80,7 +73,7 @@ async function releaseExpiredReservations() {
             order.history = history;
             await order.save();
 
-            console.log(`[Scheduler] Expired order ${order.orderNumber} (was ${order.paymentStatus}) — reservation released`);
+            console.log(`[Scheduler] Expired order ${order.orderNumber} (was ${order.paymentStatus})`);
         } catch (err) {
             console.error(`[Scheduler] Error expiring order ${order.orderNumber}:`, err);
         }
@@ -135,16 +128,16 @@ class SchedulerService {
             }
         }, 12 * 60 * 60 * 1000); // 12 hours
 
-        // Release stale stock reservations every 2 minutes
-        const expireReservationsInterval = setInterval(async () => {
+        // Expire stale unpaid orders every 2 minutes (restores color variant counts only)
+        const expireStaleOrdersInterval = setInterval(async () => {
             try {
-                await releaseExpiredReservations();
+                await expireStaleUnpaidOrders();
             } catch (error) {
-                console.error('[Scheduler] Error during reservation expiry:', error);
+                console.error('[Scheduler] Error during stale order expiry:', error);
             }
         }, 2 * 60 * 1000); // 2 minutes
 
-        this.intervals.push(cleanupDeletedInterval, cleanupInactiveInterval, expireReservationsInterval);
+        this.intervals.push(cleanupDeletedInterval, cleanupInactiveInterval, expireStaleOrdersInterval);
 
         // Run initial cleanup on startup (after 1 minute delay to let server fully start)
         setTimeout(async () => {
@@ -155,8 +148,7 @@ class SchedulerService {
                     console.log(`[Scheduler] Initial cleanup: Removed ${removedCount} featured product(s) that referenced deleted products`);
                 }
 
-                // Also release any reservations that expired while the server was down
-                await releaseExpiredReservations();
+                await expireStaleUnpaidOrders();
             } catch (error) {
                 console.error('[Scheduler] Error during initial cleanup:', error);
             }

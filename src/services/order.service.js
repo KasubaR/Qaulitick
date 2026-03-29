@@ -201,15 +201,11 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
             for (const item of items) {
                 const qty = parseInt(item.quantity) || 1;
                 const [rows] = await Product.update(
-                    {
-                        stock:         sequelize.literal(`stock - ${qty}`),
-                        reservedStock: sequelize.literal(`GREATEST(0, reservedStock - ${qty})`)
-                    },
+                    { stock: sequelize.literal(`stock - ${qty}`) },
                     {
                         where: {
                             id: parseInt(item.productId, 10),
-                            stock:         { [Op.gte]: qty },
-                            reservedStock: { [Op.gte]: qty }
+                            stock: { [Op.gte]: qty }
                         }
                     }
                 );
@@ -225,11 +221,6 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
                 const qty = parseInt(item.quantity) || 1;
                 const productId = parseInt(item.productId, 10);
 
-                await Product.update(
-                    { reservedStock: sequelize.literal(`GREATEST(0, reservedStock - ${qty})`) },
-                    { where: { id: productId, reservedStock: { [Op.gt]: 0 } } }
-                );
-
                 if (item.selectedColor) {
                     const product = await Product.findByPk(productId);
                     if (product) {
@@ -242,7 +233,7 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
                     }
                 }
             }
-            console.log(`[Order Service] Stock reservation released for order ${orderNumber}`);
+            console.log(`[Order Service] Color variant stock restored for failed/cancelled order ${orderNumber}`);
         }
 
         console.log(`[Order Service] Order ${orderNumber} status updated from "${previousStatus}" to "${newOrderStatus}" (payment: "${previousPaymentStatus}" → "${newPaymentStatus}")`);

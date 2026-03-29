@@ -48,7 +48,7 @@ function withPrices(productObj) {
     const savings        = origPrice > currentPrice
         ? Math.round(origPrice - currentPrice)
         : calculateSavings(origPrice, discount);
-    const availableStock = Math.max(0, (productObj.stock || 0) - (productObj.reservedStock || 0));
+    const availableStock = Math.max(0, Number(productObj.stock) || 0);
     const stockStatus    = getStockStatus(availableStock, productObj.lowStockThreshold);
     return { ...productObj, price: currentPrice, originalPrice: origPrice, finalPrice: currentPrice, savings, availableStock, stockStatus };
 }
@@ -304,7 +304,7 @@ exports.renderProductDetails = async (req, res) => {
         
         console.log(`[Product Controller] Sanitized reviews count:`, sanitizedReviews.length);
 
-        const availableStock = Math.max(0, (productObj.stock || 0) - (productObj.reservedStock || 0));
+        const availableStock = Math.max(0, Number(productObj.stock) || 0);
         const productWithPrices = {
             ...productObj,
             originalPrice: originalPrice,
@@ -324,7 +324,7 @@ exports.renderProductDetails = async (req, res) => {
                 const pObj = normalizeProduct(toPlain(p));
                 const pOriginalPrice = pObj.price || 0;
                 const pDiscount = pObj.discount || 0;
-                const pAvailable = Math.max(0, (Number(pObj.stock) || 0) - (Number(pObj.reservedStock) || 0));
+                const pAvailable = Math.max(0, Number(pObj.stock) || 0);
                 return {
                     ...pObj,
                     originalPrice: pOriginalPrice,

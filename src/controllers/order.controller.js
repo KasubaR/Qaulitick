@@ -123,12 +123,10 @@ exports.createOrder = async (req, res) => {
                 const requestedQuantity = Math.max(1, parseInt(item.quantity) || 1);
                 const selectedColor = item.variant?.color || item.color || null;
                 const sellable = getSellableUnitsForLine(productObj, selectedColor);
-                const physical = Number(productObj.stock) || 0;
-                const reserved = Number(productObj.reservedStock) || 0;
 
                 if (sellable < requestedQuantity) {
                     const err = new Error(
-                        `Insufficient stock for "${productObj.model}". Available to sell: ${sellable} (physical ${physical}, reserved ${reserved}), Requested: ${requestedQuantity}`
+                        `Insufficient stock for "${productObj.model}". Available: ${sellable}, Requested: ${requestedQuantity}`
                     );
                     err.statusCode = 409;
                     throw err;
@@ -225,32 +223,9 @@ exports.createOrder = async (req, res) => {
                 updatedAt: new Date().toISOString()
             };
 
-            // Atomic soft-reserve: increment reservedStock WHERE (stock - reservedStock) >= quantity.
-            // This holds units for this order without consuming them from inventory.
-            // stock is only decremented when payment is confirmed (see updateOrderStatusFromPayment).
-            // rowsAffected === 0 means another concurrent request consumed the last available unit
-            // between our read above and this update — safe to reject.
+            // Decrement color-specific JSON stock when a variant was chosen (main `stock` is
+            // reduced when payment completes — see order.service updateOrderStatusFromPayment).
             for (const item of validatedItems) {
-                const [rowsAffected] = await Product.update(
-                    { reservedStock: sequelize.literal(`reservedStock + ${item.quantity}`) },
-                    {
-                        where: {
-                            id: parseInt(item.productId, 10),
-                            [Op.and]: sequelize.literal(`(stock - reservedStock) >= ${item.quantity}`)
-                        },
-                        transaction: t
-                    }
-                );
-                if (rowsAffected === 0) {
-                    const err = new Error(`Stock no longer available for "${item.name}"`);
-                    err.statusCode = 409;
-                    throw err;
-                }
-
-                // Decrement color-specific stock within the same transaction.
-                // Re-read the product AFTER the atomic reservedStock update so we see
-                // the row-locked state — no other transaction can modify this row until
-                // we commit, eliminating the race on color stock.
                 if (item.selectedColor) {
                     const freshProduct = await Product.findByPk(parseInt(item.productId, 10), { transaction: t });
                     const colorEntry = (freshProduct.colors || []).find(c => c.name === item.selectedColor);

@@ -54,8 +54,7 @@ async function buildHomeFlashSaleViewModel() {
                     const stock = Number(productObj.stock) || 0;
                     if (stock <= 0) continue;
                     const currentPrice = Number(productObj.price) || 0;
-                    const availableStock = Math.max(0, stock - (Number(productObj.reservedStock) || 0));
-                    const stockStatus = getStockStatus(availableStock, productObj.lowStockThreshold);
+                    const stockStatus = getStockStatus(stock, productObj.lowStockThreshold);
                     products.push({
                         ...productObj,
                         originalPrice: currentPrice,

@@ -14,16 +14,8 @@ const Product = sequelize.define('Product', {
     originalPrice: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
     discount: { type: DataTypes.INTEGER, defaultValue: 0 },
     stock: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
-    reservedStock: {
-        type: DataTypes.INTEGER, allowNull: false, defaultValue: 0,
-        validate: {
-            reservedNotExceedStock(value) {
-                if (value > this.stock) {
-                    throw new Error(`reservedStock (${value}) cannot exceed stock (${this.stock})`);
-                }
-            }
-        }
-    },
+    /** Legacy column; no longer used (stock reservation removed). Kept for existing DB rows. */
+    reservedStock: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
     lowStockThreshold: { type: DataTypes.INTEGER, defaultValue: 5 },
     description: { type: DataTypes.TEXT, allowNull: true },
     images: {
@@ -88,7 +80,7 @@ const Product = sequelize.define('Product', {
             } else {
                 product.discount = 0;
             }
-            const available = Math.max(0, product.stock - (product.reservedStock || 0));
+            const available = Math.max(0, Number(product.stock) || 0);
             if (available === 0 && product.status !== 'discontinued') product.status = 'out_of_stock';
             else if (available > 0 && product.status === 'out_of_stock') product.status = 'active';
         }
@@ -97,7 +89,7 @@ const Product = sequelize.define('Product', {
 
 Product.prototype.isLowStock = function(threshold = null) {
     const t = threshold !== null ? threshold : (this.lowStockThreshold || 5);
-    const available = Math.max(0, this.stock - (this.reservedStock || 0));
+    const available = Math.max(0, Number(this.stock) || 0);
     return available > 0 && available <= t;
 };
 
