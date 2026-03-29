@@ -315,7 +315,7 @@ async function sendContactConfirmationToUser(submission) {
                         <p>If you have any urgent inquiries, please feel free to contact us directly via WhatsApp at <a href="https://wa.me/260975587617">+260 975 587 617</a>.</p>
                         
                         <div style="text-align: center;">
-                            <a href="https://qualitick-collections.com" class="btn">Visit Our Website</a>
+                            <a href="${process.env.APP_PUBLIC_URL || 'https://qualitickzm.com'}" class="btn">Visit Our Website</a>
                         </div>
                         
                         <div class="footer">
@@ -468,7 +468,7 @@ async function sendInvoiceEmail(order, pdfBuffer, options = {}) {
                         <p>If you have any questions about your order, please don't hesitate to contact us.</p>
                         
                         <div style="text-align: center;">
-                            <a href="https://qualitick-collections.com" class="btn">Visit Our Website</a>
+                            <a href="${process.env.APP_PUBLIC_URL || 'https://qualitickzm.com'}" class="btn">Visit Our Website</a>
                         </div>
                         
                         <div class="footer">
@@ -677,7 +677,7 @@ async function sendOrderNotificationToAdmin(order) {
                         `}
 
                         <div style="text-align: center;">
-                            <a href="${process.env.SITE_URL || 'https://qualitick-collections.com'}/admin/orders" class="btn">View Order in Admin Panel</a>
+                            <a href="${process.env.APP_PUBLIC_URL || 'https://qualitickzm.com'}/admin/orders" class="btn">View Order in Admin Panel</a>
                         </div>
                         
                         <div class="footer">
@@ -792,7 +792,7 @@ async function sendLowStockNotificationToAdmin(product) {
                         </div>
                         
                         <div style="text-align: center;">
-                            <a href="${process.env.SITE_URL || 'https://qualitick-collections.com'}/admin/inventory" class="btn">Manage Inventory</a>
+                            <a href="${process.env.APP_PUBLIC_URL || 'https://qualitickzm.com'}/admin/inventory" class="btn">Manage Inventory</a>
                         </div>
                         
                         <div class="footer">
@@ -929,7 +929,7 @@ async function sendPaymentNotificationToAdmin(payment, order = null) {
                         </div>
                         
                         <div style="text-align: center;">
-                            <a href="${process.env.SITE_URL || 'https://qualitick-collections.com'}/admin/orders" class="btn">View Order in Admin Panel</a>
+                            <a href="${process.env.APP_PUBLIC_URL || 'https://qualitickzm.com'}/admin/orders" class="btn">View Order in Admin Panel</a>
                         </div>
                         
                         <div class="footer">
@@ -1177,7 +1177,7 @@ async function sendOrderConfirmationEmail(order) {
                         ${deliveryBlock}
 
                         <div style="text-align: center;">
-                            <a href="${process.env.APP_PUBLIC_URL || 'https://qualitick-collections.com'}/account/orders" class="cta">View My Orders</a>
+                            <a href="${process.env.APP_PUBLIC_URL || 'https://qualitickzm.com'}/account/orders" class="cta">View My Orders</a>
                         </div>
 
                         <div class="footer">
@@ -1315,7 +1315,7 @@ async function sendNewsletterWelcomeEmail(params) {
     }
 
     const siteOrigin = String(
-        process.env.SITE_URL || process.env.APP_PUBLIC_URL || 'https://qualitick-collections.com'
+        process.env.APP_PUBLIC_URL || 'https://qualitickzm.com'
     ).replace(/\/$/, '');
     const token =
         typeof params.unsubscribeToken === 'string' && /^[a-f0-9]{64}$/i.test(params.unsubscribeToken.trim())
