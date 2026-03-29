@@ -20,7 +20,7 @@
         <% if (product.stockStatus === 'out-of-stock') { %>
             <div class="out-of-stock-overlay">Out of Stock</div>
         <% } else if (product.stockStatus === 'low-stock') { %>
-            <div class="low-stock-badge">Only <%= product.stock %> left</div>
+            <div class="low-stock-badge">Only <%= (typeof product.availableStock === 'number' ? product.availableStock : product.stock) %> left</div>
         <% } %>
         <div class="product-image">
             <a href="<%= _productUrl %>" class="product-link product-link--media">

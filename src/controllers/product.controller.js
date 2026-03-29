@@ -1,7 +1,7 @@
 // Product Controller - Updated with Database Integration
 const { UniqueConstraintError } = require('sequelize');
 const productService = require('../services/product.service');
-const { calculateFinalPrice, calculateSavings } = require('../utils/price.utils');
+const { calculateSavings, getSellingUnitPrice } = require('../utils/price.utils');
 const { clearCache } = require('../middlewares/cache.middleware');
 const { getStockStatus } = require('../utils/stock.utils');
 
@@ -324,12 +324,14 @@ exports.renderProductDetails = async (req, res) => {
                 const pObj = normalizeProduct(toPlain(p));
                 const pOriginalPrice = pObj.price || 0;
                 const pDiscount = pObj.discount || 0;
+                const pAvailable = Math.max(0, (Number(pObj.stock) || 0) - (Number(pObj.reservedStock) || 0));
                 return {
                     ...pObj,
                     originalPrice: pOriginalPrice,
-                    finalPrice: calculateFinalPrice(pOriginalPrice, pDiscount),
+                    finalPrice: getSellingUnitPrice(pObj),
                     savings: calculateSavings(pOriginalPrice, pDiscount),
-                    stockStatus: getStockStatus(pObj.stock, pObj.lowStockThreshold)
+                    availableStock: pAvailable,
+                    stockStatus: getStockStatus(pAvailable, pObj.lowStockThreshold)
                 };
             });
         

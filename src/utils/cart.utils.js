@@ -2,7 +2,8 @@
 // Helper functions for parsing and validating cart data from cookies
 
 const productService = require('../services/product.service');
-const { calculateFinalPrice, calculateSubtotal, calculateTotal } = require('./price.utils');
+const { getSellingUnitPrice, calculateSubtotal, calculateTotal } = require('./price.utils');
+const { getSellableUnitsForLine } = require('./stock.utils');
 
 /**
  * Parse cart cookie and validate/enrich items with product data from database
@@ -94,24 +95,24 @@ async function parseAndValidateCartCookie(req) {
                 
                 const productObj = product.toJSON();
                 let requestedQuantity = Math.max(1, parseInt(item.quantity) || 1);
+                const itemColor = item.variant?.color || item.color || null;
+                const sellable = getSellableUnitsForLine(productObj, itemColor);
                 
-                // Validate stock
-                if (productObj.stock < requestedQuantity) {
+                if (sellable < requestedQuantity) {
                     warnings.push({
                         itemId: item.id,
                         productId: String(productObj.id),
-                        message: `Only ${productObj.stock} item${productObj.stock !== 1 ? 's' : ''} available for "${productObj.model}"`,
-                        availableStock: productObj.stock,
+                        message: `Only ${sellable} item${sellable !== 1 ? 's' : ''} available for "${productObj.model}"`,
+                        availableStock: sellable,
                         requestedQuantity: requestedQuantity
                     });
-                    // Use available stock instead
-                    requestedQuantity = productObj.stock;
+                    requestedQuantity = sellable;
                 }
                 
                 // CRITICAL: Recalculate price from database (ignore client-provided price)
                 const originalPrice = productObj.price || 0;
                 const discount = productObj.discount || 0;
-                const authoritativePrice = calculateFinalPrice(originalPrice, discount);
+                const authoritativePrice = getSellingUnitPrice(productObj);
                 
                 // Warn if client price doesn't match server price
                 const clientPrice = parseFloat(item.price) || 0;
@@ -147,7 +148,7 @@ async function parseAndValidateCartCookie(req) {
                     discount: discount,
                     quantity: requestedQuantity,
                     image: productObj.images && productObj.images[0] ? productObj.images[0] : (item.image || '/images/placeholder.jpg'),
-                    stock: productObj.stock,
+                    stock: sellable,
                     sku: productObj.sku || null,
                     variant: variant,
                     shippingPrice: parseFloat(productObj.shippingPrice) || 0

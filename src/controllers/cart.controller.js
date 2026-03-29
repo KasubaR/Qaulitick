@@ -2,8 +2,8 @@
 // Handles cart operations with stock validation
 
 const productService = require('../services/product.service');
-const { calculateFinalPrice } = require('../utils/price.utils');
-const { getStockStatus } = require('../utils/stock.utils');
+const { getSellingUnitPrice } = require('../utils/price.utils');
+const { getStockStatus, getSellableUnitsForLine } = require('../utils/stock.utils');
 
 // Verify productService is loaded correctly
 if (!productService || typeof productService.getProductById !== 'function') {
@@ -47,14 +47,8 @@ exports.addToCart = async (req, res) => {
         const productObj = product.toJSON();
         const requestedQuantity = Math.max(1, parseInt(quantity) || 1);
 
-        // Resolve stock — use color-specific stock when a color variant is selected
-        let availableStock = productObj.stock;
-        if (color && Array.isArray(productObj.colors)) {
-            const colorEntry = productObj.colors.find(c => c.name === color);
-            if (colorEntry && colorEntry.stock != null) {
-                availableStock = colorEntry.stock;
-            }
-        }
+        // Sellable = physical stock − reserved (pending orders) ∩ color cap when applicable
+        const availableStock = getSellableUnitsForLine(productObj, color || null);
 
         // Validate stock availability
         if (availableStock < requestedQuantity) {
@@ -66,10 +60,10 @@ exports.addToCart = async (req, res) => {
             });
         }
 
-        // Calculate final price
+        // Selling price is stored on the product row; discount is badge-only (not applied again)
         const originalPrice = productObj.price || 0;
         const discount = productObj.discount || 0;
-        const finalPrice = calculateFinalPrice(originalPrice, discount);
+        const finalPrice = getSellingUnitPrice(productObj);
 
         // Return cart item data (client will store in localStorage)
         res.json({
@@ -127,14 +121,7 @@ exports.updateCartItem = async (req, res) => {
 
         const productObj = product.toJSON();
 
-        // Resolve color-specific stock
-        let availableStock = productObj.stock;
-        if (color && Array.isArray(productObj.colors)) {
-            const colorEntry = productObj.colors.find(c => c.name === color);
-            if (colorEntry && colorEntry.stock != null) {
-                availableStock = colorEntry.stock;
-            }
-        }
+        const availableStock = getSellableUnitsForLine(productObj, color || null);
 
         // Validate stock availability
         if (availableStock < requestedQuantity) {
@@ -199,7 +186,7 @@ exports.validateCart = async (req, res) => {
             });
         }
         
-        const { calculateSubtotal, calculateTotal, parseMoney } = require('../utils/price.utils');
+        const { calculateSubtotal, calculateTotal } = require('../utils/price.utils');
         
         const validatedItems = [];
         const errors = [];
@@ -230,21 +217,9 @@ exports.validateCart = async (req, res) => {
                 
                 const productObj = product.toJSON();
                 let requestedQuantity = Math.max(1, parseInt(item.quantity) || 1);
-
-                // Resolve color-specific stock, accounting for product-level reservations
                 const itemColor = item.variant?.color || item.color || null;
-                const baseAvailable = Math.max(0, (productObj.stock || 0) - (productObj.reservedStock || 0));
-                let availableStock = baseAvailable;
-                if (itemColor && Array.isArray(productObj.colors)) {
-                    const colorEntry = productObj.colors.find(c => c.name === itemColor);
-                    if (colorEntry && colorEntry.stock != null) {
-                        // Color stock is tracked separately; cap it by base available
-                        // so product-level reservations are still respected.
-                        availableStock = Math.min(colorEntry.stock, baseAvailable);
-                    }
-                }
+                const availableStock = getSellableUnitsForLine(productObj, itemColor);
 
-                // Validate stock
                 if (availableStock < requestedQuantity) {
                     warnings.push({
                         itemId: item.id,
@@ -260,7 +235,7 @@ exports.validateCart = async (req, res) => {
                 // CRITICAL: Recalculate price from database (ignore client-provided price)
                 const originalPrice = productObj.price || 0;
                 const discount = productObj.discount || 0;
-                const authoritativePrice = calculateFinalPrice(originalPrice, discount);
+                const authoritativePrice = getSellingUnitPrice(productObj);
 
                 // Warn if client price doesn't match server price
                 const clientPrice = parseFloat(item.price) || 0;
@@ -431,27 +406,28 @@ exports.getCartItems = async (req, res) => {
             
             const productObj = product.toJSON();
             const requestedQuantity = item.quantity || 1;
+            const itemColor = item.variant?.color || item.color || null;
+            const sellable = getSellableUnitsForLine(productObj, itemColor);
             
-            if (productObj.stock < requestedQuantity) {
+            if (sellable < requestedQuantity) {
                 warnings.push({
                     itemId: item.id,
                     productId: String(productObj.id),
-                    message: `Only ${productObj.stock} item${productObj.stock !== 1 ? 's' : ''} available for "${productObj.model}"`,
-                    availableStock: productObj.stock,
+                    message: `Only ${sellable} item${sellable !== 1 ? 's' : ''} available for "${productObj.model}"`,
+                    availableStock: sellable,
                     requestedQuantity: requestedQuantity
                 });
                 
-                // Update quantity to available stock
-                item.quantity = productObj.stock;
+                item.quantity = sellable;
             }
             
             // Recalculate price
             const originalPrice = productObj.price || 0;
             const discount = productObj.discount || 0;
-            item.price = calculateFinalPrice(originalPrice, discount);
+            item.price = getSellingUnitPrice(productObj);
             item.originalPrice = originalPrice;
-            item.stock = productObj.stock;
-            item.stockStatus = getStockStatus(productObj.stock, productObj.lowStockThreshold);
+            item.stock = sellable;
+            item.stockStatus = getStockStatus(sellable, productObj.lowStockThreshold);
 
             validatedItems.push(item);
         }

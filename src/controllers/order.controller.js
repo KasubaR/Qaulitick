@@ -11,6 +11,7 @@ const LaybyPlan = require('../models/LaybyPlan.model');
 const LaybyPayment = require('../models/LaybyPayment.model');
 const orderService = require('../services/order.service');
 const logger = require('../utils/logger').child({ module: 'OrderController' });
+const { getSellableUnitsForLine } = require('../utils/stock.utils');
 
 // Delivery fee in ZMW. Configurable via env; set to 0 for free shipping.
 const DELIVERY_FEE_ZMW = parseFloat(process.env.DELIVERY_FEE_ZMW ?? '0') || 0;
@@ -92,7 +93,7 @@ exports.createOrder = async (req, res) => {
             });
         }
 
-        const { calculateFinalPrice, calculateSubtotal, calculateTotal } = require('../utils/price.utils');
+        const { getSellingUnitPrice, calculateSubtotal, calculateTotal } = require('../utils/price.utils');
 
         // Coupon codes are not yet implemented — reject loudly so the client knows.
         if (coupon && coupon.code) {
@@ -120,29 +121,23 @@ exports.createOrder = async (req, res) => {
 
                 const productObj = product.toJSON();
                 const requestedQuantity = Math.max(1, parseInt(item.quantity) || 1);
-                const availableStock = productObj.stock - (productObj.reservedStock || 0);
+                const selectedColor = item.variant?.color || item.color || null;
+                const sellable = getSellableUnitsForLine(productObj, selectedColor);
+                const physical = Number(productObj.stock) || 0;
+                const reserved = Number(productObj.reservedStock) || 0;
 
-                if (availableStock < requestedQuantity) {
-                    const err = new Error(`Insufficient stock for "${productObj.model}". Available: ${availableStock}, Requested: ${requestedQuantity}`);
+                if (sellable < requestedQuantity) {
+                    const err = new Error(
+                        `Insufficient stock for "${productObj.model}". Available to sell: ${sellable} (physical ${physical}, reserved ${reserved}), Requested: ${requestedQuantity}`
+                    );
                     err.statusCode = 409;
                     throw err;
-                }
-
-                // Check color-specific stock if a color variant was selected
-                const selectedColor = item.variant?.color || item.color || null;
-                if (selectedColor && Array.isArray(productObj.colors)) {
-                    const colorEntry = productObj.colors.find(c => c.name === selectedColor);
-                    if (colorEntry && colorEntry.stock != null && colorEntry.stock < requestedQuantity) {
-                        const err = new Error(`Only ${colorEntry.stock} of "${productObj.model}" in ${selectedColor} left`);
-                        err.statusCode = 409;
-                        throw err;
-                    }
                 }
 
                 // Server-side price — ignore whatever the client sent.
                 const originalPrice = productObj.price || 0;
                 const discount = productObj.discount || 0;
-                const serverPrice = calculateFinalPrice(originalPrice, discount);
+                const serverPrice = getSellingUnitPrice(productObj);
 
                 const clientPrice = parseFloat(item.price) || 0;
                 if (Math.abs(clientPrice - serverPrice) > 0.01) {

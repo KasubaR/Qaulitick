@@ -2,6 +2,9 @@
 
 /**
  * Calculate final price after discount (server-side)
+ * Use when the base amount is the **pre-discount** list price and you need to apply a % off
+ * (e.g. flash sale on top of catalogue price). Do not use for normal products: DB `price` is
+ * already the selling price — use {@link getSellingUnitPrice} instead.
  * @param {number} price - Original price
  * @param {number} discount - Discount percentage
  * @returns {number} - Final price
@@ -10,6 +13,19 @@ function calculateFinalPrice(price, discount) {
     if (!price || price <= 0) return 0;
     const discountAmount = discount || 0;
     return Math.round(price * (1 - discountAmount / 100));
+}
+
+/**
+ * Authoritative unit price from the product row for cart, checkout, and orders.
+ * `price` is the current selling amount; `discount` is informational (badge % derived from
+ * original vs price in Product hooks) and must not be applied again.
+ * @param {object} productObj - Plain product object with `price`
+ * @returns {number}
+ */
+function getSellingUnitPrice(productObj) {
+    const p = Number(productObj && productObj.price);
+    if (!p || p <= 0) return 0;
+    return Math.round(p);
 }
 
 /**
@@ -50,6 +66,7 @@ function calculateTotal(subtotal, discount = 0, delivery = 0) {
 
 module.exports = {
     calculateFinalPrice,
+    getSellingUnitPrice,
     calculateSavings,
     calculateSubtotal,
     calculateTotal

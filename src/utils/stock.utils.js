@@ -15,4 +15,29 @@ function getStockStatus(qty, threshold = 5) {
     return 'in-stock';
 }
 
-module.exports = { getStockStatus };
+/**
+ * Units actually sellable: physical stock minus soft-reservations from unpaid/pending orders.
+ * @param {object} productObj - Plain product row ({ stock, reservedStock })
+ * @returns {number}
+ */
+function getSellableUnits(productObj) {
+    const physical = Math.max(0, Number(productObj && productObj.stock) || 0);
+    const reserved = Math.max(0, Number(productObj && productObj.reservedStock) || 0);
+    return Math.max(0, physical - reserved);
+}
+
+/**
+ * Sellable units for a cart/API line: cap by color variant stock when present.
+ * @param {object} productObj
+ * @param {string|null|undefined} colorName
+ * @returns {number}
+ */
+function getSellableUnitsForLine(productObj, colorName) {
+    const base = getSellableUnits(productObj);
+    if (!colorName || !Array.isArray(productObj.colors)) return base;
+    const colorEntry = productObj.colors.find(c => c.name === colorName);
+    if (!colorEntry || colorEntry.stock == null) return base;
+    return Math.min(base, Math.max(0, Number(colorEntry.stock) || 0));
+}
+
+module.exports = { getStockStatus, getSellableUnits, getSellableUnitsForLine };

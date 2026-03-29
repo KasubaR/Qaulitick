@@ -585,7 +585,7 @@ function renderProductsFromAPI(products) {
     products.forEach(product => {
         const currentPrice    = Number(product.finalPrice || product.price) || 0;
         const originalPrice   = Number(product.originalPrice) || 0;
-        const stockQty        = product.stock || 0;
+        const stockQty        = (product.availableStock != null ? product.availableStock : product.stock) || 0;
         const stockStatus     = product.stockStatus;
 
         const productCard = createProductCard({
