@@ -42,6 +42,24 @@ function initializeProductsPage() {
     setupTabs();
     setupSKUGeneration();
     setupSlugGeneration();
+    setupShippingToggle();
+}
+
+function setupShippingToggle() {
+    const freeShippingCheckbox = document.getElementById('freeShipping');
+    const shippingPriceWrapper = document.getElementById('shippingPriceWrapper');
+    if (!freeShippingCheckbox || !shippingPriceWrapper) return;
+
+    function applyToggle() {
+        shippingPriceWrapper.style.display = freeShippingCheckbox.checked ? 'none' : '';
+        if (freeShippingCheckbox.checked) {
+            const input = document.getElementById('shippingPrice');
+            if (input) input.value = '';
+        }
+    }
+
+    applyToggle();
+    freeShippingCheckbox.addEventListener('change', applyToggle);
 }
 
 // Setup event listeners
@@ -921,6 +939,14 @@ async function loadProductData(productId) {
         if (discountInput) discountInput.value = product.discount || 0;
         if (stockInput) stockInput.value = product.stock || 0;
         if (lowStockThresholdInput) lowStockThresholdInput.value = product.lowStockThreshold || 5;
+
+        const freeShippingInput = document.getElementById('freeShipping');
+        const shippingPriceInput = document.getElementById('shippingPrice');
+        const shippingPriceWrapper = document.getElementById('shippingPriceWrapper');
+        const isFree = !product.shippingPrice || parseFloat(product.shippingPrice) === 0;
+        if (freeShippingInput) freeShippingInput.checked = isFree;
+        if (shippingPriceInput) shippingPriceInput.value = isFree ? '' : product.shippingPrice;
+        if (shippingPriceWrapper) shippingPriceWrapper.style.display = isFree ? 'none' : '';
         
         // Populate SEO fields
         const metaTitleInput = document.getElementById('metaTitle');
@@ -1278,6 +1304,7 @@ async function handleFormSubmit(e) {
         discount: formData.get('discount') ? parseFloat(formData.get('discount')) : 0,
         stock: parseInt(formData.get('stock')),
         lowStockThreshold: parseInt(formData.get('lowStockThreshold')) || 5,
+        shippingPrice: formData.get('freeShipping') === 'on' ? 0 : (formData.get('shippingPrice') ? parseFloat(formData.get('shippingPrice')) : 0),
         videoUrl: formData.get('videoUrl')?.trim() || null,
         metaTitle: formData.get('metaTitle')?.trim() || null,
         metaDescription: formData.get('metaDescription')?.trim() || null,

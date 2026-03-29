@@ -149,7 +149,8 @@ async function parseAndValidateCartCookie(req) {
                     image: productObj.images && productObj.images[0] ? productObj.images[0] : (item.image || '/images/placeholder.jpg'),
                     stock: productObj.stock,
                     sku: productObj.sku || null,
-                    variant: variant
+                    variant: variant,
+                    shippingPrice: parseFloat(productObj.shippingPrice) || 0
                 });
             } catch (itemError) {
                 console.error(`[Cart Utils] Error validating item ${productId}:`, itemError);
@@ -163,7 +164,15 @@ async function parseAndValidateCartCookie(req) {
         
         // Calculate authoritative totals
         const subtotal = calculateSubtotal(validatedItems);
-        const delivery = 0; // Free shipping
+        // Sum each unique product's shipping price (once per product, not per quantity)
+        const seenProductIds = new Set();
+        let delivery = 0;
+        for (const item of validatedItems) {
+            if (!seenProductIds.has(item.productId)) {
+                seenProductIds.add(item.productId);
+                delivery += item.shippingPrice || 0;
+            }
+        }
         const discount = 0; // No coupon discount at cart stage
         const total = calculateTotal(subtotal, discount, delivery);
         

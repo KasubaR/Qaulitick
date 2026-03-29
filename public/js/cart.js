@@ -833,9 +833,17 @@ function updateOrderSummary() {
         subtotal += finalPrice * item.quantity;
     });
     
-    // Calculate shipping - Always free
+    // Calculate shipping from per-product shipping prices (once per unique product)
+    const seenIds = new Set();
     let shipping = 0;
-    
+    cartPageItems.forEach(item => {
+        const pid = item.productId || item.id;
+        if (!seenIds.has(pid)) {
+            seenIds.add(pid);
+            shipping += parseFloat(item.shippingPrice) || 0;
+        }
+    });
+
     // Calculate total (no tax)
     const total = subtotal + shipping;
     

@@ -13,6 +13,7 @@ const logger = require('../utils/logger');
 const productController = require('../controllers/product.controller');
 const marketingController = require('../controllers/marketing.controller');
 const contactController = require('../controllers/contact.controller');
+const newsletterController = require('../controllers/newsletter.controller');
 const paymentController = require('../controllers/payment.controller');
 const customerAuthController = require('../controllers/customer.auth.controller');
 const customerAccountController = require('../controllers/customer.account.controller');
@@ -92,6 +93,23 @@ router.post('/api/contact',
     csrfTokenValidator(),
     contactController.submitContactForm
 );
+
+router.post('/api/newsletter/subscribe',
+    rateLimit({
+        windowMs: 60 * 60 * 1000,
+        max: 30,
+        message: 'Too many subscribe attempts. Please try again later.'
+    }),
+    csrfTokenValidator(),
+    newsletterController.subscribe
+);
+
+// CSRF exception (intentional): one-click links in mail clients cannot carry session CSRF tokens, so
+// this GET mutates state without csrfTokenValidator(). That is an explicit exception to the usual rule
+// that state-changing requests must validate CSRF — do not “fix” by blindly applying
+// csrfTokenValidator() to this path. Security for unsubscribe relies on an unguessable secret token
+// in the query string and HTTPS, not on CSRF.
+router.get('/newsletter/unsubscribe', newsletterController.unsubscribePage);
 
 // ============================================
 // Cart / Orders / Payments API

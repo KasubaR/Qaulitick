@@ -299,6 +299,18 @@
                             <input type="number" id="lowStockThreshold" name="lowStockThreshold" class="form-input" min="0" value="5">
                             <small class="form-hint">Alert when stock falls below this number</small>
                         </div>
+
+                        <div class="form-group">
+                            <label>Shipping</label>
+                            <label class="checkbox-label" style="margin-bottom:8px;">
+                                <input type="checkbox" id="freeShipping" name="freeShipping">
+                                <span>Free shipping for this product</span>
+                            </label>
+                            <div id="shippingPriceWrapper">
+                                <input type="number" id="shippingPrice" name="shippingPrice" class="form-input" step="0.01" min="0" placeholder="e.g. 50.00">
+                                <small class="form-hint">Shipping cost charged to the customer for this product</small>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- SEO Tab -->

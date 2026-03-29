@@ -85,6 +85,7 @@ exports.addToCart = async (req, res) => {
                 quantity: requestedQuantity,
                 image: productObj.images && productObj.images[0] ? productObj.images[0] : null,
                 stock: availableStock,
+                shippingPrice: parseFloat(productObj.shippingPrice) || 0,
                 timestamp: new Date().toISOString()
             },
             message: 'Item added to cart successfully'
@@ -287,7 +288,8 @@ exports.validateCart = async (req, res) => {
                     stock: availableStock,
                     stockStatus: getStockStatus(availableStock, productObj.lowStockThreshold),
                     sku: productObj.sku || null,
-                    variant: item.variant || null
+                    variant: item.variant || null,
+                    shippingPrice: parseFloat(productObj.shippingPrice) || 0
                 });
             } catch (itemError) {
                 console.error(`[Cart Controller] Error validating item ${productId}:`, itemError);
@@ -311,7 +313,15 @@ exports.validateCart = async (req, res) => {
         
         // Calculate authoritative totals
         const subtotal = calculateSubtotal(validatedItems);
-        const delivery = parseFloat(req.body.delivery) || 0;
+        // Sum each unique product's shipping price (once per product, not per quantity)
+        const seenProductIds = new Set();
+        let delivery = 0;
+        for (const item of validatedItems) {
+            if (!seenProductIds.has(item.productId)) {
+                seenProductIds.add(item.productId);
+                delivery += item.shippingPrice || 0;
+            }
+        }
         const couponDiscount = parseFloat(req.body.couponDiscount) || 0;
         const total = calculateTotal(subtotal, couponDiscount, delivery);
         

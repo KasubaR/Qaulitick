@@ -23,6 +23,8 @@
     let flashTimerInterval = null;
     let sliderInterval = null; // Kept for cleanup, but not used for auto-sliding
 
+    let newsletterSubmitting = false;
+
     // Reveal server-rendered product card images (shop.css sets opacity:0 until .loaded)
     function revealProductCardImages(container) {
         const imgs = (container || document).querySelectorAll('.product-image img');
@@ -413,14 +415,96 @@
         // Newsletter form
         const newsletterForm = document.getElementById('newsletterForm');
         if (newsletterForm) {
-            newsletterForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const email = e.target.querySelector('.newsletter-input').value;
-                if (window.subscribeNewsletter) {
-                    window.subscribeNewsletter({ target: e.target });
-                }
-                e.target.reset();
+            newsletterForm.addEventListener('submit', handleNewsletterSubmit);
+        }
+    }
+
+    async function handleNewsletterSubmit(e) {
+        e.preventDefault();
+        const form = e.target;
+        if (newsletterSubmitting || !(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        const emailInput = form.querySelector('input[name="email"]');
+        const email = emailInput && typeof emailInput.value === 'string' ? emailInput.value.trim() : '';
+        if (!email) {
+            if (window.showNotification) {
+                window.showNotification('Please enter your email address.', 'error');
+            }
+            return;
+        }
+
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const prevBtnText = submitBtn ? submitBtn.textContent : '';
+
+        newsletterSubmitting = true;
+        if (submitBtn) {
+            submitBtn.disabled = true;
+        }
+
+        try {
+            const response = await fetch('/api/newsletter/subscribe', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': typeof window.getCSRFToken === 'function' ? window.getCSRFToken() : ''
+                },
+                body: JSON.stringify({ email })
             });
+
+            let data = {};
+            try {
+                data = await response.json();
+            } catch (_) {
+                data = {};
+            }
+
+            if (!response.ok) {
+                if (response.status === 429 && data.retryAfter != null) {
+                    const minutes = Math.ceil(data.retryAfter / 60);
+                    const seconds = data.retryAfter % 60;
+                    const timeMessage = minutes > 1
+                        ? `Please try again in ${minutes} minutes.`
+                        : `Please try again in ${seconds} seconds.`;
+                    throw new Error(`${data.message || 'Too many requests.'} ${timeMessage}`);
+                }
+                if (data.errors && Array.isArray(data.errors)) {
+                    throw new Error(data.errors.join(', '));
+                }
+                throw new Error(data.message || 'Something went wrong. Please try again.');
+            }
+
+            if (data.success !== true) {
+                throw new Error(data.message || 'Something went wrong. Please try again.');
+            }
+
+            form.reset();
+
+            // GA: only after HTTP OK and JSON success — never in finally (failed/non-OK must not count).
+            if (window.AnalyticsEvents && typeof window.AnalyticsEvents.trackNewsletterSubscribe === 'function') {
+                window.AnalyticsEvents.trackNewsletterSubscribe();
+            }
+
+            if (window.showNotification) {
+                window.showNotification(
+                    data.message || "Thanks — you're on the list. We'll share new collections and offers when there's news.",
+                    'success'
+                );
+            }
+        } catch (err) {
+            const msg = err && err.message
+                ? err.message
+                : 'Unable to reach the server. Please check your connection and try again.';
+            if (window.showNotification) {
+                window.showNotification(msg, 'error');
+            }
+        } finally {
+            newsletterSubmitting = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = prevBtnText;
+            }
         }
     }
 

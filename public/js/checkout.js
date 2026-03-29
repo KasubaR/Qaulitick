@@ -606,14 +606,21 @@ function validatePaymentPhone() {
     return true;
 }
 
-// Calculate delivery fee - Always free
+// Calculate delivery fee from per-product shipping prices
 function calculateDeliveryFee() {
-    // Always set delivery fee to 0 (free shipping)
+    const seenIds = new Set();
     deliveryFee = 0;
+    checkoutCartItems.forEach(item => {
+        const pid = item.productId || item.id;
+        if (!seenIds.has(pid)) {
+            seenIds.add(pid);
+            deliveryFee += parseFloat(item.shippingPrice) || 0;
+        }
+    });
 
     const deliveryFeeDisplay = document.getElementById('deliveryFeeDisplay');
     if (deliveryFeeDisplay) {
-        deliveryFeeDisplay.style.display = 'none';
+        deliveryFeeDisplay.style.display = deliveryFee > 0 ? '' : 'none';
     }
 
     updateOrderSummary();

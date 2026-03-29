@@ -362,19 +362,6 @@ function toggleMenu() {
     }
 }
 
-// Newsletter Subscription
-function subscribeNewsletter(event) {
-    event.preventDefault();
-    const email = event.target.querySelector('.newsletter-input').value;
-
-    // Show success message
-    showNotification('Thank you for subscribing! Check your email for confirmation.');
-    event.target.reset();
-}
-
-// Make subscribeNewsletter available globally
-window.subscribeNewsletter = subscribeNewsletter;
-
 // Notification System
 // Global notification function used across all pages
 // Supports: 'success', 'error', 'warning', 'info'

@@ -1,0 +1,23 @@
+<%- include('partials/header', {
+    title: typeof title !== 'undefined' ? title : 'Unsubscribed | Qualitick Collections',
+    page: typeof page !== 'undefined' ? page : 'privacy',
+    description: typeof description !== 'undefined' ? description : 'Newsletter unsubscribe confirmation.',
+    canonicalUrl: typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com/newsletter/unsubscribe',
+    url: typeof url !== 'undefined' ? url : '/newsletter/unsubscribe',
+    ogType: 'website'
+}) %>
+
+<section class="contact-hero">
+    <div class="contact-hero-inner">
+        <span class="contact-eyebrow">Newsletter</span>
+        <h1 class="contact-hero-title">You&rsquo;re<br><em>Unsubscribed</em></h1>
+        <p class="contact-hero-sub">You won&rsquo;t receive further marketing emails from Qualitick Collections at this address. You can subscribe again anytime from our website.</p>
+        <a href="/" class="btn-hero-primary">
+            Back to home
+            <img src="/images/icons/Arrow-Icon.svg" alt="">
+        </a>
+    </div>
+    <img src="/images/icons/watermark.svg" alt="" class="contact-watermark" aria-hidden="true">
+</section>
+
+<%- include('partials/footer') %>

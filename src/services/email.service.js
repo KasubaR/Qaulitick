@@ -1294,6 +1294,89 @@ async function sendDispatchEmail({ order, courier, trackingNumber, note }) {
     }
 }
 
+/**
+ * Welcome email for new newsletter subscribers (transactional).
+ * Call only when newsletter.service.subscribe() returned sendWelcome: true (new row, recovery
+ * create, or reactivation after the per-email cooldown) — not for duplicate active signups
+ * or per-email throttle. Does not block HTTP; invoke fire-and-forget from the controller.
+ * @param {{ email: string, unsubscribeToken?: string }} params
+ * @returns {Promise<{ success: boolean, messageId?: string, error?: string }>}
+ */
+async function sendNewsletterWelcomeEmail(params) {
+    const transporter = getTransporter();
+    if (!transporter) {
+        logger.warn('Cannot send newsletter welcome: transporter not configured');
+        return { success: false, error: 'Email service not configured' };
+    }
+
+    const to = typeof params?.email === 'string' ? params.email.trim() : '';
+    if (!to) {
+        return { success: false, error: 'Missing recipient' };
+    }
+
+    const siteOrigin = String(
+        process.env.SITE_URL || process.env.APP_PUBLIC_URL || 'https://qualitick-collections.com'
+    ).replace(/\/$/, '');
+    const token =
+        typeof params.unsubscribeToken === 'string' && /^[a-f0-9]{64}$/i.test(params.unsubscribeToken.trim())
+            ? params.unsubscribeToken.trim().toLowerCase()
+            : null;
+    const unsubUrl = token
+        ? `${siteOrigin}/newsletter/unsubscribe?token=${encodeURIComponent(token)}`
+        : null;
+
+    const text =
+        'Hi,\n\n' +
+        'Thanks for subscribing to Qualitick Collections. You will hear from us when we have new collections and special offers.\n\n' +
+        (unsubUrl
+            ? `One-click unsubscribe (no login required): ${unsubUrl}\n\n`
+            : '') +
+        `This email was sent to ${to}.\n\n` +
+        'Qualitick Collections\n';
+
+    const unsubHtml = unsubUrl
+        ? `<p style="font-size: 12px; color: #777;"><a href="${esc(unsubUrl)}">One-click unsubscribe</a> (no login required)</p>`
+        : '';
+
+    const html = `
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"></head>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <p>Hi,</p>
+                    <p>Thanks for subscribing to Qualitick Collections. You&rsquo;ll hear from us when we have new collections and special offers.</p>
+                    ${unsubHtml}
+                    <p style="font-size: 12px; color: #777;">This email was sent to ${esc(to)}.</p>
+                    <p style="font-size: 12px; color: #777;">Qualitick Collections</p>
+                </div>
+            </body>
+            </html>`;
+
+    const mailOptions = {
+        from: MAIL_FROM,
+        to,
+        subject: "You're subscribed - Qualitick Collections",
+        text,
+        html
+    };
+    if (unsubUrl) {
+        mailOptions.headers = {
+            'List-Unsubscribe': `<${unsubUrl}>`,
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+        };
+    }
+
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        logger.info({ messageId: info.messageId }, 'Newsletter welcome email sent');
+        return { success: true, messageId: info.messageId };
+    } catch (error) {
+        logger.error({ err: error }, 'Error sending newsletter welcome email');
+        return { success: false, error: error.message };
+    }
+}
+
 module.exports = {
     sendContactNotificationToAdmin,
     sendContactConfirmationToUser,
@@ -1305,6 +1388,7 @@ module.exports = {
     sendCustomerPasswordResetEmail,
     sendOrderConfirmationEmail,
     sendDispatchEmail,
+    sendNewsletterWelcomeEmail,
     verifyTransporter
 };
 

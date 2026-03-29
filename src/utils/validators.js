@@ -532,6 +532,31 @@ function validateContactSubmission(data) {
     };
 }
 
+/**
+ * Validate newsletter subscribe payload
+ * @param {object} data - { email }
+ * @returns {{ valid: boolean, errors: string[] }}
+ */
+function validateNewsletterSubscribe(data) {
+    const errors = [];
+
+    if (!data) {
+        errors.push('Email is required');
+        return { valid: false, errors };
+    }
+
+    if (!data.email || !validateEmail(data.email)) {
+        errors.push('Valid email address is required');
+    } else if (data.email.trim().length > 255) {
+        errors.push('Email cannot exceed 255 characters');
+    }
+
+    return {
+        valid: errors.length === 0,
+        errors
+    };
+}
+
 module.exports = {
     sanitizeString,
     sanitizeObject,
@@ -552,6 +577,7 @@ module.exports = {
     validateFilters,
     validateOrder,
     validateProduct,
-    validateContactSubmission
+    validateContactSubmission,
+    validateNewsletterSubscribe
 };
 

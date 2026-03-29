@@ -57,6 +57,7 @@ const Product = sequelize.define('Product', {
             return Array.isArray(v) ? v : [];
         }
     },
+    shippingPrice: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
     warranty: { type: DataTypes.STRING(200), allowNull: true },
     status: {
         type: DataTypes.ENUM('active', 'inactive', 'discontinued', 'out_of_stock'),
