@@ -80,7 +80,7 @@ function buildShopLd(products, canonicalUrl) {
                         '@type': 'Offer',
                         price: String(p.price),
                         priceCurrency: 'ZMW',
-                        availability: p.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock'
+                        availability: (p.availableStock || 0) > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock'
                     }
                 }
             }))

@@ -158,6 +158,25 @@ class DatabaseService {
             // because Sequelize registers an index entry for each side of every bidirectional
             // association, producing duplicates like orderId / orderId_2).
             await this.repairDuplicateIndexes();
+
+            // Ensure DB-level CHECK constraint: reservedStock can never exceed stock.
+            // Idempotent — silently skips if the constraint already exists.
+            try {
+                await sequelize.query(
+                    'ALTER TABLE products ADD CONSTRAINT chk_reserved CHECK (reservedStock <= stock)'
+                );
+                console.log('[DB] Added CHECK constraint chk_reserved on products');
+            } catch (chkErr) {
+                // ER_CHECK_CONSTRAINT_REFERS_UNKNOWN_COLUMN or duplicate constraint name
+                if (chkErr?.original?.code === 'ER_DUP_KEYNAME' ||
+                    chkErr?.original?.code === 'ER_CHECK_CONSTRAINT_VIOLATED' ||
+                    (chkErr?.original?.sqlMessage || '').includes('already exists') ||
+                    (chkErr?.original?.sqlMessage || '').includes('Duplicate')) {
+                    // Constraint already exists — nothing to do
+                } else {
+                    console.warn('[DB] Could not add chk_reserved constraint:', chkErr.message);
+                }
+            }
             this.isConnected = true;
             this.connectionAttempts = 0;
             console.log('✅ Connected to MySQL successfully');

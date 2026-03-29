@@ -11,19 +11,25 @@ const Product = require('../models/Product.model');
 const { sequelize } = require('../config/mysql');
 const { Op } = require('sequelize');
 
-const RESERVATION_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const PENDING_TTL_MS     = 10 * 60 * 1000; // 10 minutes for pending orders
+const PROCESSING_TTL_MS  = 30 * 60 * 1000; // 30 minutes for processing orders (gateway timeout)
 
 /**
  * Release stock reservations for orders that never received payment.
- * Targets orders where paymentStatus = 'pending' and createdAt < now - 30 min.
+ * Targets:
+ *   - paymentStatus = 'pending'    older than PENDING_TTL_MS   (10 min)
+ *   - paymentStatus = 'processing' older than PROCESSING_TTL_MS (30 min)
  */
 async function releaseExpiredReservations() {
-    const cutoff = new Date(Date.now() - RESERVATION_TTL_MS);
+    const pendingCutoff    = new Date(Date.now() - PENDING_TTL_MS);
+    const processingCutoff = new Date(Date.now() - PROCESSING_TTL_MS);
 
     const expiredOrders = await Order.findAll({
         where: {
-            paymentStatus: 'pending',
-            createdAt: { [Op.lt]: cutoff }
+            [Op.or]: [
+                { paymentStatus: 'pending',    createdAt: { [Op.lt]: pendingCutoff } },
+                { paymentStatus: 'processing', createdAt: { [Op.lt]: processingCutoff } }
+            ]
         }
     });
 
@@ -34,6 +40,7 @@ async function releaseExpiredReservations() {
     for (const order of expiredOrders) {
         try {
             const items = order.items || [];
+            const ttlLabel = order.paymentStatus === 'processing' ? '30 minutes' : '10 minutes';
 
             for (const item of items) {
                 const qty = parseInt(item.quantity) || 1;
@@ -65,7 +72,7 @@ async function releaseExpiredReservations() {
             history.push({
                 status: 'cancelled',
                 paymentStatus: 'expired',
-                notes: 'Order expired — payment not received within 10 minutes',
+                notes: `Order expired — payment not received within ${ttlLabel}`,
                 updatedBy: 'system',
                 updatedAt: new Date().toISOString(),
                 source: 'expiry_cron'
@@ -73,7 +80,7 @@ async function releaseExpiredReservations() {
             order.history = history;
             await order.save();
 
-            console.log(`[Scheduler] Expired order ${order.orderNumber} — reservation released`);
+            console.log(`[Scheduler] Expired order ${order.orderNumber} (was ${order.paymentStatus}) — reservation released`);
         } catch (err) {
             console.error(`[Scheduler] Error expiring order ${order.orderNumber}:`, err);
         }
@@ -128,14 +135,14 @@ class SchedulerService {
             }
         }, 12 * 60 * 60 * 1000); // 12 hours
 
-        // Release stale stock reservations every 5 minutes
+        // Release stale stock reservations every 2 minutes
         const expireReservationsInterval = setInterval(async () => {
             try {
                 await releaseExpiredReservations();
             } catch (error) {
                 console.error('[Scheduler] Error during reservation expiry:', error);
             }
-        }, 5 * 60 * 1000); // 5 minutes
+        }, 2 * 60 * 1000); // 2 minutes
 
         this.intervals.push(cleanupDeletedInterval, cleanupInactiveInterval, expireReservationsInterval);
 

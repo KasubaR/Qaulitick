@@ -248,10 +248,22 @@ exports.createOrder = async (req, res) => {
                 }
 
                 // Decrement color-specific stock within the same transaction.
-                // The row lock from the reservedStock update above prevents concurrent
-                // orders for the same color from both reading and decrementing simultaneously.
+                // Re-read the product AFTER the atomic reservedStock update so we see
+                // the row-locked state — no other transaction can modify this row until
+                // we commit, eliminating the race on color stock.
                 if (item.selectedColor) {
                     const freshProduct = await Product.findByPk(parseInt(item.productId, 10), { transaction: t });
+                    const colorEntry = (freshProduct.colors || []).find(c => c.name === item.selectedColor);
+                    const colorStock = colorEntry ? (Number(colorEntry.stock) || 0) : 0;
+
+                    if (colorStock < item.quantity) {
+                        const err = new Error(
+                            `Insufficient stock for "${item.name}" in color "${item.selectedColor}". Available: ${colorStock}, Requested: ${item.quantity}`
+                        );
+                        err.statusCode = 409;
+                        throw err;
+                    }
+
                     const updatedColors = (freshProduct.colors || []).map(c =>
                         c.name === item.selectedColor
                             ? { ...c, stock: Math.max(0, (c.stock || 0) - item.quantity) }

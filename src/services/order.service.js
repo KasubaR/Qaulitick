@@ -23,9 +23,14 @@ async function getOrdersForExport(filters = {}) {
             if (filters.startDate) where.createdAt[Op.gte] = new Date(filters.startDate);
             if (filters.endDate) where.createdAt[Op.lte] = new Date(filters.endDate);
         }
+        if (filters.email) {
+            where[Op.and] = sequelize.where(
+                sequelize.fn('JSON_UNQUOTE', sequelize.fn('JSON_EXTRACT', sequelize.col('customer'), sequelize.literal("'$.email'"))),
+                filters.email
+            );
+        }
         const order = filters.sort === 'oldest' ? [['createdAt', 'ASC']] : [['createdAt', 'DESC']];
         let orders = await Order.findAll({ where, order, limit: 10000 });
-        if (filters.email) orders = orders.filter(o => (o.customer && o.customer.email) === filters.email);
         if (filters.search) {
             const s = (filters.search || '').toLowerCase();
             orders = orders.filter(o =>
@@ -145,38 +150,54 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
             historyNote = notes || 'Payment cancelled';
         }
         
-        // Update order
+        // Atomically transition the order to the new status.
+        // The WHERE clause on paymentStatus ensures that if two identical webhooks
+        // arrive concurrently, only the first one will match and update the row.
+        // This eliminates the race window that caused double stock decrements.
         const previousStatus = order.status;
         const previousPaymentStatus = order.paymentStatus;
-        
-        order.status = newOrderStatus;
-        order.paymentStatus = newPaymentStatus;
-        
-        // Update transaction ID if provided
-        if (transactionId) {
-            order.transactionId = transactionId;
-        }
-        
-        // Add history entry
-        order.history.push({
+
+        const updateFields = {
             status: newOrderStatus,
             paymentStatus: newPaymentStatus,
-            notes: historyNote,
-            updatedBy: 'system',
-            updatedAt: new Date(),
-            source: 'payment_webhook'
-        });
-        
-        // Save order
-        await order.save();
+            history: [...(order.history || []), {
+                status: newOrderStatus,
+                paymentStatus: newPaymentStatus,
+                notes: historyNote,
+                updatedBy: 'system',
+                updatedAt: new Date(),
+                source: 'payment_webhook'
+            }]
+        };
+        if (transactionId) {
+            updateFields.transactionId = transactionId;
+        }
+
+        // Build a WHERE that only matches if paymentStatus has NOT already
+        // transitioned to the target terminal state. This is the atomicity gate.
+        const terminalStates = ['completed', 'failed', 'cancelled'];
+        const isTerminal = terminalStates.includes(paymentStatus);
+        const atomicWhere = { orderNumber };
+        if (isTerminal) {
+            atomicWhere.paymentStatus = { [Op.ne]: paymentStatus };
+        }
+
+        const [updatedRows] = await Order.update(updateFields, { where: atomicWhere });
+
+        if (updatedRows === 0 && isTerminal) {
+            console.warn(`[Order Service] Order ${orderNumber} already has paymentStatus="${paymentStatus}" — duplicate webhook ignored`);
+            return null;
+        }
+
+        // Re-fetch the order so the caller gets the updated instance
+        const updatedOrder = await Order.findByOrderNumber(orderNumber);
 
         // Adjust stock based on payment outcome.
-        // Guards against duplicate webhook calls: only act when the payment status
-        // actually transitions into a terminal state for the first time.
-        const items = order.items || [];
+        // Because the atomic UPDATE above succeeded (updatedRows > 0), we know
+        // we are the only process handling this transition — no duplicates possible.
+        const items = updatedOrder.items || [];
 
         if (paymentStatus === 'completed' && previousPaymentStatus !== 'completed') {
-            // Convert reservation to a real sale: deduct from stock and release the hold.
             for (const item of items) {
                 const qty = parseInt(item.quantity) || 1;
                 const [rows] = await Product.update(
@@ -200,18 +221,15 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
 
         } else if ((paymentStatus === 'failed' || paymentStatus === 'cancelled') &&
                    previousPaymentStatus !== 'failed' && previousPaymentStatus !== 'cancelled') {
-            // Release the reservation — stock returns to available.
             for (const item of items) {
                 const qty = parseInt(item.quantity) || 1;
                 const productId = parseInt(item.productId, 10);
 
-                // Release product-level reservation
                 await Product.update(
                     { reservedStock: sequelize.literal(`GREATEST(0, reservedStock - ${qty})`) },
                     { where: { id: productId, reservedStock: { [Op.gt]: 0 } } }
                 );
 
-                // Restore color-specific stock that was decremented at order creation
                 if (item.selectedColor) {
                     const product = await Product.findByPk(productId);
                     if (product) {
@@ -229,7 +247,7 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
 
         console.log(`[Order Service] Order ${orderNumber} status updated from "${previousStatus}" to "${newOrderStatus}" (payment: "${previousPaymentStatus}" → "${newPaymentStatus}")`);
 
-        return order;
+        return updatedOrder;
     } catch (error) {
         console.error(`[Order Service] Error updating order status from payment:`, error);
         throw error;

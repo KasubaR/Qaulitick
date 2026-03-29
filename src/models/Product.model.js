@@ -14,7 +14,16 @@ const Product = sequelize.define('Product', {
     originalPrice: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
     discount: { type: DataTypes.INTEGER, defaultValue: 0 },
     stock: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
-    reservedStock: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    reservedStock: {
+        type: DataTypes.INTEGER, allowNull: false, defaultValue: 0,
+        validate: {
+            reservedNotExceedStock(value) {
+                if (value > this.stock) {
+                    throw new Error(`reservedStock (${value}) cannot exceed stock (${this.stock})`);
+                }
+            }
+        }
+    },
     lowStockThreshold: { type: DataTypes.INTEGER, defaultValue: 5 },
     description: { type: DataTypes.TEXT, allowNull: true },
     images: {
@@ -79,8 +88,9 @@ const Product = sequelize.define('Product', {
             } else {
                 product.discount = 0;
             }
-            if (product.stock === 0 && product.status !== 'discontinued') product.status = 'out_of_stock';
-            else if (product.stock > 0 && product.status === 'out_of_stock') product.status = 'active';
+            const available = Math.max(0, product.stock - (product.reservedStock || 0));
+            if (available === 0 && product.status !== 'discontinued') product.status = 'out_of_stock';
+            else if (available > 0 && product.status === 'out_of_stock') product.status = 'active';
         }
     }
 });
