@@ -925,6 +925,118 @@ select.form-input:disabled {
     display: none;
 }
 
+/* Layby order-summary panel (deposit / balance breakdown) */
+.layby-summary-panel {
+    margin-top: 20px;
+    margin-bottom: 8px;
+    padding: 18px 18px 16px;
+    border-radius: 12px;
+    background: linear-gradient(145deg, rgba(175, 144, 68, 0.09) 0%, rgba(255, 248, 230, 0.55) 100%);
+    border: 1px solid rgba(175, 144, 68, 0.28);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+}
+
+.layby-summary-panel--hidden {
+    display: none;
+}
+
+.layby-summary-panel__header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(175, 144, 68, 0.22);
+}
+
+.layby-summary-panel__icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(175, 144, 68, 0.18);
+    color: var(--gold);
+    font-size: 16px;
+}
+
+.layby-summary-panel__title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #070707;
+    letter-spacing: 0.02em;
+}
+
+.layby-summary-panel__body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.layby-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 8px 0;
+    font-size: 14px;
+    color: #3d3428;
+}
+
+.layby-summary-row--muted {
+    color: #7a6e58;
+    font-size: 13px;
+}
+
+.layby-summary-row--muted .layby-summary-row__value {
+    font-weight: 500;
+    color: #5c5346;
+}
+
+.layby-summary-row--due {
+    padding-top: 4px;
+    padding-bottom: 10px;
+}
+
+.layby-summary-row__label {
+    flex: 1;
+    min-width: 0;
+}
+
+.layby-summary-row__value {
+    font-weight: 600;
+    color: #070707;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.layby-summary-row__value--accent {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--gold);
+}
+
+.layby-summary-divider {
+    height: 1px;
+    background: rgba(175, 144, 68, 0.2);
+    margin: 6px 0 4px;
+}
+
+.layby-summary-panel__note {
+    margin: 14px 0 0;
+    padding-top: 12px;
+    border-top: 1px dashed rgba(175, 144, 68, 0.25);
+    font-size: 12px;
+    line-height: 1.55;
+    color: #6b5f4f;
+}
+
+.layby-summary-panel__note strong {
+    color: #3d3428;
+    font-weight: 600;
+}
+
 /* Payment instructions modal — automatic confirmation (polling) */
 .payment-modal-auto-confirm {
     display: flex;

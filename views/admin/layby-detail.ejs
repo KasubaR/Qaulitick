@@ -11,6 +11,7 @@
     <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
     <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
     <link rel="stylesheet" href="/css/admin/admin.css">
+    <link rel="stylesheet" href="/css/admin/layby.css">
 </head>
 <body class="admin-page">
     <div class="admin-container">
@@ -33,36 +34,45 @@
             <div id="laybyDetailError" class="layby-detail-alert layby-detail-alert--error layby-detail-alert--hidden" role="alert"></div>
 
             <div id="laybyDetailContent" class="layby-detail-content layby-detail-content--hidden">
-                <section class="layby-detail-summary table-card">
-                    <h2 class="layby-detail-section-title">Summary</h2>
-                    <dl class="layby-detail-dl">
-                        <dt>Order</dt>
-                        <dd id="summaryOrderNumber">—</dd>
-                        <dt>Checkout</dt>
-                        <dd id="summaryCheckout">—</dd>
-                        <dt>Customer</dt>
-                        <dd id="summaryCustomer">—</dd>
-                        <dt>Plan status</dt>
-                        <dd id="summaryPlanStatus">—</dd>
-                        <dt>Balance / total</dt>
-                        <dd id="summaryBalance">—</dd>
-                        <dt>Next due</dt>
-                        <dd id="summaryNextDue">—</dd>
-                    </dl>
-                    <div class="layby-detail-status-row">
-                        <label for="planStatusSelect">Update plan status</label>
-                        <select id="planStatusSelect" class="filter-select">
-                            <option value="active">active</option>
-                            <option value="completed">completed</option>
-                            <option value="cancelled">cancelled</option>
-                        </select>
-                        <button type="button" class="btn-primary" id="savePlanStatusBtn">Save status</button>
+                <section class="table-card layby-detail-summary">
+                    <div class="card-header">
+                        <h3>Plan summary</h3>
                     </div>
-                    <p class="layby-detail-hint">Completed requires zero balance. Cancel only from active. Reactivate only from cancelled.</p>
+                    <div class="layby-detail-summary-body">
+                        <dl class="layby-detail-dl">
+                            <dt>Order</dt>
+                            <dd id="summaryOrderNumber">—</dd>
+                            <dt>Checkout</dt>
+                            <dd id="summaryCheckout">—</dd>
+                            <dt>Customer</dt>
+                            <dd id="summaryCustomer">—</dd>
+                            <dt>Plan status</dt>
+                            <dd id="summaryPlanStatus">—</dd>
+                            <dt>Balance / total</dt>
+                            <dd id="summaryBalance" class="layby-detail-dd--money">—</dd>
+                            <dt>Next due</dt>
+                            <dd id="summaryNextDue">—</dd>
+                        </dl>
+
+                        <div id="summaryOrderSummary" class="layby-order-summary layby-order-summary--hidden" aria-label="Order line items and totals"></div>
+
+                        <div class="layby-detail-status-row">
+                            <label for="planStatusSelect">Update plan status</label>
+                            <select id="planStatusSelect" class="filter-select">
+                                <option value="active">active</option>
+                                <option value="completed">completed</option>
+                                <option value="cancelled">cancelled</option>
+                            </select>
+                            <button type="button" class="btn-primary" id="savePlanStatusBtn">Save status</button>
+                        </div>
+                        <p class="layby-detail-hint">Completed requires zero balance. Cancel only from active. Reactivate only from cancelled.</p>
+                    </div>
                 </section>
 
                 <section class="table-card layby-installments-section">
-                    <h2 class="layby-detail-section-title">Installments</h2>
+                    <div class="card-header">
+                        <h3>Installments</h3>
+                    </div>
                     <div class="table-container">
                         <table class="admin-table">
                             <thead>

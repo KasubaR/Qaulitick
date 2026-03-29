@@ -1,6 +1,6 @@
 <%- include('partials/header', {title: 'Checkout | Qualitick Collections', page: 'checkout'}) %>
 
-    <div id="checkout-auth-context" class="checkout-auth-context" data-logged-in="<%= typeof loggedIn !== 'undefined' && loggedIn ? 'true' : 'false' %>" data-layby-eligible="<%= typeof laybyEligible !== 'undefined' && laybyEligible ? 'true' : 'false' %>" aria-hidden="true"></div>
+    <div id="checkout-auth-context" class="checkout-auth-context" data-logged-in="<%= typeof loggedIn !== 'undefined' && loggedIn ? 'true' : 'false' %>" data-layby-eligible="<%= typeof laybyEligible !== 'undefined' && laybyEligible ? 'true' : 'false' %>" data-layby-plan-days="<%= typeof laybyPlanDays !== 'undefined' ? laybyPlanDays : 90 %>" aria-hidden="true"></div>
 
     <!-- BREADCRUMB -->
     <div class="breadcrumb">
@@ -298,6 +298,34 @@
                                 <span><strong>Total</strong></span>
                                 <span class="total-amount" id="summaryTotal"><strong>K0</strong></span>
                             </div>
+                        </div>
+
+                        <!-- Layby breakdown (verified accounts; toggled via checkout.js) -->
+                        <div id="laybySummaryPanel" class="layby-summary-panel layby-summary-panel--hidden" aria-live="polite" aria-hidden="true">
+                            <div class="layby-summary-panel__header">
+                                <span class="layby-summary-panel__icon" aria-hidden="true"><i class="fas fa-layer-group"></i></span>
+                                <span class="layby-summary-panel__title">Layby summary</span>
+                            </div>
+                            <div class="layby-summary-panel__body">
+                                <div class="layby-summary-row">
+                                    <span class="layby-summary-row__label">Order total</span>
+                                    <span class="layby-summary-row__value" id="laybySummaryOrderTotal">—</span>
+                                </div>
+                                <div class="layby-summary-row layby-summary-row--muted">
+                                    <span class="layby-summary-row__label">Deposit (<span id="laybySummaryPct">30</span>%)</span>
+                                    <span class="layby-summary-row__value" id="laybySummaryDeposit">—</span>
+                                </div>
+                                <div class="layby-summary-row layby-summary-row--due">
+                                    <span class="layby-summary-row__label">Due today</span>
+                                    <span class="layby-summary-row__value layby-summary-row__value--accent" id="laybySummaryDueToday">—</span>
+                                </div>
+                                <div class="layby-summary-divider" role="presentation"></div>
+                                <div class="layby-summary-row">
+                                    <span class="layby-summary-row__label">Balance to pay later</span>
+                                    <span class="layby-summary-row__value" id="laybySummaryBalance">—</span>
+                                </div>
+                            </div>
+                            <p class="layby-summary-panel__note" id="laybySummaryNote">Complete the balance in one or more payments within <strong id="laybySummaryPlanDays">90</strong> days from <strong>My account → Layby</strong>.</p>
                         </div>
 
                         <!-- Trust Badges -->

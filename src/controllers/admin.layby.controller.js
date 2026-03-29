@@ -103,6 +103,7 @@ exports.getPlan = async (req, res) => {
                         'paymentStatus',
                         'checkoutMode',
                         'customer',
+                        'items',
                         'totals',
                         'createdAt'
                     ]

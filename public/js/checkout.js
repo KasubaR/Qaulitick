@@ -4,6 +4,14 @@
 let checkoutCartItems = [];
 let deliveryFee = 0;
 
+function roundMoney2(x) {
+    return Math.round(Number(x) * 100) / 100;
+}
+
+function formatCheckoutMoney(n) {
+    return `K${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 // Payment polling
 let paymentPollInterval = null;
 let paymentPollStartTime = null;
@@ -42,8 +50,18 @@ function setupLaybyCheckoutSection() {
             depositWrap.classList.add('layby-deposit-wrap--hidden');
         }
     }
-    radios.forEach((r) => r.addEventListener('change', syncDepositVisibility));
+    function onCheckoutModeOrDepositChange() {
+        syncDepositVisibility();
+        updateOrderSummary();
+    }
+    radios.forEach((r) => r.addEventListener('change', onCheckoutModeOrDepositChange));
+    const depSel = document.getElementById('laybyDepositPercent');
+    if (depSel) {
+        depSel.addEventListener('change', updateOrderSummary);
+    }
     syncDepositVisibility();
+    // Section visibility just updated — refresh summary layby panel for eligible users
+    updateOrderSummary();
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -697,6 +715,51 @@ function updateOrderSummary() {
     summarySubtotal.textContent = `K${subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     summaryDelivery.textContent = deliveryFee > 0 ? `K${deliveryFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Free';
     summaryTotal.innerHTML = `<strong>K${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>`;
+
+    syncLaybySummaryPanel(total);
+}
+
+/**
+ * Layby breakdown in order summary (matches server rounding in layby.service).
+ */
+function syncLaybySummaryPanel(orderTotal) {
+    const panel = document.getElementById('laybySummaryPanel');
+    if (!panel) return;
+
+    const section = document.getElementById('laybyCheckoutSection');
+    const laybyRadio = document.getElementById('checkoutModeLayby');
+    const depSel = document.getElementById('laybyDepositPercent');
+    const eligible = section && !section.classList.contains('layby-checkout-section--hidden');
+
+    if (!eligible || !laybyRadio || !laybyRadio.checked) {
+        panel.classList.add('layby-summary-panel--hidden');
+        panel.setAttribute('aria-hidden', 'true');
+        return;
+    }
+
+    const pctRaw = parseFloat(depSel && depSel.value ? depSel.value : '30', 10);
+    const safePct = Number.isFinite(pctRaw) ? pctRaw : 30;
+    const deposit = roundMoney2(orderTotal * (safePct / 100));
+    const balance = roundMoney2(orderTotal - deposit);
+
+    const elTotal = document.getElementById('laybySummaryOrderTotal');
+    const elPct = document.getElementById('laybySummaryPct');
+    const elDep = document.getElementById('laybySummaryDeposit');
+    const elDue = document.getElementById('laybySummaryDueToday');
+    const elBal = document.getElementById('laybySummaryBalance');
+    if (elTotal) elTotal.textContent = formatCheckoutMoney(orderTotal);
+    if (elPct) elPct.textContent = String(Math.round(safePct));
+    if (elDep) elDep.textContent = formatCheckoutMoney(deposit);
+    if (elDue) elDue.textContent = formatCheckoutMoney(deposit);
+    if (elBal) elBal.textContent = formatCheckoutMoney(balance);
+
+    const ctx = document.getElementById('checkout-auth-context');
+    const planDays = ctx && ctx.dataset.laybyPlanDays ? ctx.dataset.laybyPlanDays : '90';
+    const planEl = document.getElementById('laybySummaryPlanDays');
+    if (planEl) planEl.textContent = planDays;
+
+    panel.classList.remove('layby-summary-panel--hidden');
+    panel.setAttribute('aria-hidden', 'false');
 }
 
 // Handle form submission

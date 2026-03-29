@@ -19,6 +19,7 @@ const customerAuthController = require('../controllers/customer.auth.controller'
 const customerAccountController = require('../controllers/customer.account.controller');
 
 const cartUtils = require('../utils/cart.utils');
+const laybyConfig = require('../config/layby');
 
 const productRoutes = require('./product.routes');
 const cartRoutes = require('./cart.routes');
@@ -281,6 +282,7 @@ router.get('/checkout', (req, res) => {
         page: 'checkout',
         loggedIn: !!u,
         laybyEligible: !!(u && u.emailVerifiedAt),
+        laybyPlanDays: laybyConfig.PLAN_PERIOD_DAYS,
         prefill: u ? {
             name: u.name || '',
             email: u.email || '',

@@ -67,6 +67,94 @@ function formatDate(iso) {
     return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString();
 }
 
+function escapeHtml(s) {
+    if (s == null) return '';
+    const d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+}
+
+function formatZmw(n) {
+    const x = Number(n);
+    if (Number.isNaN(x)) return '—';
+    return `K${x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/**
+ * Line items + totals from the linked order (admin layby detail).
+ */
+function renderOrderSummary(order) {
+    const el = document.getElementById('summaryOrderSummary');
+    if (!el) return;
+
+    const items = Array.isArray(order.items) ? order.items : [];
+    const t = order.totals || {};
+    const hasLines = items.length > 0;
+    const hasTotals =
+        t.subtotal != null ||
+        t.total != null ||
+        t.delivery != null ||
+        (t.discount != null && Number(t.discount) > 0);
+
+    if (!hasLines && !hasTotals) {
+        el.classList.add('layby-order-summary--hidden');
+        el.innerHTML = '';
+        return;
+    }
+
+    el.classList.remove('layby-order-summary--hidden');
+
+    let linesHtml = '';
+    items.forEach((it) => {
+        const name = it.name || 'Item';
+        const qty = it.quantity || 1;
+        const price = Number(it.price) || 0;
+        const line = price * qty;
+        linesHtml +=
+            '<li class="layby-order-summary__line">' +
+            '<span class="layby-order-summary__line-name">' +
+            escapeHtml(name) +
+            '<span class="layby-order-summary__line-meta">× ' +
+            String(qty) +
+            '</span></span>' +
+            '<span class="layby-order-summary__line-price">' +
+            formatZmw(line) +
+            '</span></li>';
+    });
+
+    let totalsHtml = '<div class="layby-order-summary__totals">';
+    if (t.subtotal != null) {
+        totalsHtml +=
+            '<div class="layby-order-summary__total-row"><span>Subtotal</span><span>' +
+            formatZmw(t.subtotal) +
+            '</span></div>';
+    }
+    if (t.discount != null && Number(t.discount) > 0) {
+        totalsHtml +=
+            '<div class="layby-order-summary__total-row"><span>Discount</span><span>− ' +
+            formatZmw(t.discount) +
+            '</span></div>';
+    }
+    if (t.delivery != null) {
+        totalsHtml +=
+            '<div class="layby-order-summary__total-row"><span>Delivery</span><span>' +
+            formatZmw(t.delivery) +
+            '</span></div>';
+    }
+    if (t.total != null) {
+        totalsHtml +=
+            '<div class="layby-order-summary__total-row layby-order-summary__total-row--strong"><span>Order total</span><span>' +
+            formatZmw(t.total) +
+            '</span></div>';
+    }
+    totalsHtml += '</div>';
+
+    el.innerHTML =
+        '<h4 class="layby-order-summary__title">Order summary</h4>' +
+        (hasLines ? '<ul class="layby-order-summary__lines">' + linesHtml + '</ul>' : '') +
+        (hasTotals ? totalsHtml : '');
+}
+
 function showError(msg) {
     const el = document.getElementById('laybyDetailError');
     const content = document.getElementById('laybyDetailContent');
@@ -103,7 +191,7 @@ function renderInstallments(rows, planStatus) {
             ? `${pay.status}${pay.lencoReference ? ` (${pay.lencoReference})` : ''}`
             : '—';
 
-        [String(row.sequence), `${row.amount}`, formatDate(row.dueAt), row.status, formatDate(row.adminConfirmedAt), paySummary].forEach(
+        [String(row.sequence), formatZmw(row.amount), formatDate(row.dueAt), row.status, formatDate(row.adminConfirmedAt), paySummary].forEach(
             (text) => {
                 const td = document.createElement('td');
                 td.textContent = text;
@@ -142,8 +230,14 @@ function fillSummary(plan) {
     const cust = [user.name, user.email].filter(Boolean).join(' · ');
     setText('summaryCustomer', cust || '—');
     setText('summaryPlanStatus', plan.status || '—');
-    setText('summaryBalance', `${plan.balanceRemaining} / ${plan.orderTotal} ${plan.currency || 'ZMW'}`);
+    const cur = plan.currency || 'ZMW';
+    setText(
+        'summaryBalance',
+        `${formatZmw(plan.balanceRemaining)} / ${formatZmw(plan.orderTotal)} ${cur}`
+    );
     setText('summaryNextDue', formatDate(plan.nextDueAt));
+
+    renderOrderSummary(order);
 
     const sel = document.getElementById('planStatusSelect');
     if (sel && plan.status) {
