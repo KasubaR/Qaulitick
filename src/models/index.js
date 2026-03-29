@@ -73,6 +73,11 @@ function addMongooseCompat(Model) {
     if (!Model.find) {
         Model.find = function(where) { return findChain(Model, where || {}); };
     }
+    if (!Model.deleteMany) {
+        Model.deleteMany = function(where) {
+            return Model.destroy({ where: where || {} });
+        };
+    }
 }
 
 const Product = require('./Product.model');

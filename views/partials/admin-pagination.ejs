@@ -15,7 +15,7 @@
     pageInfoText   : initial text for the info span     (simple variant only, default: 'Page 1 of 1')
     hidden         : true | false — start with display:none  (default: false)
     extraClass     : additional CSS class(es) appended to the .pagination div
-#%>
+%>
 <%
   const _variant       = (typeof variant === 'string' && variant === 'simple') ? 'simple' : 'pages';
   const _pageNumbersId = (typeof pageNumbersId === 'string' && pageNumbersId) ? pageNumbersId : 'pageNumbers';
