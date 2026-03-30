@@ -48,7 +48,19 @@ function withPrices(productObj) {
     const savings        = origPrice > currentPrice
         ? Math.round(origPrice - currentPrice)
         : calculateSavings(origPrice, discount);
-    const availableStock = Math.max(0, Number(productObj.stock) || 0);
+    // For products with named color variants, derive stock from color-level stocks
+    // so the badge always reflects actual per-color availability, not a stale aggregate.
+    let stockBase = Number(productObj.stock) || 0;
+    if (Array.isArray(productObj.colors)) {
+        const namedColors = productObj.colors.filter(c => c && typeof c.name === 'string' && c.name.trim());
+        if (namedColors.length > 0) {
+            stockBase = namedColors.reduce((sum, c) => {
+                const n = parseInt(c.stock, 10);
+                return sum + (Number.isNaN(n) || n < 0 ? 0 : n);
+            }, 0);
+        }
+    }
+    const availableStock = Math.max(0, stockBase);
     const stockStatus    = getStockStatus(availableStock, productObj.lowStockThreshold);
     return { ...productObj, price: currentPrice, originalPrice: origPrice, finalPrice: currentPrice, savings, availableStock, stockStatus };
 }

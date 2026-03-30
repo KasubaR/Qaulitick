@@ -357,8 +357,12 @@ function goToShop() {
 
 function toggleMenu() {
     const nav = document.getElementById("mainNav");
+    const btn = document.getElementById("mobileMenuBtn");
     if (nav) {
-        nav.classList.toggle("active");
+        const isOpen = nav.classList.toggle("active");
+        if (btn) {
+            btn.querySelector("i").className = isOpen ? "fas fa-times" : "fas fa-bars";
+        }
     }
 }
 

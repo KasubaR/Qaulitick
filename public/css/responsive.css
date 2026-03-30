@@ -8,6 +8,13 @@
     header {
         padding: 0 5%;
         height: 64px;
+        position: relative;
+    }
+
+    .nav-brand {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
     }
 
     .nav-logo {
@@ -16,6 +23,8 @@
 
     .mobile-menu-btn {
         display: block;
+        position: relative;
+        z-index: 1;
     }
 
     nav {

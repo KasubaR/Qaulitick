@@ -155,12 +155,6 @@ router.delete('/api/products/bulk',
 );
 
 // :id must be numeric only — otherwise "search", "export", etc. match :id and break those routes
-router.get('/api/products/:id(\\d+)',
-    rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
-    authenticateAdmin,
-    productController.getProductByIdAPI
-);
-
 router.put('/api/products/:id(\\d+)',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }),
     authenticateAdmin,
