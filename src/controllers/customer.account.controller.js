@@ -1,5 +1,6 @@
 const { Order, LaybyPlan, LaybyPayment, Payment } = require('../models');
 const userService = require('../services/user.service');
+const productService = require('../services/product.service');
 const { sanitizeObject, validatePhone } = require('../utils/validators');
 const logger = require('../utils/logger').child({ module: 'CustomerAccountController' });
 
@@ -153,16 +154,41 @@ exports.updateAddress = async (req, res) => {
 
 exports.renderOrders = async (req, res) => {
     try {
+        const user = req.customerUser;
         const orders = await Order.findAll({
-            where: { userId: req.customerUser.id, status: 'paid' },
+            where: { userId: user.id, status: 'paid' },
             order: [['createdAt', 'DESC']],
             limit: 100
         });
+
+        const ordersJson = orders.map((o) => o.toJSON());
+
+        // Collect unique product IDs across all order items
+        const productIds = [...new Set(
+            ordersJson.flatMap(o => (Array.isArray(o.items) ? o.items : []).map(i => i.productId).filter(Boolean))
+        )];
+
+        // Build a map of productId → the user's review (matched by email or userId)
+        const reviewedMap = {};
+        if (productIds.length > 0) {
+            const products = await productService.getProductsByIds(productIds);
+            for (const p of products) {
+                const pObj = typeof p.toJSON === 'function' ? p.toJSON() : p;
+                const reviews = Array.isArray(pObj.reviews) ? pObj.reviews : [];
+                const userReview = reviews.find(r =>
+                    (r.userId && String(r.userId) === String(user.id)) ||
+                    (r.email && r.email.toLowerCase() === user.email.toLowerCase())
+                );
+                if (userReview) reviewedMap[String(pObj.id)] = userReview;
+            }
+        }
+
         res.render('account/orders', {
             title: 'Order history | Qualitick Collections',
             page: 'account',
             accountSection: 'orders',
-            orders: orders.map((o) => o.toJSON())
+            orders: ordersJson,
+            reviewedMap
         });
     } catch (error) {
         logger.error({ err: error }, 'renderOrders failed');
@@ -171,6 +197,7 @@ exports.renderOrders = async (req, res) => {
             page: 'account',
             accountSection: 'orders',
             orders: [],
+            reviewedMap: {},
             error: 'Could not load orders.'
         });
     }

@@ -24,21 +24,69 @@
             <table class="account-table">
                 <thead>
                     <tr>
+                        <th>Items</th>
+                        <th>Name</th>
                         <th>Order</th>
                         <th>Date</th>
                         <th>Status</th>
-                        <th>Payment</th>
                         <th>Total</th>
+                        <th>Review</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <% orders.forEach(function(o) { %>
+                    <% orders.forEach(function(o) {
+                        const items = Array.isArray(o.items) ? o.items : [];
+                    %>
                         <tr>
+                            <td>
+                                <div class="order-items-list">
+                                    <% items.forEach(function(item) { %>
+                                        <a href="/product/<%= item.productId %>" class="order-item-thumb-link" title="<%= item.name %>">
+                                            <img
+                                                src="<%= item.image || '/images/placeholder.jpg' %>"
+                                                alt="<%= item.name %>"
+                                                class="order-item-thumb"
+                                            >
+                                        </a>
+                                    <% }); %>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="order-item-names">
+                                    <% items.forEach(function(item) { %>
+                                        <a href="/product/<%= item.productId %>" class="order-item-name-link"><%= item.name %></a>
+                                    <% }); %>
+                                </div>
+                            </td>
                             <td><%= o.orderNumber %></td>
                             <td><%= o.createdAt ? new Date(o.createdAt).toLocaleDateString() : '—' %></td>
                             <td><%= o.status || '—' %></td>
-                            <td><%= o.paymentStatus || '—' %></td>
-                            <td><%= o.totals && o.totals.total != null ? o.totals.total : '—' %></td>
+                            <td><%= o.totals && o.totals.total != null ? 'K' + Number(o.totals.total).toLocaleString() : '—' %></td>
+                            <td>
+                                <div class="order-review-links">
+                                    <% items.forEach(function(item) {
+                                        const existingReview = reviewedMap && reviewedMap[String(item.productId)];
+                                    %>
+                                        <% if (existingReview) { %>
+                                            <div class="order-review-card">
+                                                <div class="order-review-card-stars">
+                                                    <% for (let s = 1; s <= 5; s++) { %>
+                                                        <i class="<%= s <= existingReview.rating ? 'fas' : 'far' %> fa-star"></i>
+                                                    <% } %>
+                                                </div>
+                                                <div class="order-review-card-title"><%= existingReview.title %></div>
+                                                <div class="order-review-card-comment"><%= existingReview.comment %></div>
+                                            </div>
+                                        <% } else { %>
+                                            <button
+                                                class="order-write-review-btn"
+                                                data-product-id="<%= item.productId %>"
+                                                data-product-name="<%= item.name %>"
+                                            >Write a Review</button>
+                                        <% } %>
+                                    <% }); %>
+                                </div>
+                            </td>
                         </tr>
                     <% }); %>
                 </tbody>
@@ -46,5 +94,188 @@
         </div>
     <% } %>
 </div>
+
+<!-- Review Modal -->
+<div class="review-modal" id="accountReviewModal">
+    <div class="review-modal-content">
+        <button class="review-close" id="accountReviewClose">&times;</button>
+        <h3>Write a Review</h3>
+        <% if (currentUser) { %>
+        <div class="review-info-message review-info-message--verified">
+            <i class="fas fa-check-circle"></i>
+            Reviewing as <strong><%= currentUser.name %></strong> (<%= currentUser.email %>)
+        </div>
+        <% } else { %>
+        <div class="review-info-message review-info-message--info">
+            <i class="fas fa-info-circle"></i>
+            Only verified buyers can review. Please use the same email used during checkout.
+        </div>
+        <% } %>
+        <form id="accountReviewForm">
+            <div class="form-group">
+                <label>Your Rating *</label>
+                <div class="star-rating-input" id="accountStarRating">
+                    <i class="far fa-star" data-rating="1"></i>
+                    <i class="far fa-star" data-rating="2"></i>
+                    <i class="far fa-star" data-rating="3"></i>
+                    <i class="far fa-star" data-rating="4"></i>
+                    <i class="far fa-star" data-rating="5"></i>
+                </div>
+                <input type="hidden" id="accountReviewRating" value="0">
+            </div>
+            <div class="form-group">
+                <label for="accountReviewTitle">Review Title *</label>
+                <input type="text" id="accountReviewTitle" autocomplete="off" required placeholder="Sum up your experience" maxlength="100">
+            </div>
+            <div class="form-group">
+                <label for="accountReviewComment">Your Review *</label>
+                <textarea id="accountReviewComment" rows="5" autocomplete="off" required placeholder="Share your thoughts about this product" maxlength="1000"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="accountReviewName">Your Name *</label>
+                <input type="text" id="accountReviewName" autocomplete="name" required maxlength="100" value="<%= currentUser ? currentUser.name : '' %>">
+            </div>
+            <% if (!currentUser) { %>
+            <div class="form-group">
+                <label for="accountReviewEmail">Your Email *</label>
+                <input type="email" id="accountReviewEmail" autocomplete="email" required placeholder="Use the email from your order">
+                <small style="color:#666;font-size:12px;">We'll verify your purchase using this email</small>
+            </div>
+            <% } %>
+            <button type="submit" class="btn-primary" id="accountReviewSubmit">Submit Review</button>
+        </form>
+    </div>
+</div>
+
+<script>
+(function () {
+    const currentUserEmail = '<%= currentUser ? currentUser.email : "" %>';
+
+    function starsHtml(rating) {
+        let s = '';
+        for (let i = 1; i <= 5; i++) {
+            s += '<i class="' + (i <= rating ? 'fas' : 'far') + ' fa-star"></i>';
+        }
+        return s;
+    }
+
+    function escapeHtml(str) {
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function buildReviewCard(review) {
+        const card = document.createElement('div');
+        card.className = 'order-review-card';
+        card.innerHTML =
+            '<div class="order-review-card-stars">' + starsHtml(review.rating) + '</div>' +
+            '<div class="order-review-card-title">' + escapeHtml(review.title) + '</div>' +
+            '<div class="order-review-card-comment">' + escapeHtml(review.comment) + '</div>';
+        return card;
+    }
+
+    function replaceWithCard(productId, review) {
+        document.querySelectorAll('.order-write-review-btn[data-product-id="' + productId + '"]').forEach(function (btn) {
+            btn.replaceWith(buildReviewCard(review));
+        });
+    }
+
+    // Modal state
+    const modal = document.getElementById('accountReviewModal');
+    const form  = document.getElementById('accountReviewForm');
+    let currentProductId = null;
+    let currentRating = 0;
+
+    function openModal(productId) {
+        currentProductId = productId;
+        currentRating = 0;
+        document.getElementById('accountReviewRating').value = '0';
+        document.getElementById('accountReviewTitle').value = '';
+        document.getElementById('accountReviewComment').value = '';
+        document.querySelectorAll('#accountStarRating i').forEach(function (s) { s.className = 'far fa-star'; });
+        const submitBtn = document.getElementById('accountReviewSubmit');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Review';
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    document.getElementById('accountReviewClose').addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+
+    document.querySelectorAll('.order-write-review-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () { openModal(btn.dataset.productId); });
+    });
+
+    // Star rating
+    document.querySelectorAll('#accountStarRating i').forEach(function (star) {
+        star.addEventListener('click', function () {
+            currentRating = parseInt(this.dataset.rating);
+            document.getElementById('accountReviewRating').value = currentRating;
+            document.querySelectorAll('#accountStarRating i').forEach(function (s, i) {
+                s.className = i < currentRating ? 'fas fa-star active' : 'far fa-star';
+            });
+        });
+        star.addEventListener('mouseenter', function () {
+            const hovered = parseInt(this.dataset.rating);
+            document.querySelectorAll('#accountStarRating i').forEach(function (s, i) {
+                s.className = i < hovered ? 'fas fa-star active' : 'far fa-star';
+            });
+        });
+        star.addEventListener('mouseleave', function () {
+            document.querySelectorAll('#accountStarRating i').forEach(function (s, i) {
+                s.className = i < currentRating ? 'fas fa-star active' : 'far fa-star';
+            });
+        });
+    });
+
+    // Form submit
+    form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        if (currentRating === 0) { showNotification('Please select a star rating.', 'error'); return; }
+
+        const title   = document.getElementById('accountReviewTitle').value.trim();
+        const comment = document.getElementById('accountReviewComment').value.trim();
+        const name    = document.getElementById('accountReviewName').value.trim();
+        const emailEl = document.getElementById('accountReviewEmail');
+        const email   = currentUserEmail || (emailEl ? emailEl.value.trim() : '');
+
+        if (!title || !comment || !name) { showNotification('Please fill in all required fields.', 'error'); return; }
+        if (!currentUserEmail && !email) { showNotification('Please enter your email.', 'error'); return; }
+
+        const submitBtn = document.getElementById('accountReviewSubmit');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting…';
+
+        try {
+            const res = await fetch('/api/products/' + currentProductId + '/reviews', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rating: currentRating, title, comment, name, email })
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Review';
+                showNotification(data.message || 'Failed to submit review.', 'error');
+                return;
+            }
+
+            replaceWithCard(currentProductId, { rating: currentRating, title, comment });
+            closeModal();
+            showNotification('Review submitted successfully!', 'success');
+        } catch (err) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Review';
+            showNotification('Something went wrong. Please try again.', 'error');
+        }
+    });
+})();
+</script>
 
 <%- include('../partials/footer') %>
