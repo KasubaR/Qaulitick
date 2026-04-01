@@ -83,6 +83,8 @@ const Product = sequelize.define('Product', {
             const available = Math.max(0, Number(product.stock) || 0);
             if (available === 0 && product.status !== 'discontinued') product.status = 'out_of_stock';
             else if (available > 0 && product.status === 'out_of_stock') product.status = 'active';
+            // Legacy column — keep at 0 so the chk_reserved DB constraint (reservedStock <= stock) never fires
+            product.reservedStock = 0;
         }
     }
 });

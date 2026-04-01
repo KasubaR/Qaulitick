@@ -462,6 +462,18 @@ async function initiateMobileMoneyPayment(orderData, customerPhone, provider, am
         throw err;
     }
 
+    if (chargeAmount < 1) {
+        log('error', 'Charge amount below Lenco minimum (K1)', {
+            orderNumber: orderData.orderNumber,
+            chargeAmount
+        });
+        const err = new Error('Payment amount must be at least K1.00');
+        err.name = 'validation_error';
+        err.code = 400;
+        err.retryable = false;
+        throw err;
+    }
+
     log('info', 'Initiating mobile money payment', {
         orderNumber: orderData.orderNumber,
         provider: provider.toLowerCase(),

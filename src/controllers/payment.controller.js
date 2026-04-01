@@ -347,7 +347,8 @@ exports.processPayment = async (req, res) => {
                     }
                 });
 
-                return res.status(500).json({
+                const statusCode = error.name === 'validation_error' ? 400 : 500;
+                return res.status(statusCode).json({
                     success: false,
                     message: error.message || 'Failed to initiate mobile money payment',
                     orderNumber,
