@@ -27,6 +27,7 @@ async function expireStaleUnpaidOrders() {
 
     const expiredOrders = await Order.findAll({
         where: {
+            paymentType: 'standard',
             [Op.or]: [
                 { paymentStatus: 'pending',    createdAt: { [Op.lt]: pendingCutoff } },
                 { paymentStatus: 'processing', createdAt: { [Op.lt]: processingCutoff } }
