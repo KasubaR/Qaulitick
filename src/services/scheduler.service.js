@@ -8,6 +8,7 @@
 const featuredProductService = require('./featuredProduct.service');
 const Order = require('../models/Order.model');
 const Product = require('../models/Product.model');
+const { LaybyPlan, LaybyPayment } = require('../models');
 const { sequelize } = require('../config/mysql');
 const { Op } = require('sequelize');
 
@@ -80,6 +81,74 @@ async function expireStaleUnpaidOrders() {
     }
 }
 
+/**
+ * Flag pending layby installments whose dueAt has passed as 'overdue'.
+ * Also cancels active layby plans that have exceeded their plan period with a remaining balance.
+ */
+async function flagOverdueLaybyInstallments() {
+    const now = new Date();
+
+    // Mark individual installments overdue
+    const [overdueCount] = await LaybyPayment.update(
+        { status: 'overdue' },
+        {
+            where: {
+                status: 'pending',
+                dueAt: { [Op.lt]: now }
+            }
+        }
+    );
+
+    if (overdueCount > 0) {
+        console.log(`[Scheduler] Marked ${overdueCount} layby installment(s) as overdue`);
+    }
+
+    // Cancel plans that have exceeded their period and still have a balance
+    const activePlans = await LaybyPlan.findAll({
+        where: { status: 'active' }
+    });
+
+    let cancelledCount = 0;
+    for (const plan of activePlans) {
+        try {
+            const sched = plan.installmentSchedule && typeof plan.installmentSchedule === 'object'
+                ? plan.installmentSchedule
+                : null;
+            const periodDays = sched && sched.planPeriodDays ? sched.planPeriodDays : null;
+            if (!periodDays) continue;
+
+            const expiresAt = new Date(plan.createdAt.getTime() + periodDays * 86400000);
+            if (now < expiresAt) continue;
+            if (Number(plan.balanceRemaining) <= 0) continue;
+
+            plan.status = 'cancelled';
+            await plan.save();
+
+            const order = await Order.findByPk(plan.orderId);
+            if (order) {
+                order.history = order.history || [];
+                order.history.push({
+                    status: order.status,
+                    paymentStatus: order.paymentStatus,
+                    notes: `Layby plan cancelled — plan period of ${periodDays} days exceeded with balance remaining`,
+                    updatedBy: 'system',
+                    updatedAt: new Date().toISOString(),
+                    source: 'layby_expiry_cron'
+                });
+                await order.save();
+            }
+
+            cancelledCount++;
+        } catch (err) {
+            console.error(`[Scheduler] Error processing layby plan ${plan.id}:`, err);
+        }
+    }
+
+    if (cancelledCount > 0) {
+        console.log(`[Scheduler] Cancelled ${cancelledCount} expired layby plan(s)`);
+    }
+}
+
 class SchedulerService {
     constructor() {
         this.intervals = [];
@@ -137,7 +206,16 @@ class SchedulerService {
             }
         }, 2 * 60 * 1000); // 2 minutes
 
-        this.intervals.push(cleanupDeletedInterval, cleanupInactiveInterval, expireStaleOrdersInterval);
+        // Flag overdue layby installments and cancel expired plans every hour
+        const laybyOverdueInterval = setInterval(async () => {
+            try {
+                await flagOverdueLaybyInstallments();
+            } catch (error) {
+                console.error('[Scheduler] Error during layby overdue check:', error);
+            }
+        }, 60 * 60 * 1000); // 1 hour
+
+        this.intervals.push(cleanupDeletedInterval, cleanupInactiveInterval, expireStaleOrdersInterval, laybyOverdueInterval);
 
         // Run initial cleanup on startup (after 1 minute delay to let server fully start)
         setTimeout(async () => {
@@ -149,6 +227,7 @@ class SchedulerService {
                 }
 
                 await expireStaleUnpaidOrders();
+                await flagOverdueLaybyInstallments();
             } catch (error) {
                 console.error('[Scheduler] Error during initial cleanup:', error);
             }

@@ -20,8 +20,9 @@ const {
     USE_FIXED_INSTALLMENT_INTERVAL,
     FIXED_INTERVAL_DAYS
 } = require('../config/layby');
-const { LaybyPlan, LaybyPayment, Order } = require('../models');
+const { LaybyPlan, LaybyPayment, Order, Payment } = require('../models');
 const logger = require('../utils/logger').child({ module: 'LaybyService' });
+const emailService = require('./email.service');
 
 function roundMoney2(x) {
     return Math.round(Number(x) * 100) / 100;
@@ -209,43 +210,94 @@ async function recordLaybyInstallmentPaid(payment) {
         return null;
     }
 
-    const installment = await LaybyPayment.findByPk(payment.laybyPaymentId);
-    if (!installment) {
-        logger.warn({ laybyPaymentId: payment.laybyPaymentId }, 'LaybyPayment row missing');
-        return null;
-    }
+    return sequelize.transaction(async (t) => {
+        const installment = await LaybyPayment.findByPk(payment.laybyPaymentId, {
+            transaction: t,
+            lock: t.LOCK.UPDATE
+        });
+        if (!installment) {
+            logger.warn({ laybyPaymentId: payment.laybyPaymentId }, 'LaybyPayment row missing');
+            return null;
+        }
 
-    if (installment.status === 'paid') {
-        return { alreadyApplied: true };
-    }
+        if (installment.status === 'paid') {
+            return { alreadyApplied: true };
+        }
 
-    const plan = await LaybyPlan.findByPk(installment.laybyPlanId);
-    if (!plan || plan.status !== 'active') {
-        logger.warn({ planId: installment.laybyPlanId }, 'Layby plan missing or not active');
-        return null;
-    }
+        const plan = await LaybyPlan.findByPk(installment.laybyPlanId, {
+            transaction: t,
+            lock: t.LOCK.UPDATE
+        });
+        if (!plan || plan.status !== 'active') {
+            logger.warn({ planId: installment.laybyPlanId }, 'Layby plan missing or not active');
+            return null;
+        }
 
-    const order = await Order.findByPk(plan.orderId);
-    if (!order) return null;
+        const order = await Order.findByPk(plan.orderId, { transaction: t, lock: t.LOCK.UPDATE });
+        if (!order) return null;
 
-    const paidRaw = roundMoney2(payment.amount);
-    const balBefore = roundMoney2(Number(plan.balanceRemaining));
-    const applied = roundMoney2(Math.min(paidRaw, balBefore));
-    let newBal = roundMoney2(balBefore - applied);
-    if (newBal < 0) newBal = 0;
+        const paidRaw = roundMoney2(payment.amount);
+        const balBefore = roundMoney2(Number(plan.balanceRemaining));
+        const applied = roundMoney2(Math.min(paidRaw, balBefore));
+        let newBal = roundMoney2(balBefore - applied);
+        if (newBal < 0) newBal = 0;
 
-    const flexBalance = isFlexibleBalanceInstallment(plan, installment);
+        const flexBalance = isFlexibleBalanceInstallment(plan, installment);
 
-    if (flexBalance && newBal > 0) {
-        installment.amount = newBal;
-        await installment.save();
+        if (flexBalance && newBal > 0) {
+            installment.amount = newBal;
+            await installment.save({ transaction: t });
+
+            plan.balanceRemaining = newBal;
+            plan.nextDueAt = installment.dueAt;
+            await plan.save({ transaction: t });
+
+            order.paymentStatus = 'processing';
+            order.status = 'payment_pending';
+            if (payment.lencoTransactionId || payment.transactionId) {
+                order.transactionId = payment.lencoTransactionId || payment.transactionId;
+            }
+            order.history = order.history || [];
+            order.history.push({
+                status: order.status,
+                paymentStatus: order.paymentStatus,
+                notes: `Layby payment received (${applied} ZMW); balance remaining ${newBal}`,
+                updatedBy: 'system',
+                updatedAt: new Date().toISOString(),
+                source: 'layby_payment'
+            });
+            await order.save({ transaction: t });
+
+            logger.info(
+                { orderNumber: order.orderNumber, planId: plan.id, newBal, partial: true },
+                'Layby partial payment recorded'
+            );
+
+            return { order, plan, fullyPaid: false };
+        }
+
+        installment.status = 'paid';
+        installment.paidAt = new Date();
+        installment.paymentId = payment.id;
+        await installment.save({ transaction: t });
+
+        const nextPending = await LaybyPayment.findOne({
+            where: { laybyPlanId: plan.id, status: 'pending' },
+            order: [['sequence', 'ASC']],
+            transaction: t
+        });
 
         plan.balanceRemaining = newBal;
-        plan.nextDueAt = installment.dueAt;
-        await plan.save();
+        plan.nextDueAt = nextPending ? nextPending.dueAt : null;
 
-        order.paymentStatus = 'processing';
-        order.status = 'payment_pending';
+        const fullyPaid = newBal <= 0;
+        if (fullyPaid) {
+            plan.status = 'completed';
+        }
+        await plan.save({ transaction: t });
+
+        order.paymentStatus = fullyPaid ? 'completed' : 'processing';
+        order.status = fullyPaid ? 'paid' : 'payment_pending';
         if (payment.lencoTransactionId || payment.transactionId) {
             order.transactionId = payment.lencoTransactionId || payment.transactionId;
         }
@@ -253,64 +305,22 @@ async function recordLaybyInstallmentPaid(payment) {
         order.history.push({
             status: order.status,
             paymentStatus: order.paymentStatus,
-            notes: `Layby payment received (${applied} ZMW); balance remaining ${newBal}`,
+            notes: fullyPaid
+                ? 'Layby completed — full balance received'
+                : `Layby installment received (${applied} ZMW); balance remaining ${newBal}`,
             updatedBy: 'system',
             updatedAt: new Date().toISOString(),
             source: 'layby_payment'
         });
-        await order.save();
+        await order.save({ transaction: t });
 
         logger.info(
-            { orderNumber: order.orderNumber, planId: plan.id, newBal, partial: true },
-            'Layby partial payment recorded'
+            { orderNumber: order.orderNumber, planId: plan.id, newBal, fullyPaid },
+            'Layby installment recorded'
         );
 
-        return { order, plan, fullyPaid: false };
-    }
-
-    installment.status = 'paid';
-    installment.paidAt = new Date();
-    installment.paymentId = payment.id;
-    await installment.save();
-
-    const nextPending = await LaybyPayment.findOne({
-        where: { laybyPlanId: plan.id, status: 'pending' },
-        order: [['sequence', 'ASC']]
+        return { order, plan, fullyPaid };
     });
-
-    plan.balanceRemaining = newBal;
-    plan.nextDueAt = nextPending ? nextPending.dueAt : null;
-
-    const fullyPaid = newBal <= 0;
-    if (fullyPaid) {
-        plan.status = 'completed';
-    }
-    await plan.save();
-
-    order.paymentStatus = fullyPaid ? 'completed' : 'processing';
-    order.status = fullyPaid ? 'paid' : 'payment_pending';
-    if (payment.lencoTransactionId || payment.transactionId) {
-        order.transactionId = payment.lencoTransactionId || payment.transactionId;
-    }
-    order.history = order.history || [];
-    order.history.push({
-        status: order.status,
-        paymentStatus: order.paymentStatus,
-        notes: fullyPaid
-            ? 'Layby completed — full balance received'
-            : `Layby installment received (${applied} ZMW); balance remaining ${newBal}`,
-        updatedBy: 'system',
-        updatedAt: new Date().toISOString(),
-        source: 'layby_payment'
-    });
-    await order.save();
-
-    logger.info(
-        { orderNumber: order.orderNumber, planId: plan.id, newBal, fullyPaid },
-        'Layby installment recorded'
-    );
-
-    return { order, plan, fullyPaid };
 }
 
 /**
@@ -329,7 +339,7 @@ async function confirmInstallmentOffline(laybyPaymentId, admin) {
     }
 
     try {
-        return await sequelize.transaction(async (t) => {
+        const result = await sequelize.transaction(async (t) => {
             const installment = await LaybyPayment.findByPk(id, {
                 transaction: t,
                 lock: t.LOCK.UPDATE
@@ -413,6 +423,25 @@ async function confirmInstallmentOffline(laybyPaymentId, admin) {
             installment.adminConfirmedAt = now;
             await installment.save({ transaction: t });
 
+            // Create an audit Payment record for the offline confirmation
+            const offlinePayment = await Payment.create({
+                orderNumber: order.orderNumber,
+                paymentMethod: 'cash_on_delivery',
+                amount: paidAmt,
+                currency: 'ZMW',
+                status: 'completed',
+                completedAt: now,
+                laybyPaymentId: installment.id,
+                metadata: {
+                    source: 'layby_admin_offline',
+                    adminId: admin && admin.adminId ? admin.adminId : null,
+                    adminEmail: admin && admin.adminEmail ? admin.adminEmail : null
+                }
+            }, { transaction: t });
+
+            installment.paymentId = offlinePayment.id;
+            await installment.save({ transaction: t });
+
             const nextPending = await LaybyPayment.findOne({
                 where: { laybyPlanId: plan.id, status: 'pending' },
                 order: [['sequence', 'ASC']],
@@ -451,8 +480,22 @@ async function confirmInstallmentOffline(laybyPaymentId, admin) {
                 'Layby installment confirmed offline by admin'
             );
 
-            return { plan, order, fullyPaid };
+            return { plan, order, fullyPaid, paidAmt, newBal };
         });
+
+        // Send customer email outside the transaction (fire-and-forget)
+        if (result && !result.error && result.order) {
+            emailService.sendLaybyInstallmentConfirmedEmail({
+                order: result.order.toJSON ? result.order.toJSON() : result.order,
+                paidAmt: result.paidAmt,
+                balanceRemaining: result.newBal,
+                fullyPaid: result.fullyPaid
+            }).catch(err =>
+                logger.error({ err, laybyPaymentId: id }, 'Failed to send layby installment confirmation email')
+            );
+        }
+
+        return result;
     } catch (err) {
         logger.error({ err, laybyPaymentId: id }, 'confirmInstallmentOffline failed');
         return { error: 'TRANSACTION_FAILED' };
