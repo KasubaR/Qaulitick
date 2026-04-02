@@ -79,36 +79,13 @@
                 <div class="filter-section">
                     <h4 class="filter-section-title">Brand</h4>
                     <div class="checkbox-filter">
+                        <% (brands || []).forEach(function(brand) { %>
                         <label class="checkbox-item">
-                            <input type="checkbox" name="brand" value="rolex">
+                            <input type="checkbox" name="brand" value="<%= brand %>">
                             <span class="checkmark"></span>
-                            Rolex
+                            <%= brand %>
                         </label>
-                        <label class="checkbox-item">
-                            <input type="checkbox" name="brand" value="omega">
-                            <span class="checkmark"></span>
-                            Omega
-                        </label>
-                        <label class="checkbox-item">
-                            <input type="checkbox" name="brand" value="tagheuer">
-                            <span class="checkmark"></span>
-                            Tag Heuer
-                        </label>
-                        <label class="checkbox-item">
-                            <input type="checkbox" name="brand" value="cartier">
-                            <span class="checkmark"></span>
-                            Cartier
-                        </label>
-                        <label class="checkbox-item">
-                            <input type="checkbox" name="brand" value="audemars">
-                            <span class="checkmark"></span>
-                            Audemars Piguet
-                        </label>
-                        <label class="checkbox-item">
-                            <input type="checkbox" name="brand" value="patek">
-                            <span class="checkmark"></span>
-                            Patek Philippe
-                        </label>
+                        <% }); %>
                     </div>
                 </div>
 
@@ -153,26 +130,13 @@
                 <div class="filter-section">
                     <h4 class="filter-section-title">Strap Type</h4>
                     <div class="checkbox-filter">
+                        <% (strapTypes || []).forEach(function(strap) { %>
                         <label class="checkbox-item">
-                            <input type="checkbox" name="strap" value="metal">
+                            <input type="checkbox" name="strap" value="<%= strap %>">
                             <span class="checkmark"></span>
-                            Metal Bracelet
+                            <%= strap %>
                         </label>
-                        <label class="checkbox-item">
-                            <input type="checkbox" name="strap" value="leather">
-                            <span class="checkmark"></span>
-                            Leather
-                        </label>
-                        <label class="checkbox-item">
-                            <input type="checkbox" name="strap" value="rubber">
-                            <span class="checkmark"></span>
-                            Rubber
-                        </label>
-                        <label class="checkbox-item">
-                            <input type="checkbox" name="strap" value="ceramic">
-                            <span class="checkmark"></span>
-                            Ceramic
-                        </label>
+                        <% }); %>
                     </div>
                 </div>
 

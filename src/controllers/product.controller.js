@@ -668,6 +668,8 @@ exports.renderShop = async (req, res) => {
                 page: 'shop',
                 products: [],
                 productCount: 0,
+                brands: [],
+                strapTypes: [],
                 description,
                 keywords,
                 canonicalUrl,
@@ -683,12 +685,18 @@ exports.renderShop = async (req, res) => {
         );
 
         const shopLd = buildShopLd(productsWithPrices, canonicalUrl);
+        const [brands, strapTypes] = await Promise.all([
+            productService.getBrands(),
+            productService.getStrapTypes()
+        ]);
 
         res.render('shop', {
             title: 'Shop Luxury Watches | Qualitick Collections',
             page: 'shop',
             products: productsWithPrices,
             productCount: productsWithPrices.length,
+            brands,
+            strapTypes,
             description,
             keywords,
             canonicalUrl,

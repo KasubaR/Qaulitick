@@ -263,6 +263,21 @@ class ProductService {
         }
     }
 
+    async getStrapTypes() {
+        try {
+            const results = await Product.findAll({
+                attributes: ['strapType'],
+                where: { strapType: { [Op.ne]: '' } },
+                group: ['strapType'],
+                raw: true
+            });
+            return results.map(r => r.strapType).filter(Boolean).sort();
+        } catch (error) {
+            console.error('Error getting strap types:', error);
+            throw error;
+        }
+    }
+
     async addReview(id, reviewData) {
         try {
             const product = await Product.findByPk(id);
