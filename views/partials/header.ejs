@@ -58,82 +58,16 @@
     <!-- Session Management (load after cookie-utils and cookie-consent) -->
     <script src="/js/session.js"></script>
 
-    <!-- Google Analytics (GA4) - Only loads if user consented to Analytics cookies -->
+    <!-- Google tag (gtag.js) -->
     <% if (typeof GA4_MEASUREMENT_ID !== 'undefined' && GA4_MEASUREMENT_ID) { %>
+        <script async src="https://www.googletagmanager.com/gtag/js?id=<%= GA4_MEASUREMENT_ID %>"></script>
         <script>
-            // Google Analytics (GA4) loading function
-            // Only loads if user has consented to Analytics cookies
-            (function() {
-                const GA4_MEASUREMENT_ID = '<%= GA4_MEASUREMENT_ID %>';
-                let ga4Loaded = false; // Track if GA4 has been loaded to prevent duplicate loading
-                
-                /**
-                 * Load Google Analytics (GA4) script and initialize tracking
-                 */
-                function loadGA4() {
-                    // Prevent duplicate loading
-                    if (ga4Loaded || typeof window.gtag !== 'undefined') {
-                        return;
-                    }
-                    
-                        // Store GA4 Measurement ID for use in analytics-events.js
-                    window.GA4_MEASUREMENT_ID = GA4_MEASUREMENT_ID;
-                        
-                    // Initialize dataLayer and gtag function
-                        window.dataLayer = window.dataLayer || [];
-                        function gtag(){dataLayer.push(arguments);}
-                    window.gtag = gtag;
-                        gtag('js', new Date());
-                    gtag('config', GA4_MEASUREMENT_ID, {
-                            'anonymize_ip': true,
-                            'cookie_flags': 'SameSite=None;Secure'
-                        });
-
-                    // Load GA4 script dynamically
-                        const script = document.createElement('script');
-                        script.async = true;
-                    script.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA4_MEASUREMENT_ID;
-                        document.head.appendChild(script);
-                    
-                    ga4Loaded = true;
-                }
-                
-                /**
-                 * Check if user has consented to Analytics and load GA4 if so
-                 */
-                function checkAndLoadGA4() {
-                    if (typeof window.CookieUtils !== 'undefined') {
-                        const hasAnalyticsConsent = window.CookieUtils.isCategoryAllowed(
-                            window.CookieUtils.COOKIE_CATEGORIES.ANALYTICS
-                        );
-                        
-                        if (hasAnalyticsConsent) {
-                            loadGA4();
-                        }
-                    }
-                }
-                
-                // Try to load GA4 immediately if CookieUtils is available
-                if (typeof window.CookieUtils !== 'undefined') {
-                    checkAndLoadGA4();
-                } else {
-                    // If CookieUtils not loaded yet, check on DOMContentLoaded
-                    document.addEventListener('DOMContentLoaded', function() {
-                        checkAndLoadGA4();
-                    });
-                }
-                
-                // Listen for consent updates to load GA4 when user grants analytics consent
-                window.addEventListener('cookieConsentUpdated', function(event) {
-                    const consentData = event.detail;
-                                
-                    // Check if analytics consent was just granted
-                    if (consentData && consentData.analytics === true) {
-                        // User just granted analytics consent - load GA4 now
-                        checkAndLoadGA4();
-                        }
-                    });
-            })();
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            window.gtag = gtag;
+            gtag('js', new Date());
+            gtag('config', '<%= GA4_MEASUREMENT_ID %>');
+            window.GA4_MEASUREMENT_ID = '<%= GA4_MEASUREMENT_ID %>';
         </script>
     <% } %>
 
