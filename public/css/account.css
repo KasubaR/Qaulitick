@@ -187,7 +187,8 @@
 .account-form input[type="text"],
 .account-form input[type="email"],
 .account-form input[type="tel"],
-.account-form input[type="password"] {
+.account-form input[type="password"],
+.account-form input[type="number"] {
     width: 100%;
     max-width: 420px;
     padding: 12px 14px;
