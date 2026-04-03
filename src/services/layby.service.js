@@ -246,6 +246,7 @@ async function recordLaybyInstallmentPaid(payment) {
 
         if (flexBalance && newBal > 0) {
             installment.amount = newBal;
+            installment.paymentId = payment.id;
             await installment.save({ transaction: t });
 
             plan.balanceRemaining = newBal;
