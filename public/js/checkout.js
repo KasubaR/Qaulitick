@@ -1328,6 +1328,12 @@ function closePaymentInstructionsModal() {
         modal.style.display = 'none';
     }
 
+    const placeOrderBtn = document.getElementById('placeOrderBtn');
+    if (placeOrderBtn) {
+        placeOrderBtn.disabled = false;
+        placeOrderBtn.innerHTML = '<i class="fas fa-lock"></i> Place Order';
+    }
+
     // Hide the status indicator
     updatePaymentStatusIndicator('cancelled');
 
