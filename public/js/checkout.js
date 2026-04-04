@@ -841,6 +841,7 @@ async function handleFormSubmit(e) {
 
     // Validate required fields (paymentMethod is validated separately above)
     const requiredFields = ['fullName', 'phone', 'email', 'deliveryAddress', 'province', 'city', 'acceptTerms'];
+    let firstInvalidField = null;
 
     requiredFields.forEach(fieldName => {
         const field = document.getElementById(fieldName);
@@ -849,16 +850,22 @@ async function handleFormSubmit(e) {
                 if (!field.checked) {
                     isValid = false;
                     showFieldError(field, 'This field is required');
+                    if (!firstInvalidField) firstInvalidField = field;
                 }
             } else {
                 if (!validateField(field)) {
                     isValid = false;
+                    if (!firstInvalidField) firstInvalidField = field;
                 }
             }
         }
     });
 
     if (!isValid) {
+        if (firstInvalidField) {
+            firstInvalidField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            firstInvalidField.focus();
+        }
         return;
     }
 
