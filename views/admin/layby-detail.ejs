@@ -16,20 +16,29 @@
 <body class="admin-page">
     <div class="admin-container">
         <%- include('../partials/admin-sidebar', { activePage: 'layby' }) %>
+        <% const _laybyDetailPlanIdParsed = typeof planId !== 'undefined' && planId !== null && planId !== ''
+            ? parseInt(planId, 10)
+            : NaN;
+           const _laybyDetailPlanIdOk = Number.isFinite(_laybyDetailPlanIdParsed);
+           const _laybyDetailPlanIdAttr = _laybyDetailPlanIdOk ? JSON.stringify(_laybyDetailPlanIdParsed) : ''; %>
 
-        <main class="admin-main" id="laybyDetailMain" data-plan-id="<%= typeof planId !== 'undefined' ? planId : '' %>">
+        <main class="admin-main" id="laybyDetailMain" data-plan-id="<%- _laybyDetailPlanIdAttr %>">
             <header class="admin-header">
                 <div class="header-left">
                     <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Toggle sidebar">
                         <i class="fas fa-bars"></i>
                     </button>
-                    <h1 class="page-title">Layby plan #<span id="detailPlanIdLabel"><%= typeof planId !== 'undefined' ? planId : '' %></span></h1>
+                    <h1 class="page-title">Layby plan #<span id="detailPlanIdLabel"><%= _laybyDetailPlanIdOk ? _laybyDetailPlanIdParsed : '' %></span></h1>
                 </div>
                 <div class="header-right">
                     <a class="btn-outline" href="/admin/layby"><i class="fas fa-arrow-left"></i> All plans</a>
                     <%- include('../partials/admin-button', { id: 'refreshDetailBtn', icon: 'fa-sync-alt', label: 'Refresh', buttonType: 'button' }) %>
                 </div>
             </header>
+
+            <noscript>
+                <p class="admin-noscript-notice">JavaScript is required to use the admin panel.</p>
+            </noscript>
 
             <div id="laybyDetailError" class="layby-detail-alert layby-detail-alert--error layby-detail-alert--hidden" role="alert"></div>
 

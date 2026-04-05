@@ -8,42 +8,12 @@
 
 const axios = require('axios');
 const crypto = require('crypto');
-require('dotenv').config();
 
-/**
- * Structured Logging Utility
- */
+const logger = require('../utils/logger').child({ module: 'LencoService' });
+
 function log(level, message, data = {}) {
-    const timestamp = new Date().toISOString();
-    const logEntry = {
-        timestamp,
-        service: 'lenco',
-        level,
-        message,
-        ...data
-    };
-    
-    // Format log entry
-    const logString = JSON.stringify(logEntry);
-    
-    switch (level) {
-        case 'error':
-            console.error(`[Lenco Service] ${logString}`);
-            break;
-        case 'warn':
-            console.warn(`[Lenco Service] ${logString}`);
-            break;
-        case 'info':
-            console.log(`[Lenco Service] ${logString}`);
-            break;
-        case 'debug':
-            if (process.env.NODE_ENV === 'development') {
-                console.log(`[Lenco Service] ${logString}`);
-            }
-            break;
-        default:
-            console.log(`[Lenco Service] ${logString}`);
-    }
+    const fn = logger[level] ?? logger.info;
+    fn.call(logger, data, message);
 }
 
 /**
@@ -194,8 +164,6 @@ function parseApiError(error) {
  * Make API request with retry logic
  */
 async function makeApiRequest(config, retryCount = 0) {
-    const axiosInstance = createAxiosInstance();
-    
     try {
         log('info', 'API Request', {
             method: config.method || 'GET',
@@ -205,7 +173,7 @@ async function makeApiRequest(config, retryCount = 0) {
             transactionId: config.metadata?.transactionId
         });
         
-        const response = await axiosInstance(config);
+        const response = await lencoAxiosInstance(config);
         
         log('info', 'API Response', {
             method: config.method || 'GET',
@@ -406,6 +374,9 @@ function createAxiosInstance() {
 
     return instance;
 }
+
+/** Shared client for Lenco v2 API (connection pooling, single interceptor chain). */
+const lencoAxiosInstance = createAxiosInstance();
 
 /**
  * Initiate Mobile Money Payment
@@ -883,7 +854,16 @@ function validateWebhookSignature(payload, signature) {
         // Normalize signatures for comparison (remove any prefixes like 'sha256=')
         const normalizedSignature = signature.replace(/^sha256=/, '').trim();
         const normalizedExpected = expectedSignature.trim();
-        
+
+        // Reject non-hex signatures before attempting Buffer decode.
+        // Buffer.from(str, 'hex') silently produces zeroes for invalid hex — reject explicitly.
+        if (!/^[0-9a-f]+$/i.test(normalizedSignature)) {
+            log('error', 'Webhook signature is not valid hex — rejecting', {
+                function: 'validateWebhookSignature'
+            });
+            return false;
+        }
+
         // Timing-safe comparison only — any length mismatch means invalid, no fallback
         let isValid = false;
         try {

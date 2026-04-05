@@ -128,7 +128,7 @@ async function flagOverdueLaybyInstallments() {
 
             const order = await Order.findByPk(plan.orderId);
             if (order) {
-                // Restore main stock and color variant stock reserved at layby creation
+                // Restore top-level stock reserved at layby order creation (colors JSON is not decremented for layby).
                 const items = order.items || [];
                 for (const item of items) {
                     const qty = parseInt(item.quantity) || 1;
@@ -136,24 +136,10 @@ async function flagOverdueLaybyInstallments() {
                     if (!productId) continue;
 
                     try {
-                        // Restore main stock (decremented at layby order creation)
                         await Product.update(
                             { stock: sequelize.literal(`stock + ${qty}`) },
                             { where: { id: productId } }
                         );
-
-                        // Restore color variant stock if applicable (decremented at order creation)
-                        if (item.selectedColor) {
-                            const product = await Product.findByPk(productId);
-                            if (product) {
-                                const updatedColors = (product.colors || []).map(c =>
-                                    c.name === item.selectedColor
-                                        ? { ...c, stock: (c.stock || 0) + qty }
-                                        : c
-                                );
-                                await product.update({ colors: updatedColors });
-                            }
-                        }
                     } catch (stockErr) {
                         console.error(`[Scheduler] Stock restore failed for product ${productId} on expired layby plan ${plan.id}:`, stockErr);
                     }

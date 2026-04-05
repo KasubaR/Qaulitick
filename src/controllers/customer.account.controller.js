@@ -1,10 +1,14 @@
 const { Order, LaybyPlan, LaybyPayment, Payment } = require('../models');
+const { Op } = require('sequelize');
 const userService = require('../services/user.service');
 const productService = require('../services/product.service');
 const { sanitizeObject, validatePhone } = require('../utils/validators');
 const { deleteAllSessionsForUser } = require('../services/session.service');
 const { cookieName: sessionCookieName } = require('../config/session.constants');
 const logger = require('../utils/logger').child({ module: 'CustomerAccountController' });
+
+/** Max layby plans loaded per account/layby request (includes nested installments). */
+const LAYBY_ACCOUNT_PLANS_PER_PAGE = 50;
 
 exports.renderDashboard = (req, res) => {
     const u = req.customerUser.toJSON();
@@ -159,7 +163,7 @@ exports.renderOrders = async (req, res) => {
     try {
         const user = req.customerUser;
         const orders = await Order.findAll({
-            where: { userId: user.id, status: 'paid' },
+            where: { userId: user.id, status: { [Op.in]: ['paid', 'confirmed', 'packed', 'shipped', 'delivered', 'payment_pending'] } },
             order: [['createdAt', 'DESC']],
             limit: 100
         });
@@ -174,7 +178,7 @@ exports.renderOrders = async (req, res) => {
         // Build a map of productId → the user's review (matched by email or userId)
         const reviewedMap = {};
         if (productIds.length > 0) {
-            const products = await productService.getProductsByIds(productIds);
+            const products = await productService.getProductsByIds(productIds, { attributes: ['id', 'reviews'] });
             for (const p of products) {
                 const pObj = typeof p.toJSON === 'function' ? p.toJSON() : p;
                 const reviews = Array.isArray(pObj.reviews) ? pObj.reviews : [];
@@ -207,9 +211,19 @@ exports.renderOrders = async (req, res) => {
 };
 
 exports.renderLayby = async (req, res) => {
+    const userId = req.customerUser.id;
+    const laybyPlansPerPage = LAYBY_ACCOUNT_PLANS_PER_PAGE;
     try {
+        const plansTotal = await LaybyPlan.count({ where: { userId } });
+        const totalPages = Math.max(1, Math.ceil(plansTotal / laybyPlansPerPage));
+        let laybyPlansPage = Math.max(1, parseInt(req.query.page, 10) || 1);
+        if (laybyPlansPage > totalPages) {
+            laybyPlansPage = totalPages;
+        }
+        const offset = (laybyPlansPage - 1) * laybyPlansPerPage;
+
         const plans = await LaybyPlan.findAll({
-            where: { userId: req.customerUser.id },
+            where: { userId },
             include: [
                 {
                     model: LaybyPayment,
@@ -227,7 +241,9 @@ exports.renderLayby = async (req, res) => {
                 },
                 { model: Order, as: 'order', attributes: ['id', 'orderNumber', 'status', 'paymentStatus', 'createdAt'] }
             ],
-            order: [['createdAt', 'DESC']]
+            order: [['createdAt', 'DESC']],
+            limit: laybyPlansPerPage,
+            offset
         });
         const cu = req.customerUser.toJSON();
         res.render('account/layby', {
@@ -235,6 +251,10 @@ exports.renderLayby = async (req, res) => {
             page: 'account',
             accountSection: 'layby',
             plans: plans.map((p) => p.toJSON()),
+            laybyPlansPage,
+            laybyPlansTotal: plansTotal,
+            laybyPlansPerPage,
+            laybyPlansTotalPages: totalPages,
             csrfToken: res.locals.csrfToken || '',
             payCustomerInfo: {
                 name: cu.name || '',
@@ -249,6 +269,10 @@ exports.renderLayby = async (req, res) => {
             page: 'account',
             accountSection: 'layby',
             plans: [],
+            laybyPlansPage: 1,
+            laybyPlansTotal: 0,
+            laybyPlansPerPage: LAYBY_ACCOUNT_PLANS_PER_PAGE,
+            laybyPlansTotalPages: 1,
             csrfToken: res.locals.csrfToken || '',
             payCustomerInfo: { name: '', email: '', phone: '' },
             error: 'Could not load layby plans.'
@@ -277,7 +301,15 @@ exports.logoutAllDevices = async (req, res) => {
 };
 
 /**
- * Returns next pending installment metadata for future payment integration (Lenco).
+ * Returns next pending installment metadata for POST /api/payments/process (layby).
+ *
+ * Ownership: plan is loaded with { id, userId: req.customerUser.id }; nextPayment is
+ * scoped to plan.id, so the installment belongs to the customer’s plan.
+ *
+ * Concurrency: two parallel requests for the same plan can both receive the same
+ * laybyPaymentId. Duplicate initiation is mitigated in payment.controller processPayment
+ * (e.g. existing pending payment for orderNumber); that path is not a full DB-serialized
+ * guard and can race (TOCTOU). No extra lock here by design — document if hardening.
  */
 exports.startLaybyPayment = async (req, res) => {
     try {

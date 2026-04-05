@@ -1,6 +1,6 @@
 // Validation and Sanitization Utilities
 
-const validator = require('validator');
+const validator = require('validator'); // isEmail, isMobilePhone (en-ZM), isStrongPassword (custom options)
 
 /**
  * Normalize string input: type-check, trim, and cap length.
@@ -29,10 +29,8 @@ function sanitizeObject(obj) {
     
     if (typeof obj === 'object') {
         const sanitized = {};
-        for (const key in obj) {
-            if (obj.hasOwnProperty(key)) {
-                sanitized[key] = sanitizeObject(obj[key]);
-            }
+        for (const key of Object.keys(obj)) {
+            sanitized[key] = sanitizeObject(obj[key]);
         }
         return sanitized;
     }
@@ -50,15 +48,12 @@ function sanitizeObject(obj) {
  * @returns {boolean} - True if valid
  */
 function validateEmail(email) {
-    if (!email || typeof email !== 'string') {
-        return false;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email.trim());
+    if (!email || typeof email !== 'string') return false;
+    return validator.isEmail(email.trim());
 }
 
 /**
- * Validate phone number (Zambian format)
+ * Validate phone number (Zambian mobile — validator locale en-ZM)
  * @param {string} phone - Phone number to validate
  * @returns {boolean} - True if valid
  */
@@ -66,9 +61,8 @@ function validatePhone(phone) {
     if (!phone || typeof phone !== 'string') {
         return false;
     }
-    // Zambian phone format: +260XXXXXXXXX or 0XXXXXXXXX
-    const phoneRegex = /^(\+260|0)?[0-9]{9}$/;
-    return phoneRegex.test(phone.replace(/\s/g, ''));
+    const normalized = phone.replace(/\s/g, '');
+    return validator.isMobilePhone(normalized, 'en-ZM');
 }
 
 /**
@@ -155,19 +149,8 @@ function validatePagination(params) {
  * @returns {string|null} - Sanitized search query or null
  */
 function validateSearch(search) {
-    if (!search || typeof search !== 'string') {
-        return null;
-    }
-    
-    const sanitized = sanitizeString(search);
-    
-    // Limit search length
-    if (sanitized.length > 100) {
-        return sanitized.substring(0, 100);
-    }
-    
-    // Remove special characters that could be used for injection
-    return sanitized.replace(/[<>'"\\]/g, '');
+    if (!search || typeof search !== 'string') return null;
+    return search.trim().slice(0, 100).replace(/[<>'"\\]/g, '');
 }
 
 /**
@@ -239,18 +222,26 @@ function validateFilters(filters) {
  * @returns {object} - Validation result { valid: boolean, errors: array }
  */
 /**
- * Password policy: min 8 chars, at least one letter and one number.
+ * Password policy: min 8 chars, max 128, at least one letter and one number.
+ * (validator default isStrongPassword requires upper + symbol; we relax to match existing policy.)
  */
 function validatePasswordStrength(password) {
-    if (!password || typeof password !== 'string' || password.length < 8) {
+    if (!password || typeof password !== 'string') {
         return false;
     }
     if (password.length > 128) {
         return false;
     }
-    const hasLetter = /[a-zA-Z]/.test(password);
-    const hasNumber = /\d/.test(password);
-    return hasLetter && hasNumber;
+    if (!/[a-zA-Z]/.test(password)) {
+        return false;
+    }
+    return validator.isStrongPassword(password, {
+        minLength: 8,
+        minLowercase: 0,
+        minUppercase: 0,
+        minNumbers: 1,
+        minSymbols: 0
+    });
 }
 
 /**
@@ -364,7 +355,10 @@ function validateOrder(orderData) {
         errors.push('At least one item is required');
     } else {
         orderData.items.forEach((item, index) => {
-            if (!item.id || !item.name || !item.price) {
+            if (!item.productId && !item.id) {
+                errors.push(`Item ${index + 1} is missing product ID`);
+            }
+            if (!item.name || !item.price) {
                 errors.push(`Item ${index + 1} is missing required fields`);
             }
             if (!validatePrice(item.price)) {
@@ -374,7 +368,7 @@ function validateOrder(orderData) {
     }
     
     // Payment method validation
-    const validPaymentMethods = ['mobile', 'mobile_money', 'card', 'paypal', 'bank', 'bank_transfer', 'crypto', 'cash_on_delivery'];
+    const validPaymentMethods = ['mobile_money']; // only live method — add 'bank_transfer' when re-enabled
     if (!orderData.paymentMethod || !validPaymentMethods.includes(orderData.paymentMethod)) {
         errors.push('Valid payment method is required');
     }

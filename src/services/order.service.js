@@ -12,8 +12,11 @@ const { Op } = require('sequelize');
  * @param {Object} filters - Filter criteria
  * @returns {Promise<Array>} Array of orders
  */
-async function getOrdersForExport(filters = {}) {
+const MAX_EXPORT_ROWS = 10000;
+
+async function getOrdersForExport(filters = {}, options = {}) {
     try {
+        const limit = Math.min(options.limit ?? MAX_EXPORT_ROWS, MAX_EXPORT_ROWS);
         const where = {};
         if (filters.status) where.status = filters.status;
         if (filters.paymentStatus) where.paymentStatus = filters.paymentStatus;
@@ -30,7 +33,7 @@ async function getOrdersForExport(filters = {}) {
             );
         }
         const order = filters.sort === 'oldest' ? [['createdAt', 'ASC']] : [['createdAt', 'DESC']];
-        let orders = await Order.findAll({ where, order, limit: 10000 });
+        let orders = await Order.findAll({ where, order, limit });
         if (filters.search) {
             const s = (filters.search || '').toLowerCase();
             orders = orders.filter(o =>
@@ -225,7 +228,13 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
                 const qty = parseInt(item.quantity) || 1;
                 const productId = parseInt(item.productId, 10);
 
-                if (item.selectedColor) {
+                // Layby reserves top-level `stock` at order creation (not colors JSON) — restore that only.
+                if (updatedOrder.checkoutMode === 'layby') {
+                    await Product.update(
+                        { stock: sequelize.literal(`stock + ${qty}`) },
+                        { where: { id: productId } }
+                    );
+                } else if (item.selectedColor) {
                     const product = await Product.findByPk(productId);
                     if (product) {
                         const updatedColors = (product.colors || []).map(c =>
@@ -237,7 +246,9 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
                     }
                 }
             }
-            console.log(`[Order Service] Color variant stock restored for failed/cancelled order ${orderNumber}`);
+            console.log(
+                `[Order Service] Stock restored for failed/cancelled order ${orderNumber} (layby: main stock; standard+color: colors JSON)`
+            );
         }
 
         console.log(`[Order Service] Order ${orderNumber} status updated from "${previousStatus}" to "${newOrderStatus}" (payment: "${previousPaymentStatus}" → "${newPaymentStatus}")`);
@@ -250,6 +261,7 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
 }
 
 module.exports = {
+    MAX_EXPORT_ROWS,
     getOrdersForExport,
     formatPaymentMethod,
     formatCurrency,

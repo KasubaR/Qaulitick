@@ -6,6 +6,7 @@
     const POLL_INTERVAL_MS = 15000;
     const POLL_TIMEOUT_MS = 15 * 60 * 1000;
 
+    /** Canonical pattern: empty token aborts payment — no silent POST without X-CSRF-Token. */
     function getCsrf() {
         if (typeof window.getCSRFToken === 'function') {
             return window.getCSRFToken();
@@ -62,8 +63,14 @@
                 : 'Payment started. Approve the charge on your phone; status updates automatically.';
         }
         if (urlWrap && link && paymentResult.paymentUrl) {
-            link.href = paymentResult.paymentUrl;
-            urlWrap.classList.remove('account-layby-pay-url-wrap--hidden');
+            try {
+                const url = new URL(paymentResult.paymentUrl);
+                if (url.protocol !== 'https:') throw new Error('Insecure');
+                link.href = url.href;
+                urlWrap.classList.remove('account-layby-pay-url-wrap--hidden');
+            } catch {
+                urlWrap.classList.add('account-layby-pay-url-wrap--hidden');
+            }
         } else if (urlWrap) {
             urlWrap.classList.add('account-layby-pay-url-wrap--hidden');
         }
@@ -75,7 +82,8 @@
         }
     }
 
-    async function pollVerify(transactionId, statusEl) {
+    async function pollVerify(transactionId, statusEl, expectedOrderNumber) {
+        const expectedOrd = expectedOrderNumber != null ? String(expectedOrderNumber).trim() : '';
         const start = Date.now();
         await sleep(POLL_FIRST_MS);
         while (Date.now() - start < POLL_TIMEOUT_MS) {
@@ -101,6 +109,10 @@
                 data = {};
             }
             if (data.success) {
+                if (data.orderNumber && expectedOrd && String(data.orderNumber).trim() !== expectedOrd) {
+                    if (statusEl) statusEl.textContent = 'Payment mismatch. Contact support.';
+                    return;
+                }
                 const status = data.status || data.lencoStatus;
                 const statusNorm = String(status || '').toLowerCase();
                 const isPaid =
@@ -248,7 +260,7 @@
                     }
                     const txId = payData.transactionId;
                     if (txId) {
-                        pollVerify(txId, statusEl);
+                        pollVerify(txId, statusEl, orderNumber);
                     }
                 } finally {
                     btn.disabled = false;

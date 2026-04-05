@@ -1,5 +1,10 @@
 /* Admin layby list + detail (loaded after admin.css) */
 
+.admin-noscript-notice {
+    padding: 2rem;
+    color: var(--danger, #c0392b);
+}
+
 .layby-table-link {
     display: inline-block;
     padding: 6px 12px;
@@ -92,6 +97,14 @@
 
 .layby-installments-section .table-container {
     border-top: none;
+}
+
+#installmentsBody {
+    transition: opacity 0.15s ease;
+}
+
+#installmentsBody.layby-installments-body--refreshing {
+    opacity: 0.55;
 }
 
 .layby-confirm-offline-btn {

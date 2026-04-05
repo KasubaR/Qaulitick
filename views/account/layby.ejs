@@ -89,6 +89,20 @@
                 <% } %>
             </div>
         <% }); %>
+        <% var _lt = typeof laybyPlansTotal !== 'undefined' ? laybyPlansTotal : 0; var _lpp = typeof laybyPlansPerPage !== 'undefined' ? laybyPlansPerPage : 50; var _lpg = typeof laybyPlansPage !== 'undefined' ? laybyPlansPage : 1; %>
+        <% if (_lt > _lpp) { %>
+            <nav class="account-layby-pager" aria-label="Layby plan pages">
+                <p class="account-layby-pager-summary">Showing <%= Math.min(_lt, (_lpg - 1) * _lpp + 1) %>–<%= Math.min(_lt, _lpg * _lpp) %> of <%= _lt %> plans (newest first).</p>
+                <div class="account-layby-pager-links">
+                    <% if (_lpg > 1) { %>
+                        <a class="account-layby-pager-link" href="/account/layby?page=<%= _lpg - 1 %>">Newer plans</a>
+                    <% } %>
+                    <% if (_lpg * _lpp < _lt) { %>
+                        <a class="account-layby-pager-link" href="/account/layby?page=<%= _lpg + 1 %>">Older plans</a>
+                    <% } %>
+                </div>
+            </nav>
+        <% } %>
     <% } %>
 </div>
 

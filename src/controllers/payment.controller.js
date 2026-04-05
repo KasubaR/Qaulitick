@@ -225,7 +225,12 @@ exports.processPayment = async (req, res) => {
         let lencoResponse;
         let paymentRecord;
 
-        // Idempotency: one pending/processing payment per order (standard) or per layby installment
+        // Atomic idempotency gate — closes TOCTOU race between concurrent requests.
+        // Lock the Order row so any concurrent processPayment for the same order
+        // serialises here. Re-check for an in-flight payment inside the lock, then
+        // INSERT a placeholder Payment row (status='pending') before releasing.
+        // The Lenco API call happens outside this transaction so no DB lock is held
+        // during the network round-trip.
         const pendingWhere = {
             orderNumber,
             status: { [Op.in]: ['pending', 'processing'] }
@@ -235,19 +240,49 @@ exports.processPayment = async (req, res) => {
         } else {
             pendingWhere.laybyPaymentId = { [Op.is]: null };
         }
-        const existingPending = await Payment.findOne({ where: pendingWhere });
-        if (existingPending) {
-            return res.status(409).json({
-                success: false,
-                message: 'A payment is already pending for this order',
-                transactionId: existingPending.lencoTransactionId
+
+        try {
+            paymentRecord = await sequelize.transaction(async (t) => {
+                // Lock the order row — a second concurrent request blocks here until
+                // this transaction commits, then finds the placeholder and returns 409.
+                await Order.findByPk(order.id, { lock: t.LOCK.UPDATE, transaction: t });
+
+                const existing = await Payment.findOne({ where: pendingWhere, transaction: t });
+                if (existing) {
+                    const err = new Error('ALREADY_PENDING');
+                    err.statusCode = 409;
+                    err.transactionId = existing.lencoTransactionId;
+                    throw err;
+                }
+
+                return Payment.create({
+                    orderNumber,
+                    paymentMethod,
+                    amount: authoritativeAmount,
+                    currency: 'ZMW',
+                    status: 'pending',
+                    customerInfo,
+                    laybyPaymentId: laybyIdValid ? laybyPaymentId : null,
+                    lencoProvider: paymentMethod === 'mobile_money' ? (provider || '').toLowerCase() : undefined,
+                    metadata: { initiating: true }
+                }, { transaction: t });
             });
+        } catch (err) {
+            if (err.statusCode === 409) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'A payment is already pending for this order',
+                    transactionId: err.transactionId
+                });
+            }
+            throw err;
         }
 
         // Handle Mobile Money Payment
         if (paymentMethod === 'mobile_money') {
             // Validate mobile money requirements
             if (!provider || !customerPhone) {
+                await paymentRecord.update({ status: 'failed', failureReason: 'Missing provider or phone', failedAt: new Date() }).catch(() => {});
                 return res.status(400).json({
                     success: false,
                     message: 'Mobile money payment requires provider (airtel or mtn) and customer phone number'
@@ -255,6 +290,7 @@ exports.processPayment = async (req, res) => {
             }
 
             if (!['airtel', 'mtn'].includes(provider.toLowerCase())) {
+                await paymentRecord.update({ status: 'failed', failureReason: 'Invalid provider', failedAt: new Date() }).catch(() => {});
                 return res.status(400).json({
                     success: false,
                     message: 'Invalid mobile money provider. Must be: airtel or mtn'
@@ -262,7 +298,7 @@ exports.processPayment = async (req, res) => {
             }
 
             try {
-                // Initiate mobile money payment with Lenco
+                // Initiate mobile money payment with Lenco (outside the DB transaction)
                 lencoResponse = await lencoService.initiateMobileMoneyPayment(
                     orderDataForLenco,
                     customerPhone,
@@ -270,38 +306,26 @@ exports.processPayment = async (req, res) => {
                     laybyIdValid ? authoritativeAmount : null
                 );
 
-                // Create payment record with Lenco collection data
-                // Map Lenco status to payment status
-                const tempPayment = new Payment();
-                const mappedStatus = tempPayment.mapLencoStatusToPaymentStatus(lencoResponse.status || 'pending');
-                
-                paymentRecord = await Payment.create({
-                    orderNumber,
-                    paymentMethod: 'mobile_money',
-                    amount: authoritativeAmount, // Use authoritative amount from database order
+                // Update placeholder with Lenco collection data
+                const mappedStatus = Payment.mapLencoStatusToPaymentStatus(lencoResponse.status || 'pending');
+
+                await paymentRecord.update({
+                    status: mappedStatus,
                     currency: lencoResponse.currency || 'ZMW',
-                    status: mappedStatus, // Mapped from lencoStatus
-                    customerInfo,
-                    laybyPaymentId: laybyIdValid ? laybyPaymentId : null,
-                    
                     // Lenco-specific fields
                     lencoTransactionId: lencoResponse.transactionId,      // Collection ID (col_xxx)
-                    lencoReference: lencoResponse.lencoReference,        // Lenco's reference (LNC-xxx)
+                    lencoReference: lencoResponse.lencoReference,         // Lenco's reference (LNC-xxx)
                     lencoProvider: provider.toLowerCase(),
-                    lencoStatus: lencoResponse.status,                   // 'pay-offline', 'pending', etc.
+                    lencoStatus: lencoResponse.status,                    // 'pay-offline', 'pending', etc.
                     lencoResponse: lencoResponse.rawResponse || lencoResponse,
-                    
                     // Your reference (QC-ORD-xxx)
                     transactionId: lencoResponse.reference,
-                    
                     // Payment instructions for customer
                     paymentInstructions: lencoResponse.paymentInstructions,
-                    
                     // Additional Lenco fields
                     qrCode: lencoResponse.qrCode,
                     paymentUrl: lencoResponse.paymentUrl,
                     expiresAt: lencoResponse.expiresAt ? new Date(lencoResponse.expiresAt) : null,
-                    
                     metadata: {
                         provider: provider.toLowerCase(),
                         customerPhone: customerPhone,
@@ -327,25 +351,18 @@ exports.processPayment = async (req, res) => {
                 }
 
             } catch (error) {
-                console.error('[Payment Controller] Error initiating mobile money payment:', error);
-                
-                // Create failed payment record
-                paymentRecord = await Payment.create({
-                    orderNumber,
-                    paymentMethod: 'mobile_money',
-                    amount: authoritativeAmount, // Use authoritative amount from database order
-                    currency: 'ZMW',
+                logger.error({ err: error }, 'Error initiating mobile money payment');
+
+                // Update placeholder to failed (avoid a second pending row)
+                await paymentRecord.update({
                     status: 'failed',
-                    customerInfo,
-                    laybyPaymentId: laybyIdValid ? laybyPaymentId : null,
-                    lencoProvider: provider.toLowerCase(),
                     failureReason: error.message,
                     failedAt: new Date(),
                     metadata: {
                         provider: provider.toLowerCase(),
                         customerPhone: customerPhone
                     }
-                });
+                }).catch(() => {});
 
                 const statusCode = error.name === 'validation_error' ? 400 : 500;
                 return res.status(statusCode).json({
@@ -353,7 +370,7 @@ exports.processPayment = async (req, res) => {
                     message: error.message || 'Failed to initiate mobile money payment',
                     orderNumber,
                     paymentMethod,
-                    amount: authoritativeAmount, // Use authoritative amount from database order
+                    amount: authoritativeAmount,
                     status: 'failed'
                 });
             }
@@ -510,6 +527,22 @@ exports.verifyPayment = async (req, res) => {
                 success: false,
                 message: 'Payment not found'
             });
+        }
+
+        // Ownership check — layby payments (has laybyPaymentId) use plan.userId;
+        // standard payments use order.userId. Admins bypass both.
+        const authError = await assertLaybyPaymentVerifyAuthorized(req, payment);
+        if (authError) return res.status(authError.status).json(authError.body);
+
+        if (!payment.laybyPaymentId) {
+            const admin = await getAuthenticatedAdmin(req);
+            if (!admin) {
+                const order = await Order.findByOrderNumber(payment.orderNumber);
+                const uid = req.session?.userId != null ? parseInt(String(req.session.userId), 10) : null;
+                if (order?.userId != null && order.userId !== uid) {
+                    return res.status(403).json({ success: false, message: 'Forbidden' });
+                }
+            }
         }
 
         logger.debug(
@@ -700,10 +733,10 @@ exports.verifyPayment = async (req, res) => {
             });
         
     } catch (error) {
-        console.error('[Payment Controller] Error verifying payment:', error);
+        logger.error({ err: error }, 'verifyPayment failed');
         res.status(500).json({
             success: false,
-            message: error.message || 'Failed to verify payment'
+            message: 'Failed to verify payment'
         });
     }
 };
@@ -850,10 +883,8 @@ exports.handleLencoWebhook = async (req, res) => {
         const [rowsAffected] = await Payment.update(updatePayload, {
             where: {
                 id: payment.id,
-                [Op.or]: [
-                    { webhookReceived: false },
-                    { status: { [Op.notIn]: terminalStatuses } }
-                ]
+                webhookReceived: false,
+                status: { [Op.notIn]: terminalStatuses }
             }
         });
 
@@ -1038,11 +1069,10 @@ exports.getBanks = async (req, res) => {
             count: result.count
         });
     } catch (error) {
-        console.error('[Payment Controller] Error fetching banks:', error);
+        logger.error({ err: error }, 'getBanks failed');
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch banks list',
-            error: error.message
+            message: 'Failed to fetch banks list'
         });
     }
 };
@@ -1068,6 +1098,21 @@ exports.cancelPayment = async (req, res) => {
 
         if (!payment) {
             return res.status(404).json({ success: false, message: 'Payment not found' });
+        }
+
+        // Ownership check — mirrors verifyPayment: layby uses plan.userId, standard uses order.userId.
+        const authError = await assertLaybyPaymentVerifyAuthorized(req, payment);
+        if (authError) return res.status(authError.status).json(authError.body);
+
+        if (!payment.laybyPaymentId) {
+            const admin = await getAuthenticatedAdmin(req);
+            if (!admin) {
+                const order = await Order.findByOrderNumber(payment.orderNumber);
+                const uid = req.session?.userId != null ? parseInt(String(req.session.userId), 10) : null;
+                if (order?.userId != null && order.userId !== uid) {
+                    return res.status(403).json({ success: false, message: 'Forbidden' });
+                }
+            }
         }
 
         const terminalStatuses = ['completed', 'failed', 'cancelled', 'refunded'];
@@ -1119,7 +1164,7 @@ exports.cancelPayment = async (req, res) => {
         logger.error({ err: error }, 'cancelPayment failed');
         res.status(500).json({
             success: false,
-            message: error.message || 'Failed to cancel payment'
+            message: 'Failed to cancel payment'
         });
     }
 };
@@ -1160,6 +1205,30 @@ exports.retryPayment = async (req, res) => {
             }
         }
 
+        const priorFailedCount = await Payment.count({
+            where: {
+                orderNumber,
+                laybyPaymentId: { [Op.is]: null },
+                status: 'failed'
+            }
+        });
+
+        if (priorFailedCount === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Payment not found for this order'
+            });
+        }
+
+        if (priorFailedCount > MAX_PAYMENT_RETRIES) {
+            return res.status(429).json({
+                success: false,
+                message: `Maximum retry limit (${MAX_PAYMENT_RETRIES}) reached. Please contact support for assistance with your payment.`,
+                retryCount: priorFailedCount,
+                maxRetries: MAX_PAYMENT_RETRIES
+            });
+        }
+
         const existingPayment = await Payment.findOne({
             where: { orderNumber, status: 'failed', laybyPaymentId: { [Op.is]: null } },
             order: [['createdAt', 'DESC']]
@@ -1169,23 +1238,6 @@ exports.retryPayment = async (req, res) => {
             return res.status(404).json({
                 success: false,
                 message: 'Payment not found for this order'
-            });
-        }
-
-        if (existingPayment.status !== 'failed') {
-            return res.status(400).json({
-                success: false,
-                message: 'Only failed payments can be retried'
-            });
-        }
-
-        const currentRetryCount = existingPayment.retryCount || 0;
-        if (currentRetryCount >= MAX_PAYMENT_RETRIES) {
-            return res.status(429).json({
-                success: false,
-                message: `Maximum retry limit (${MAX_PAYMENT_RETRIES}) reached. Please contact support for assistance with your payment.`,
-                retryCount: currentRetryCount,
-                maxRetries: MAX_PAYMENT_RETRIES
             });
         }
 
@@ -1204,6 +1256,9 @@ exports.retryPayment = async (req, res) => {
             email: order.customer.email,
             phone: order.customer.phone
         };
+
+        // Amount must come from the order (source of truth), not the gateway response.
+        const dbAmount = Number((order.totals || {}).total) || Number(existingPayment.amount);
 
         let lencoResponse;
         let newPaymentRecord;
@@ -1237,7 +1292,7 @@ exports.retryPayment = async (req, res) => {
                 newPaymentRecord = await Payment.create({
                     orderNumber,
                     paymentMethod: 'mobile_money',
-                    amount: lencoResponse.amount || existingPayment.amount,
+                    amount: dbAmount,
                     currency: lencoResponse.currency || existingPayment.currency || 'ZMW',
                     status: mappedStatus,
                     customerInfo,
@@ -1257,7 +1312,7 @@ exports.retryPayment = async (req, res) => {
                     
                     // Link to original payment
                     retryOf: existingPayment.id,
-                    retryCount: (existingPayment.retryCount || 0) + 1,
+                    retryCount: priorFailedCount,
 
                     // Metadata
                     metadata: {
@@ -1287,7 +1342,7 @@ exports.retryPayment = async (req, res) => {
                 newPaymentRecord = await Payment.create({
                     orderNumber,
                     paymentMethod: 'bank_transfer',
-                    amount: lencoResponse.amount || existingPayment.amount,
+                    amount: dbAmount,
                     currency: lencoResponse.currency || existingPayment.currency || 'ZMW',
                     status: mappedStatus,
                     customerInfo,
@@ -1311,7 +1366,7 @@ exports.retryPayment = async (req, res) => {
                     
                     // Link to original payment
                     retryOf: existingPayment.id,
-                    retryCount: (existingPayment.retryCount || 0) + 1,
+                    retryCount: priorFailedCount,
 
                     // Metadata
                     metadata: {
@@ -1342,7 +1397,12 @@ exports.retryPayment = async (req, res) => {
             return res.json({
                 success: true,
                 message: 'Payment retry initiated successfully',
-                payment: newPaymentRecord,
+                orderNumber,
+                transactionId: newPaymentRecord.lencoTransactionId,
+                reference: newPaymentRecord.transactionId,
+                status: newPaymentRecord.status,
+                paymentMethod: newPaymentRecord.paymentMethod,
+                currency: newPaymentRecord.currency,
                 paymentInstructions: lencoResponse.paymentInstructions,
                 qrCode: lencoResponse.qrCode,
                 paymentUrl: lencoResponse.paymentUrl,
@@ -1364,7 +1424,7 @@ exports.retryPayment = async (req, res) => {
                     failureReason: error.message || 'Failed to initiate payment retry',
                     failedAt: new Date(),
                     retryOf: existingPayment.id,
-                    retryCount: (existingPayment.retryCount || 0) + 1,
+                    retryCount: priorFailedCount,
                     metadata: {
                         isRetry: true,
                         originalPaymentId: String(existingPayment.id),
@@ -1375,9 +1435,10 @@ exports.retryPayment = async (req, res) => {
                 console.error('[Payment Controller] Error creating failed retry payment record:', createError);
             }
 
+            logger.error({ err: error }, 'retryPayment inner handler failed');
             return res.status(500).json({
                 success: false,
-                message: error.message || 'Failed to retry payment'
+                message: 'Failed to retry payment'
             });
         }
     } catch (error) {
@@ -1398,7 +1459,7 @@ function buildPaymentQuery(filters) {
     const where = {};
 
     if (search) {
-        const term = `%${search}%`;
+        const term = `%${String(search).trim().slice(0, 100).replace(/[%_\\]/g, '\\$&')}%`;
         const customerInfoLike = (path) =>
             sequelize.where(
                 sequelize.fn(
@@ -1489,7 +1550,7 @@ exports.getAllPayments = async (req, res) => {
         
         // Calculate pagination
         const pageNum = parseInt(page, 10) || 1;
-        const limitNum = parseInt(limit, 10) || 50;
+        const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
         const skip = (pageNum - 1) * limitNum;
         
         // Execute query

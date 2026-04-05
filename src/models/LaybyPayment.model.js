@@ -17,6 +17,7 @@ const LaybyPayment = sequelize.define('LaybyPayment', {
     sequence: {
         type: DataTypes.INTEGER,
         allowNull: false,
+        validate: { min: 1 },
         comment: '1 = deposit, 2..n = installments'
     },
     dueAt: {

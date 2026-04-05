@@ -36,7 +36,9 @@
             const message = data.message || `Server error ${response.status}: ${rawText.slice(0, 100)}`;
             const err = new Error(message);
             err.status = response.status;
-            err.data = data;
+            if (typeof data.message === 'string' && data.message) {
+                err.serverMessage = data.message;
+            }
             throw err;
         }
 

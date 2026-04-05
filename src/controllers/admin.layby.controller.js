@@ -10,6 +10,53 @@ const { LaybyPlan, LaybyPayment, Order, User, Payment } = require('../models');
 const laybyService = require('../services/layby.service');
 const logger = require('../utils/logger').child({ module: 'AdminLaybyController' });
 
+/** Allowed admin PATCH status transitions (LaybyPlan.status). */
+const LAYBY_PLAN_STATUS_TRANSITIONS = {
+    active: ['completed', 'cancelled'],
+    cancelled: ['active'],
+    completed: []
+};
+
+/**
+ * Admin layby detail API: only fields rendered in views/admin/layby-detail + layby-detail.js.
+ * Omits order.customer (PII), full line-item internals, and extra user columns.
+ */
+function sanitizeLaybyPlanDetailForAdmin(plan) {
+    const j = plan.toJSON();
+    if (j.order) {
+        const o = j.order;
+        const totals = o.totals && typeof o.totals === 'object' ? o.totals : {};
+        const items = Array.isArray(o.items) ? o.items : [];
+        j.order = {
+            id: o.id,
+            orderNumber: o.orderNumber,
+            status: o.status,
+            paymentStatus: o.paymentStatus,
+            checkoutMode: o.checkoutMode,
+            createdAt: o.createdAt,
+            totals: {
+                subtotal: totals.subtotal,
+                discount: totals.discount,
+                delivery: totals.delivery,
+                total: totals.total
+            },
+            items: items.map((it) => ({
+                name: it.name,
+                quantity: it.quantity,
+                price: it.price
+            }))
+        };
+    }
+    if (j.user) {
+        j.user = {
+            id: j.user.id,
+            name: j.user.name,
+            email: j.user.email
+        };
+    }
+    return j;
+}
+
 exports.renderLaybyListPage = (req, res) => {
     res.render('admin/layby', {
         title: 'Layby plans | Admin Panel',
@@ -102,13 +149,12 @@ exports.getPlan = async (req, res) => {
                         'status',
                         'paymentStatus',
                         'checkoutMode',
-                        'customer',
                         'items',
                         'totals',
                         'createdAt'
                     ]
                 },
-                { model: User, as: 'user', attributes: ['id', 'email', 'name', 'phone'], required: false },
+                { model: User, as: 'user', attributes: ['id', 'email', 'name'], required: false },
                 {
                     model: LaybyPayment,
                     as: 'laybyPayments',
@@ -130,7 +176,7 @@ exports.getPlan = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Plan not found' });
         }
 
-        res.json({ success: true, plan: plan.toJSON() });
+        res.json({ success: true, plan: sanitizeLaybyPlanDetailForAdmin(plan) });
     } catch (err) {
         logger.error({ err }, 'getPlan failed');
         res.status(500).json({ success: false, message: 'Failed to load plan' });
@@ -157,21 +203,13 @@ exports.updatePlanStatus = async (req, res) => {
 
             const cur = plan.status;
 
+            if (!LAYBY_PLAN_STATUS_TRANSITIONS[cur]?.includes(status)) {
+                return { http: 400, message: `Cannot transition from ${cur} to ${status}` };
+            }
+
             if (status === 'completed') {
                 if (parseFloat(plan.balanceRemaining) > 0.001) {
                     return { http: 400, message: 'Cannot mark completed while balance remains' };
-                }
-            }
-
-            if (status === 'cancelled') {
-                if (cur !== 'active') {
-                    return { http: 400, message: 'Only active plans can be cancelled' };
-                }
-            }
-
-            if (status === 'active') {
-                if (cur !== 'cancelled') {
-                    return { http: 400, message: 'Only cancelled plans can be reactivated' };
                 }
             }
 

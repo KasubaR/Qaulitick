@@ -63,7 +63,12 @@ const LaybyPlan = sequelize.define('LaybyPlan', {
     }
 }, {
     tableName: 'layby_plans',
-    timestamps: true
+    timestamps: true,
+    indexes: [
+        { fields: ['orderId'] },
+        { fields: ['userId'] },
+        { fields: ['status'] }
+    ]
 });
 
 module.exports = LaybyPlan;

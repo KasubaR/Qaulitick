@@ -7,8 +7,8 @@ function convertValue(v) {
         if (v.$lt !== undefined) return { [Op.lt]: v.$lt };
         if (v.$gt !== undefined) return { [Op.gt]: v.$gt };
         if (v.$ne !== undefined) return { [Op.ne]: v.$ne };
-        if (v.$in !== undefined) return { [Op.in]: v.$in };
-        if (v.$nin !== undefined) return { [Op.notIn]: v.$nin };
+        if (v.$in !== undefined) return { [Op.in]: Array.isArray(v.$in) ? v.$in : [v.$in] };
+        if (v.$nin !== undefined) return { [Op.notIn]: Array.isArray(v.$nin) ? v.$nin : [v.$nin] };
     }
     return v;
 }
@@ -58,7 +58,10 @@ function addMongooseCompat(Model) {
         Model.findByIdAndUpdate = async function(id, update, opts = {}) {
             const pk = parseInt(String(id), 10);
             if (Number.isNaN(pk)) return null;
-            const [count] = await Model.update(update, { where: { id: pk } });
+            if (update == null || typeof update !== 'object') return null;
+            // Unwrap $set if present (Mongoose compat — Sequelize does not understand $set / $unset)
+            const fields = update.$set || update;
+            const [count] = await Model.update(fields, { where: { id: pk } });
             if (count === 0) return null;
             return opts.new !== false ? Model.findByPk(pk) : { id: pk };
         };

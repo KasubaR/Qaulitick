@@ -12,6 +12,36 @@ const LaybyPayment = require('../models/LaybyPayment.model');
 const orderService = require('../services/order.service');
 const logger = require('../utils/logger').child({ module: 'OrderController' });
 const { getSellableUnitsForLine } = require('../utils/stock.utils');
+/** Admin order list filters — must match `Order` model ENUMs */
+const ORDER_LIST_STATUSES = [
+    'pending', 'payment_pending', 'paid', 'confirmed', 'processing', 'packed',
+    'shipped', 'delivered', 'cancelled', 'payment_failed', 'returned'
+];
+const ORDER_LIST_PAYMENT_STATUSES = ['pending', 'processing', 'completed', 'failed', 'refunded'];
+const ORDER_LIST_PAYMENT_METHODS = ['mobile_money', 'bank_transfer', 'card', 'cash_on_delivery'];
+
+function firstQueryString(val) {
+    if (val == null || val === '') return null;
+    const v = Array.isArray(val) ? val[0] : val;
+    if (typeof v !== 'string') return null;
+    const t = v.trim();
+    return t === '' ? null : t;
+}
+
+/** Max length for admin order `search` / `email` LIKE terms (limits JSON_EXTRACT + LIKE cost). */
+const ORDER_LIST_LIKE_MAX_LEN = 100;
+
+/**
+ * Trim, cap length, strip a few problematic characters, escape LIKE metacharacters for bound %…% patterns.
+ */
+function normalizeOrderListLikeTerm(raw) {
+    if (raw == null || typeof raw !== 'string') return null;
+    let s = raw.trim().slice(0, ORDER_LIST_LIKE_MAX_LEN);
+    if (!s) return null;
+    s = s.replace(/[<>'"]/g, '');
+    if (!s) return null;
+    return s.replace(/[%_\\]/g, '\\$&');
+}
 
 // Delivery fee in ZMW. Configurable via env; set to 0 for free shipping.
 const DELIVERY_FEE_ZMW = parseFloat(process.env.DELIVERY_FEE_ZMW ?? '0') || 0;
@@ -223,32 +253,39 @@ exports.createOrder = async (req, res) => {
                 updatedAt: new Date().toISOString()
             };
 
-            // Decrement color-specific JSON stock when a variant was chosen (main `stock` is
-            // reduced when payment completes — see order.service updateOrderStatusFromPayment).
+            // Colour variants: always enforce per-shade availability against `colors[].stock`.
+            // Standard checkout: decrement that JSON now; top-level `stock` is reduced when payment
+            // completes (order.service updateOrderStatusFromPayment).
+            // Layby: the reservation loop below decrements top-level `stock` only — do not also
+            // mutate `colors` here or units are reserved twice (JSON shade + global).
             for (const item of validatedItems) {
-                if (item.selectedColor) {
-                    const freshProduct = await Product.findByPk(parseInt(item.productId, 10), { transaction: t });
-                    const colorEntry = (freshProduct.colors || []).find(c => c.name === item.selectedColor);
-                    const colorStock = colorEntry ? (Number(colorEntry.stock) || 0) : 0;
+                if (!item.selectedColor) continue;
 
-                    if (colorStock < item.quantity) {
-                        const err = new Error(
-                            `Insufficient stock for "${item.name}" in color "${item.selectedColor}". Available: ${colorStock}, Requested: ${item.quantity}`
-                        );
-                        err.statusCode = 409;
-                        throw err;
-                    }
+                const freshProduct = await Product.findByPk(parseInt(item.productId, 10), { transaction: t });
+                const colorEntry = (freshProduct.colors || []).find(c => c.name === item.selectedColor);
+                const colorStock = colorEntry ? (Number(colorEntry.stock) || 0) : 0;
 
-                    const updatedColors = (freshProduct.colors || []).map(c =>
-                        c.name === item.selectedColor
-                            ? { ...c, stock: Math.max(0, (c.stock || 0) - item.quantity) }
-                            : c
+                if (colorStock < item.quantity) {
+                    const err = new Error(
+                        `Insufficient stock for "${item.name}" in color "${item.selectedColor}". Available: ${colorStock}, Requested: ${item.quantity}`
                     );
-                    await Product.update(
-                        { colors: updatedColors },
-                        { where: { id: parseInt(item.productId, 10) }, transaction: t }
-                    );
+                    err.statusCode = 409;
+                    throw err;
                 }
+
+                if (checkoutMode === 'layby') {
+                    continue;
+                }
+
+                const updatedColors = (freshProduct.colors || []).map(c =>
+                    c.name === item.selectedColor
+                        ? { ...c, stock: Math.max(0, (c.stock || 0) - item.quantity) }
+                        : c
+                );
+                await Product.update(
+                    { colors: updatedColors },
+                    { where: { id: parseInt(item.productId, 10) }, transaction: t }
+                );
             }
 
             const created = await Order.create(orderData, { transaction: t });
@@ -325,11 +362,12 @@ exports.createOrder = async (req, res) => {
         res.json({
             success: true,
             orderNumber: order.orderNumber,
-            order: order.toJSON(),
-            message: 'Order created successfully',
-            checkoutMode,
+            checkoutMode: order.checkoutMode,
+            status: order.status,
+            paymentStatus: order.paymentStatus,
             laybyPaymentId,
-            laybyFirstAmount
+            laybyFirstAmount,
+            message: 'Order created successfully'
         });
     } catch (error) {
         logger.error({ err: error }, 'Error creating order');
@@ -372,6 +410,19 @@ exports.getOrderByNumber = async (req, res) => {
             });
         }
 
+        const isAdmin = !!req.admin;
+        const loggedUserId =
+            req.session?.userId != null && req.session.userId !== ''
+                ? parseInt(String(req.session.userId), 10)
+                : null;
+        const sessionUserId = Number.isNaN(loggedUserId) ? null : loggedUserId;
+        const rawOwnerId = order.userId != null ? parseInt(String(order.userId), 10) : null;
+        const ownerUserId = Number.isNaN(rawOwnerId) ? null : rawOwnerId;
+
+        if (!isAdmin && ownerUserId !== sessionUserId) {
+            return res.status(403).json({ success: false, message: 'Forbidden' });
+        }
+
         // Enrich order with payment status from Payment model (source of truth)
         // This ensures orders.ejs shows the same payment status as payments.ejs
         const enrichedOrder = await enrichOrderWithPaymentStatus(order);
@@ -401,6 +452,26 @@ exports.getAllOrders = async (req, res) => {
         const pageNum  = Math.max(1, parseInt(page, 10)  || 1);
         const pageSize = Math.min(200, Math.max(1, parseInt(rawLimit, 10) || 50));
         const offset   = (pageNum - 1) * pageSize;
+
+        const statusF = firstQueryString(status);
+        const paymentStatusF = firstQueryString(paymentStatus);
+        const paymentMethodF = firstQueryString(paymentMethod);
+        const searchRaw = firstQueryString(search);
+        const emailRaw = firstQueryString(email);
+
+        if (statusF && !ORDER_LIST_STATUSES.includes(statusF)) {
+            return res.status(400).json({ success: false, message: 'Invalid status filter' });
+        }
+        if (paymentStatusF && !ORDER_LIST_PAYMENT_STATUSES.includes(paymentStatusF)) {
+            return res.status(400).json({ success: false, message: 'Invalid paymentStatus filter' });
+        }
+        if (paymentMethodF && !ORDER_LIST_PAYMENT_METHODS.includes(paymentMethodF)) {
+            return res.status(400).json({ success: false, message: 'Invalid paymentMethod filter' });
+        }
+
+        const searchLike = normalizeOrderListLikeTerm(searchRaw);
+        const emailLike = normalizeOrderListLikeTerm(emailRaw);
+
         let orderClause;
         if (sort === 'oldest') {
             orderClause = [['createdAt', 'ASC']];
@@ -415,9 +486,9 @@ exports.getAllOrders = async (req, res) => {
         // Build WHERE clause from query params
         const where = {};
 
-        if (status)        where.status        = status;
-        if (paymentStatus) where.paymentStatus = paymentStatus;
-        if (paymentMethod) where.paymentMethod = paymentMethod;
+        if (statusF) where.status = statusF;
+        if (paymentStatusF) where.paymentStatus = paymentStatusF;
+        if (paymentMethodF) where.paymentMethod = paymentMethodF;
 
         if (updatedSince) {
             const since = new Date(updatedSince);
@@ -451,14 +522,14 @@ exports.getAllOrders = async (req, res) => {
             );
 
         const searchClauses = [];
-        if (search) {
-            searchClauses.push({ orderNumber: { [Op.like]: `%${search}%` } });
-            searchClauses.push(jsonCustomerLike('email', search));
-            searchClauses.push(jsonCustomerLike('name', search));
-            searchClauses.push(jsonCustomerLike('phone', search));
+        if (searchLike) {
+            searchClauses.push({ orderNumber: { [Op.like]: `%${searchLike}%` } });
+            searchClauses.push(jsonCustomerLike('email', searchLike));
+            searchClauses.push(jsonCustomerLike('name', searchLike));
+            searchClauses.push(jsonCustomerLike('phone', searchLike));
         }
-        if (email) {
-            searchClauses.push(jsonCustomerLike('email', email));
+        if (emailLike) {
+            searchClauses.push(jsonCustomerLike('email', emailLike));
         }
         if (searchClauses.length) {
             where[Op.or] = searchClauses;
@@ -472,10 +543,18 @@ exports.getAllOrders = async (req, res) => {
             offset
         });
 
-        // Batch-load payments for this page in one query — avoids N+1
+        // Batch-load payments for this page in one query — avoids N+1.
+        // Oldest-first so `new Map([[orderNumber, p], ...])` ends with the newest row per order
+        // (same as Payment.findLatestPaymentByOrderNumber: createdAt DESC).
         const orderNumbers = orders.map(o => o.orderNumber);
         const payments = orderNumbers.length
-            ? await Payment.findAll({ where: { orderNumber: { [Op.in]: orderNumbers } } })
+            ? await Payment.findAll({
+                where: { orderNumber: { [Op.in]: orderNumbers } },
+                order: [
+                    ['createdAt', 'ASC'],
+                    ['id', 'ASC']
+                ]
+            })
             : [];
         const paymentByOrder = new Map(payments.map(p => [p.orderNumber, p]));
 
@@ -562,18 +641,39 @@ exports.dispatchOrder = async (req, res) => {
         const { orderNumber } = req.params;
         const { courier, trackingNumber, note } = req.body;
 
-        const order = await Order.findByOrderNumber(orderNumber);
-        if (!order) {
+        let dispatched = false;
+        await sequelize.transaction(async (t) => {
+            const order = await Order.findOne({
+                where: { orderNumber },
+                transaction: t,
+                lock: t.LOCK.UPDATE
+            });
+            if (!order) return;
+
+            const history = Array.isArray(order.history) ? [...order.history] : [];
+            history.push({
+                status: 'shipped',
+                notes: 'Order dispatched by admin',
+                updatedBy: 'admin',
+                updatedAt: new Date().toISOString()
+            });
+
+            await order.update(
+                {
+                    courier,
+                    trackingNumber,
+                    shippingNote: note,
+                    status: 'shipped',
+                    history
+                },
+                { transaction: t }
+            );
+            dispatched = true;
+        });
+
+        if (!dispatched) {
             return res.status(404).json({ success: false, message: 'Order not found' });
         }
-
-        // Save tracking info and mark as shipped
-        await order.update({ courier, trackingNumber, shippingNote: note, status: 'shipped' });
-
-        // Add history entry
-        const history = Array.isArray(order.history) ? [...order.history] : [];
-        history.push({ status: 'shipped', notes: 'Order dispatched by admin', updatedBy: 'admin', updatedAt: new Date() });
-        await order.update({ history });
 
         // Send dispatch email to customer (non-blocking)
         const emailService = require('../services/email.service');
@@ -811,7 +911,7 @@ exports.verifyOrderPayment = async (req, res) => {
         logger.error({ err: error }, 'Error verifying order payment');
         res.status(500).json({
             success: false,
-            message: error.message || 'Failed to verify order payment'
+            message: 'Failed to verify order payment'
         });
     }
 };
@@ -1080,9 +1180,13 @@ exports.exportOrders = async (req, res) => {
             }
         });
 
-        // Get orders for export
+        // Get orders for export (hard cap enforced in service)
         const orderService = require('../services/order.service');
-        const orders = await orderService.getOrdersForExport(filters);
+        const orders = await orderService.getOrdersForExport(filters, { limit: orderService.MAX_EXPORT_ROWS });
+
+        if (orders.length === orderService.MAX_EXPORT_ROWS) {
+            res.setHeader('X-Export-Truncated', 'true');
+        }
 
         if (orders.length === 0) {
             return res.status(400).json({

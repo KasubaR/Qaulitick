@@ -38,11 +38,13 @@ class ProductService {
         }
     }
 
-    async getProductsByIds(ids) {
+    async getProductsByIds(ids, options = {}) {
         try {
             const numericIds = ids.map(id => parseInt(id, 10)).filter(n => !isNaN(n));
             if (numericIds.length === 0) return [];
-            return await Product.findAll({ where: { id: { [Op.in]: numericIds } } });
+            const findOpts = { where: { id: { [Op.in]: numericIds } } };
+            if (options.attributes) findOpts.attributes = options.attributes;
+            return await Product.findAll(findOpts);
         } catch (error) {
             console.error('Error getting products by IDs:', error);
             throw error;

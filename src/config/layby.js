@@ -9,7 +9,7 @@
 function parseFloatEnv(key, fallback) {
     const v = process.env[key];
     if (v === undefined || String(v).trim() === '') return fallback;
-    const n = parseFloat(String(v), 10);
+    const n = parseFloat(String(v));
     return Number.isNaN(n) ? fallback : n;
 }
 
@@ -25,7 +25,7 @@ const MIN_PCT = parseFloatEnv('LAYBY_MIN_DEPOSIT_PERCENT', 30);
 const maxEnv = process.env.LAYBY_MAX_DEPOSIT_PERCENT;
 const maxParsed =
     maxEnv !== undefined && String(maxEnv).trim() !== ''
-        ? parseFloat(String(maxEnv), 10)
+        ? parseFloat(String(maxEnv))
         : Number.NaN;
 /** Upper deposit clamp; unset env ⇒ 100 (no cap above min other than full payment). */
 const MAX_PCT = Number.isNaN(maxParsed)

@@ -12,21 +12,70 @@ function formatCheckoutMoney(n) {
     return `K${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/**
+ * Same CSRF resolution as public/js/account-layby.js (window helper, then meta).
+ * Also tries legacy global getCSRFToken if present. Callers must abort with a
+ * clear error when this is empty — never POST mutating routes without X-CSRF-Token.
+ */
+function getCheckoutCsrfToken() {
+    if (typeof window.getCSRFToken === 'function') {
+        return window.getCSRFToken();
+    }
+    if (typeof getCSRFToken === 'function') {
+        return getCSRFToken();
+    }
+    const m = document.querySelector('meta[name="csrf-token"]');
+    return m ? m.getAttribute('content') || '' : '';
+}
+
+const CHECKOUT_CSRF_MISSING_MSG = 'Security token missing. Refresh the page and try again.';
+
 // Payment polling
-let paymentPollInterval = null;
+let paymentPollTimer = null;
 let paymentPollStartTime = null;
 const PAYMENT_POLL_INTERVAL = 15000; // 15 seconds (rate limit: 60 requests/15min = 4 req/min = 1 every 15s)
 const PAYMENT_POLL_TIMEOUT = 15 * 60 * 1000; // 15 minutes
 let currentTransactionId = null;
 let rateLimitBackoff = 0; // Exponential backoff for rate limits
 const PENDING_TRANSACTION_KEY = 'checkout_pending_transaction_id';
+/** Wall-clock start of polling for PAYMENT_POLL_TIMEOUT (survives full page reload via sessionStorage). */
+const PAYMENT_POLL_START_KEY = 'checkout_payment_poll_start_ms';
 
-// If the browser restores this page from bfcache (back-forward navigation), kill any
-// stale polling interval that was running before navigation so it cannot fire again.
+// bfcache restore: timers are frozen/cancelled by the browser, but in-memory + session state remain.
+// Clear only the timer and reschedule — do not call stopPaymentPolling() or the 15m window resets.
 window.addEventListener('pageshow', (e) => {
-    if (e.persisted) {
-        stopPaymentPolling();
+    if (!e.persisted) return;
+
+    if (paymentPollTimer) {
+        clearTimeout(paymentPollTimer);
+        paymentPollTimer = null;
     }
+
+    const txId = currentTransactionId || sessionStorage.getItem(PENDING_TRANSACTION_KEY);
+    if (!txId) return;
+
+    let startMs = paymentPollStartTime;
+    if (startMs == null) {
+        const raw = sessionStorage.getItem(PAYMENT_POLL_START_KEY);
+        if (raw != null) {
+            const t = parseInt(raw, 10);
+            if (!Number.isNaN(t)) startMs = t;
+        }
+    }
+    if (startMs == null) return;
+
+    paymentPollStartTime = startMs;
+    currentTransactionId = txId;
+
+    const elapsed = Date.now() - startMs;
+    if (elapsed > PAYMENT_POLL_TIMEOUT) {
+        stopPaymentPolling();
+        showPaymentTimeoutError();
+        return;
+    }
+
+    const nextDelay = Math.max(PAYMENT_POLL_INTERVAL, rateLimitBackoff);
+    paymentPollTimer = setTimeout(() => scheduleNextPoll(txId), nextDelay);
 });
 
 // Initialize checkout page
@@ -76,7 +125,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const pendingTxId = sessionStorage.getItem(PENDING_TRANSACTION_KEY);
     if (pendingTxId) {
         console.log(`[Payment Polling] Resuming polling for pending transaction: ${pendingTxId}`);
-        startPaymentPolling(pendingTxId);
+        startPaymentPolling(pendingTxId, { resume: true });
     }
 });
 
@@ -155,23 +204,10 @@ function updatePaymentMethodUI(method) {
         `;
         paymentSection.appendChild(paymentPhoneSection);
 
-        // Add event listener to validate phone matches provider
-        setTimeout(() => {
-            const mobileProvider = document.getElementById('mobileProvider');
-            const paymentPhone = document.getElementById('paymentPhone');
-
-            if (mobileProvider && paymentPhone) {
-                // Validate when provider changes
-                mobileProvider.addEventListener('change', () => {
-                    validatePaymentPhone();
-                });
-
-                // Validate when phone number changes
-                paymentPhone.addEventListener('blur', () => {
-                    validatePaymentPhone();
-                });
-            }
-        }, 100);
+        const mobileProvider = document.getElementById('mobileProvider');
+        const paymentPhone = document.getElementById('paymentPhone');
+        if (mobileProvider) mobileProvider.addEventListener('change', validatePaymentPhone);
+        if (paymentPhone) paymentPhone.addEventListener('blur', validatePaymentPhone);
     }
 
     // Bank Transfer - DISABLED FOR NOW (Will be enabled in future update)
@@ -246,6 +282,12 @@ async function loadCartItems() {
             return;
         }
 
+        const MAX_CART_ITEMS = 50;
+        if (cartData.length > MAX_CART_ITEMS) {
+            cartData = cartData.slice(0, MAX_CART_ITEMS);
+            showNotification('Your cart has been trimmed to the maximum allowed items.', 'warning');
+        }
+
         // Normalize prices (handle both number and string formats)
         checkoutCartItems = cartData.map(item => {
             // Normalize price to number
@@ -277,8 +319,8 @@ async function loadCartItems() {
         // SECURITY: Always validate cart items server-side to get authoritative prices
         // This prevents price manipulation and ensures stock availability
         try {
-            // Get CSRF token for authenticated request
-            const csrfToken = typeof getCSRFToken === 'function' ? getCSRFToken() : (typeof window.getCSRFToken === 'function' ? window.getCSRFToken() : '');
+            const csrfToken = getCheckoutCsrfToken();
+            if (!csrfToken) throw new Error(CHECKOUT_CSRF_MISSING_MSG);
 
             const response = await fetch('/api/cart/validate', {
                 method: 'POST',
@@ -656,6 +698,8 @@ function updateOrderSummary() {
     const summaryDelivery = document.getElementById('summaryDelivery');
     const summaryTotal = document.getElementById('summaryTotal');
 
+    if (!summaryItems || !summarySubtotal || !summaryDelivery || !summaryTotal) return;
+
     // Clear existing items
     summaryItems.innerHTML = '';
 
@@ -700,14 +744,24 @@ function updateOrderSummary() {
         // Add item to summary
         const itemDiv = document.createElement('div');
         itemDiv.className = 'summary-item';
-        itemDiv.innerHTML = `
-            <img src="${item.image || '/images/placeholder.jpg'}" alt="${item.name}" class="summary-item-image">
-            <div class="summary-item-info">
-                <div class="summary-item-name">${escapeHtml(item.name)}</div>
-                <div class="summary-item-details">Qty: ${quantity}</div>
-                <div class="summary-item-price">K${(price * quantity).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-            </div>
+
+        const img = document.createElement('img');
+        img.src = (item.image && /^(\/|https?:\/\/)/.test(item.image))
+            ? item.image
+            : '/images/placeholder.jpg';
+        img.alt = item.name || '';
+        img.className = 'summary-item-image';
+
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'summary-item-info';
+        infoDiv.innerHTML = `
+            <div class="summary-item-name">${escapeHtml(item.name)}</div>
+            <div class="summary-item-details">Qty: ${quantity}</div>
+            <div class="summary-item-price">K${(price * quantity).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
         `;
+
+        itemDiv.appendChild(img);
+        itemDiv.appendChild(infoDiv);
         summaryItems.appendChild(itemDiv);
     });
 
@@ -763,8 +817,11 @@ function syncLaybySummaryPanel(orderTotal) {
 }
 
 // Handle form submission
+let isSubmitting = false;
+
 async function handleFormSubmit(e) {
     e.preventDefault();
+    if (isSubmitting) return;
 
     // Validate all fields
     const form = e.target;
@@ -869,6 +926,8 @@ async function handleFormSubmit(e) {
         return;
     }
 
+    isSubmitting = true;
+
     // Disable submit button
     const placeOrderBtn = document.getElementById('placeOrderBtn');
     placeOrderBtn.disabled = true;
@@ -929,7 +988,7 @@ async function handleFormSubmit(e) {
 
         if (checkoutMode === 'layby') {
             const dep = document.getElementById('laybyDepositPercent');
-            orderData.laybyDepositPercent = dep ? dep.value : '30';
+            orderData.laybyDepositPercent = dep ? parseFloat(dep.value) || 30 : 30;
         }
 
         // Debug: Log order data to verify structure
@@ -975,8 +1034,8 @@ async function handleFormSubmit(e) {
         // Show error modal
         document.getElementById('errorMessage').textContent = error.message || 'There was an error processing your order. Please try again.';
         document.getElementById('errorModal').style.display = 'flex';
-
-        // Re-enable submit button
+    } finally {
+        isSubmitting = false;
         placeOrderBtn.disabled = false;
         placeOrderBtn.innerHTML = '<i class="fas fa-lock"></i> Place Order';
     }
@@ -985,12 +1044,15 @@ async function handleFormSubmit(e) {
 // Process order with Lenco payment
 async function processOrderWithLenco(orderData, formData) {
     try {
+        const csrfToken = getCheckoutCsrfToken();
+        if (!csrfToken) throw new Error(CHECKOUT_CSRF_MISSING_MSG);
+
         // Step 1: Create order
         const orderResponse = await fetch('/api/orders/create', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-Token': typeof window.getCSRFToken === 'function' ? window.getCSRFToken() : ''
+                'X-CSRF-Token': csrfToken
             },
             body: JSON.stringify(orderData)
         });
@@ -1061,7 +1123,7 @@ async function processOrderWithLenco(orderData, formData) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-Token': typeof window.getCSRFToken === 'function' ? window.getCSRFToken() : ''
+                'X-CSRF-Token': csrfToken
             },
             body: JSON.stringify(paymentData)
         });
@@ -1127,8 +1189,14 @@ function showPaymentInstructionsModal(paymentData) {
     const paymentUrlSection = modal.querySelector('.payment-url-section');
     const paymentLinkBtn = modal.querySelector('.payment-link-btn');
     if (paymentData.paymentUrl && paymentUrlSection && paymentLinkBtn) {
-        paymentLinkBtn.href = paymentData.paymentUrl;
-        paymentUrlSection.style.display = 'block';
+        try {
+            const url = new URL(paymentData.paymentUrl);
+            if (url.protocol !== 'https:') throw new Error('Insecure protocol');
+            paymentLinkBtn.href = url.href;
+            paymentUrlSection.style.display = 'block';
+        } catch {
+            paymentUrlSection.style.display = 'none';
+        }
     } else if (paymentUrlSection) {
         paymentUrlSection.style.display = 'none';
     }
@@ -1389,27 +1457,51 @@ async function scheduleNextPoll(transactionId) {
 
     const nextDelay = Math.max(PAYMENT_POLL_INTERVAL, rateLimitBackoff);
     console.log(`[Payment Polling] Next poll in ${nextDelay}ms (${nextDelay / 1000}s)`);
-    paymentPollInterval = setTimeout(() => scheduleNextPoll(transactionId), nextDelay);
+    paymentPollTimer = setTimeout(() => scheduleNextPoll(transactionId), nextDelay);
 }
 
 // Start payment status polling
-function startPaymentPolling(transactionId) {
+function startPaymentPolling(transactionId, { resume = false } = {}) {
     if (!transactionId) {
         console.error('Cannot start polling: transactionId is required');
         return;
     }
 
+    let preservedStartMs = null;
+    if (resume) {
+        const prevTx = sessionStorage.getItem(PENDING_TRANSACTION_KEY);
+        const startStr = sessionStorage.getItem(PAYMENT_POLL_START_KEY);
+        if (prevTx === transactionId && startStr != null) {
+            const t = parseInt(startStr, 10);
+            if (!Number.isNaN(t)) {
+                if (Date.now() - t > PAYMENT_POLL_TIMEOUT) {
+                    sessionStorage.removeItem(PENDING_TRANSACTION_KEY);
+                    sessionStorage.removeItem(PAYMENT_POLL_START_KEY);
+                    console.warn('[Payment Polling] Pending transaction exceeded timeout; not resuming.');
+                    return;
+                }
+                preservedStartMs = t;
+            }
+        } else if (resume && prevTx === transactionId && startStr == null) {
+            console.warn(
+                '[Payment Polling] Missing checkout_payment_poll_start_ms; timeout window reset (legacy session).'
+            );
+        }
+    }
+
     // Clear any existing polling first
     stopPaymentPolling();
 
-    // Set start time AFTER clearing previous polling
     currentTransactionId = transactionId;
-    paymentPollStartTime = Date.now();
+    paymentPollStartTime = preservedStartMs != null ? preservedStartMs : Date.now();
     sessionStorage.setItem(PENDING_TRANSACTION_KEY, transactionId);
+    sessionStorage.setItem(PAYMENT_POLL_START_KEY, String(paymentPollStartTime));
 
     console.log(`[Payment Polling] Starting polling for transaction: ${transactionId}`);
     console.log(`[Payment Polling] Waiting 8 seconds before first check to allow Lenco to create collection...`);
-    console.log(`[Payment Polling] Poll start time: ${new Date(paymentPollStartTime).toISOString()}`);
+    console.log(
+        `[Payment Polling] Poll start time: ${new Date(paymentPollStartTime).toISOString()}${resume ? ' (resumed)' : ''}`
+    );
     console.log(`[Payment Polling] Base poll interval: ${PAYMENT_POLL_INTERVAL}ms (${PAYMENT_POLL_INTERVAL / 1000}s)`);
 
     // Reset backoff when starting new polling
@@ -1418,7 +1510,7 @@ function startPaymentPolling(transactionId) {
     // IMPORTANT: Wait 8 seconds before first poll
     // Lenco needs time to create the collection record after initiating payment
     // Polling too early causes "Collection details was not found" errors
-    paymentPollInterval = setTimeout(() => {
+    paymentPollTimer = setTimeout(() => {
         if (currentTransactionId !== transactionId) {
             console.log(`[Payment Polling] Transaction changed, stopping old polling`);
             return;
@@ -1539,14 +1631,15 @@ function getStatusMessage(status) {
 
 // Stop payment polling
 function stopPaymentPolling() {
-    if (paymentPollInterval) {
-        clearTimeout(paymentPollInterval);
-        paymentPollInterval = null;
+    if (paymentPollTimer) {
+        clearTimeout(paymentPollTimer);
+        paymentPollTimer = null;
     }
     currentTransactionId = null;
     paymentPollStartTime = null;
     rateLimitBackoff = 0; // Reset backoff when stopping
     sessionStorage.removeItem(PENDING_TRANSACTION_KEY);
+    sessionStorage.removeItem(PAYMENT_POLL_START_KEY);
 }
 
 // Handle payment success
@@ -1560,8 +1653,13 @@ function handlePaymentSuccess(orderNumber) {
     // Clear cart
     localStorage.removeItem('cart');
 
-    // Redirect to order success page
-    window.location.href = `/order-success/${orderNumber}`;
+    // Redirect to order success page (validate order number before redirect)
+    if (!/^[A-Za-z0-9\-]+$/.test(orderNumber)) {
+        console.error('[Checkout] Invalid order number in redirect');
+        showNotification('Order placed. Please check your email for confirmation.', 'success');
+        return;
+    }
+    window.location.href = `/order-success/${encodeURIComponent(orderNumber)}`;
 }
 
 // Show payment timeout error
@@ -1601,6 +1699,21 @@ function calculateSubtotal() {
 
 // Calculate discount
 function calculateDiscount() {
+    // TODO: Implement coupon/discount support (see /api/cart/validate response)
+    if (window.serverValidatedTotals?.discount) {
+        const n = parseFloat(String(window.serverValidatedTotals.discount));
+        return Number.isNaN(n) ? 0 : n;
+    }
+    if (
+        typeof location !== 'undefined' &&
+        /^(localhost|127\.0\.0\.1)$/.test(location.hostname) &&
+        !window.__checkoutCalculateDiscountDevWarned
+    ) {
+        window.__checkoutCalculateDiscountDevWarned = true;
+        console.warn(
+            '[Checkout] calculateDiscount: returning 0; order summary does not use this yet — sync with /api/cart/validate totals when adding coupons.'
+        );
+    }
     return 0;
 }
 

@@ -96,6 +96,9 @@ async function createLaybyPlanAndPayments({ order, userId, depositPercentInput, 
                 orderTotal: total,
                 depositPercent: pct,
                 depositAmount: deposit,
+                // Intentionally set to full order total, not balanceAfterDeposit.
+                // recordLaybyInstallmentPaid() decrements this as each payment is confirmed.
+                // At any point: amountPaid = orderTotal - balanceRemaining.
                 balanceRemaining: total,
                 installmentCount: 1,
                 installmentSchedule: {
@@ -143,6 +146,9 @@ async function createLaybyPlanAndPayments({ order, userId, depositPercentInput, 
             orderTotal: total,
             depositPercent: pct,
             depositAmount: deposit,
+            // Intentionally set to full order total, not balanceAfterDeposit.
+            // recordLaybyInstallmentPaid() decrements this as each payment is confirmed.
+            // At any point: amountPaid = orderTotal - balanceRemaining.
             balanceRemaining: total,
             installmentCount: INSTALLMENT_COUNT,
             installmentSchedule: USE_FIXED_INSTALLMENT_INTERVAL
@@ -198,7 +204,7 @@ async function createLaybyPlanAndPayments({ order, userId, depositPercentInput, 
 
 /**
  * After a Lenco Payment row is marked completed, apply layby bookkeeping and order state.
- * Idempotent if installment already paid.
+ * Idempotent if installment already paid. Returns { error: 'NOT_PAYABLE' } if status is not pending/overdue.
  *
  * Layby order rule: order.paymentStatus stays `processing` and status `payment_pending` until
  * plan.balanceRemaining reaches 0, then order is `paid` / payment `completed`.
@@ -222,6 +228,14 @@ async function recordLaybyInstallmentPaid(payment) {
 
         if (installment.status === 'paid') {
             return { alreadyApplied: true };
+        }
+
+        if (!['pending', 'overdue'].includes(installment.status)) {
+            logger.warn(
+                { installmentId: installment.id, status: installment.status },
+                'Installment not payable'
+            );
+            return { error: 'NOT_PAYABLE' };
         }
 
         const plan = await LaybyPlan.findByPk(installment.laybyPlanId, {

@@ -29,6 +29,35 @@
     border-color: var(--gold, #b8860b);
 }
 
+.account-layby-pager {
+    margin-top: 1.75rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.account-layby-pager-summary {
+    margin: 0 0 0.75rem;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.account-layby-pager-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.account-layby-pager-link {
+    font-weight: 600;
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.account-layby-pager-link:hover {
+    opacity: 0.85;
+}
+
 .account-layby-pay-block {
     margin-top: 16px;
     padding-top: 16px;

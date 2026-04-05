@@ -179,41 +179,134 @@ function hideError() {
     }
 }
 
-function renderInstallments(rows, planStatus) {
-    const body = document.getElementById('installmentsBody');
-    if (!body) return;
-    body.textContent = '';
+function installmentPaySummary(row) {
+    const pay = row.payment;
+    return pay ? `${pay.status}${pay.lencoReference ? ` (${pay.lencoReference})` : ''}` : '—';
+}
 
-    rows.forEach((row) => {
-        const tr = document.createElement('tr');
-        const pay = row.payment;
-        const paySummary = pay
-            ? `${pay.status}${pay.lencoReference ? ` (${pay.lencoReference})` : ''}`
-            : '—';
+function buildInstallmentRow(row, planStatus) {
+    const tr = document.createElement('tr');
+    tr.setAttribute('data-installment-id', String(row.id));
 
-        [String(row.sequence), formatZmw(row.amount), formatDate(row.dueAt), row.status, formatDate(row.adminConfirmedAt), paySummary].forEach(
-            (text) => {
-                const td = document.createElement('td');
-                td.textContent = text;
-                tr.appendChild(td);
-            }
-        );
+    const paySummary = installmentPaySummary(row);
+    [String(row.sequence), formatZmw(row.amount), formatDate(row.dueAt), row.status, formatDate(row.adminConfirmedAt), paySummary].forEach(
+        (text) => {
+            const td = document.createElement('td');
+            td.textContent = text;
+            tr.appendChild(td);
+        }
+    );
 
-        const tdBtn = document.createElement('td');
-        if (row.status === 'pending' && planStatus === 'active') {
+    const tdBtn = document.createElement('td');
+    if (row.status === 'pending' && planStatus === 'active') {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn-outline layby-confirm-offline-btn';
+        btn.setAttribute('data-installment-id', String(row.id));
+        btn.textContent = 'Confirm offline';
+        tdBtn.appendChild(btn);
+    } else {
+        tdBtn.textContent = '—';
+    }
+    tr.appendChild(tdBtn);
+    return tr;
+}
+
+function updateInstallmentRow(tr, row, planStatus) {
+    const paySummary = installmentPaySummary(row);
+    const texts = [
+        String(row.sequence),
+        formatZmw(row.amount),
+        formatDate(row.dueAt),
+        row.status,
+        formatDate(row.adminConfirmedAt),
+        paySummary
+    ];
+    const tds = tr.querySelectorAll('td');
+    for (let c = 0; c < 6; c++) {
+        const td = tds[c];
+        if (td && td.textContent !== texts[c]) {
+            td.textContent = texts[c];
+        }
+    }
+    const tdBtn = tds[6];
+    if (!tdBtn) return;
+    const wantBtn = row.status === 'pending' && planStatus === 'active';
+    const btnEl = tdBtn.querySelector('.layby-confirm-offline-btn');
+    if (wantBtn) {
+        if (!btnEl || btnEl.getAttribute('data-installment-id') !== String(row.id)) {
+            tdBtn.replaceChildren();
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'btn-outline layby-confirm-offline-btn';
             btn.setAttribute('data-installment-id', String(row.id));
             btn.textContent = 'Confirm offline';
             tdBtn.appendChild(btn);
-        } else {
-            tdBtn.textContent = '—';
         }
-        tr.appendChild(tdBtn);
+    } else if (btnEl || tdBtn.textContent !== '—') {
+        tdBtn.textContent = '—';
+    }
+}
 
-        body.appendChild(tr);
-    });
+const INSTALLMENTS_REFRESH_MS = 160;
+
+/**
+ * Updates installment rows in place when order and ids match the previous render
+ * to avoid clearing the tbody on every refresh. Opacity eases only for structural
+ * changes and only when the tbody already had rows (skips first paint).
+ */
+function renderInstallments(rows, planStatus) {
+    const body = document.getElementById('installmentsBody');
+    if (!body) return;
+
+    const hadAnyRows = body.childElementCount > 0;
+    let easeActive = false;
+    const startEase = () => {
+        if (hadAnyRows && !easeActive) {
+            easeActive = true;
+            body.classList.add('layby-installments-body--refreshing');
+        }
+    };
+    const finishEase = () => {
+        if (easeActive) {
+            window.setTimeout(() => body.classList.remove('layby-installments-body--refreshing'), INSTALLMENTS_REFRESH_MS);
+        }
+    };
+
+    if (!rows.length) {
+        if (hadAnyRows) startEase();
+        body.replaceChildren();
+        finishEase();
+        return;
+    }
+
+    let diverged = false;
+
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const tr = body.children[i];
+        const idOk = tr && tr.getAttribute('data-installment-id') === String(row.id);
+        if (!diverged && idOk) {
+            updateInstallmentRow(tr, row, planStatus);
+        } else {
+            startEase();
+            diverged = true;
+            while (body.childElementCount > i) {
+                body.removeChild(body.lastElementChild);
+            }
+            for (let j = i; j < rows.length; j++) {
+                body.appendChild(buildInstallmentRow(rows[j], planStatus));
+            }
+            break;
+        }
+    }
+
+    while (body.childElementCount > rows.length) {
+        startEase();
+        body.removeChild(body.lastElementChild);
+    }
+
+    finishEase();
 }
 
 function setText(id, value) {
