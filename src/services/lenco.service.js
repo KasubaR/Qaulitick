@@ -1,10 +1,5 @@
 // Lenco Payment Gateway Service
 // Handles all interactions with Lenco payment API
-//
-// TODO: Request Signing
-// If Lenco ever requires request signing for their Collections API, implement it here.
-// Common patterns: HMAC-SHA256, JWT, etc.
-// Reference: Lenco API documentation (check for signing requirements in future API versions)
 
 const axios = require('axios');
 const crypto = require('crypto');

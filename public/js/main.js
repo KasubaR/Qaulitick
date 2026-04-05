@@ -1,10 +1,6 @@
 // Global JavaScript - Used across all pages
 // Cart management, notifications, navigation, utilities
 //
-// TODO: Server-side cart sync for cross-device cart recovery
-// Planned feature: Store cart in session/database to enable cart recovery across devices
-// Would require: POST /api/cart/sync and GET /api/cart/recover endpoints in cart.controller.js
-
 // Global DOM Elements
 const cartCount = document.getElementById("cartCount");
 
@@ -201,9 +197,6 @@ function clearCartStorage() {
     }
 }
 
-// TODO: Server-side cart sync for cross-device cart recovery
-// Planned feature: Store cart in session/database to enable cart recovery across devices
-// Would require: POST /api/cart/sync and GET /api/cart/recover endpoints in cart.controller.js
 
 // Initialize global functionality
 function initGlobal() {

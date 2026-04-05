@@ -182,7 +182,6 @@ function setupEventListeners() {
 
 // Setup sidebar
 function setupSidebar() {
-    // TODO: Highlight active nav item based on current route
     const currentPath = window.location.pathname;
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
@@ -415,24 +414,16 @@ function setupCharts() {
 
 // Setup quick actions
 function setupQuickActions() {
-    // TODO: Implement quick action handlers
-    
     document.getElementById('addProductBtn')?.addEventListener('click', () => {
-        // TODO: Navigate to add product page
         window.location.href = '/admin/products/new';
     });
 
     document.getElementById('createCouponBtn')?.addEventListener('click', () => {
-        // TODO: Open coupon creation modal or navigate to coupon page
         window.location.href = '/admin/coupons/new';
     });
 
     document.getElementById('flashSaleBtn')?.addEventListener('click', () => {
         window.location.href = '/admin/marketing/flash-sales';
-    });
-
-    document.getElementById('sendNotificationBtn')?.addEventListener('click', () => {
-        openNotificationModal();
     });
 
     document.getElementById('exportReportBtn')?.addEventListener('click', () => {
@@ -1694,225 +1685,6 @@ function showExportFormatModal() {
                 resolve(null);
             }
         });
-    });
-}
-
-// Open notification sending modal
-function openNotificationModal() {
-    const modal = document.createElement('div');
-    modal.className = 'notification-modal-overlay';
-    modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.7);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10002;
-    `;
-    
-    modal.innerHTML = `
-        <div class="notification-modal" style="
-            background: var(--admin-bg-card, #111);
-            border: 1px solid var(--admin-border, rgba(255, 215, 0, 0.2));
-            border-radius: 12px;
-            padding: 30px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-            color: #fff;
-        ">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h3 style="margin: 0; color: var(--admin-yellow, #FFD700);">
-                    <i class="fas fa-bell"></i> Send Notification
-                </h3>
-                <button class="close-notification-modal" style="
-                    background: none;
-                    border: none;
-                    color: #aaa;
-                    font-size: 24px;
-                    cursor: pointer;
-                    padding: 0;
-                    width: 30px;
-                    height: 30px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                ">&times;</button>
-            </div>
-            
-            <form id="notificationForm" style="display: flex; flex-direction: column; gap: 20px;">
-                <div>
-                    <label style="display: block; margin-bottom: 8px; color: #fff; font-weight: 600;">
-                        Recipient Type
-                    </label>
-                    <select id="notificationRecipientType" required style="
-                        width: 100%;
-                        padding: 12px;
-                        background: var(--admin-bg-medium, #1a1a1a);
-                        border: 1px solid var(--admin-border, rgba(255, 215, 0, 0.2));
-                        border-radius: 8px;
-                        color: #fff;
-                        font-size: 14px;
-                    ">
-                        <option value="all">All Customers</option>
-                        <option value="recent">Recent Customers (Last 30 days)</option>
-                        <option value="top">Top Customers</option>
-                        <option value="custom">Custom Email</option>
-                    </select>
-                </div>
-                
-                <div id="customEmailField" style="display: none;">
-                    <label style="display: block; margin-bottom: 8px; color: #fff; font-weight: 600;">
-                        Email Address
-                    </label>
-                    <input type="email" id="notificationEmail" style="
-                        width: 100%;
-                        padding: 12px;
-                        background: var(--admin-bg-medium, #1a1a1a);
-                        border: 1px solid var(--admin-border, rgba(255, 215, 0, 0.2));
-                        border-radius: 8px;
-                        color: #fff;
-                        font-size: 14px;
-                    " placeholder="customer@example.com">
-                </div>
-                
-                <div>
-                    <label style="display: block; margin-bottom: 8px; color: #fff; font-weight: 600;">
-                        Subject
-                    </label>
-                    <input type="text" id="notificationSubject" required style="
-                        width: 100%;
-                        padding: 12px;
-                        background: var(--admin-bg-medium, #1a1a1a);
-                        border: 1px solid var(--admin-border, rgba(255, 215, 0, 0.2));
-                        border-radius: 8px;
-                        color: #fff;
-                        font-size: 14px;
-                    " placeholder="Notification subject">
-                </div>
-                
-                <div>
-                    <label style="display: block; margin-bottom: 8px; color: #fff; font-weight: 600;">
-                        Message
-                    </label>
-                    <textarea id="notificationMessage" required rows="6" style="
-                        width: 100%;
-                        padding: 12px;
-                        background: var(--admin-bg-medium, #1a1a1a);
-                        border: 1px solid var(--admin-border, rgba(255, 215, 0, 0.2));
-                        border-radius: 8px;
-                        color: #fff;
-                        font-size: 14px;
-                        resize: vertical;
-                        font-family: inherit;
-                    " placeholder="Enter notification message..."></textarea>
-                </div>
-                
-                <div style="display: flex; gap: 10px;">
-                    <button type="submit" style="
-                        flex: 1;
-                        padding: 12px 24px;
-                        background: var(--admin-yellow, #FFD700);
-                        border: none;
-                        border-radius: 8px;
-                        color: #000;
-                        font-weight: 600;
-                        cursor: pointer;
-                        font-size: 14px;
-                    ">
-                        <i class="fas fa-paper-plane"></i> Send Notification
-                    </button>
-                    <button type="button" class="cancel-notification-btn" style="
-                        padding: 12px 24px;
-                        background: transparent;
-                        border: 1px solid #666;
-                        border-radius: 8px;
-                        color: #aaa;
-                        cursor: pointer;
-                        font-size: 14px;
-                    ">Cancel</button>
-                </div>
-            </form>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // Handle recipient type change
-    const recipientType = modal.querySelector('#notificationRecipientType');
-    const customEmailField = modal.querySelector('#customEmailField');
-    const emailInput = modal.querySelector('#notificationEmail');
-    
-    recipientType.addEventListener('change', (e) => {
-        if (e.target.value === 'custom') {
-            customEmailField.style.display = 'block';
-            emailInput.required = true;
-        } else {
-            customEmailField.style.display = 'none';
-            emailInput.required = false;
-        }
-    });
-    
-    // Handle form submission
-    const form = modal.querySelector('#notificationForm');
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const submitBtn = form.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
-        
-        try {
-            const notificationData = {
-                recipientType: recipientType.value,
-                email: recipientType.value === 'custom' ? emailInput.value : null,
-                subject: modal.querySelector('#notificationSubject').value,
-                message: modal.querySelector('#notificationMessage').value
-            };
-            
-            // TODO: Replace with actual API endpoint when available
-            // For now, simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // In production, uncomment this:
-            // const response = await fetch('/api/admin/notifications/send', {
-            //     method: 'POST',
-            //     headers: { 'Content-Type': 'application/json' },
-            //     body: JSON.stringify(notificationData)
-            // });
-            // if (!response.ok) throw new Error('Failed to send notification');
-            
-            showNotification('Notification sent successfully!', 'success');
-            document.body.removeChild(modal);
-        } catch (error) {
-            console.error('[Dashboard] Error sending notification:', error);
-            showNotification('Failed to send notification. Please try again.', 'error');
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalText;
-        }
-    });
-    
-    // Handle close
-    const closeBtn = modal.querySelector('.close-notification-modal');
-    const cancelBtn = modal.querySelector('.cancel-notification-btn');
-    
-    const closeModal = () => {
-        document.body.removeChild(modal);
-    };
-    
-    closeBtn.addEventListener('click', closeModal);
-    cancelBtn.addEventListener('click', closeModal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal();
-        }
     });
 }
 

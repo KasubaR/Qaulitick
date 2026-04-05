@@ -1,8 +1,5 @@
 // Admin Orders Management JavaScript
 
-// TODO: Implement authentication check
-// TODO: Implement tracking number integration
-
 let currentPage = 1;
 let totalPages = 1;
 let selectedOrders = [];
@@ -76,13 +73,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Initialize orders page
 function initializeOrdersPage() {
-    // Authentication check is handled in DOMContentLoaded
-    // TODO: Check admin authentication
-    // if (!isAuthenticated()) {
-    //     window.location.href = '/admin/login';
-    //     return;
-    // }
-    
     setupSidebar();
     setupTabs();
 }

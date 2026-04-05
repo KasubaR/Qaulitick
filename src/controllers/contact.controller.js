@@ -74,8 +74,7 @@ exports.submitContactForm = async (req, res) => {
  */
 exports.getContactSubmissions = async (req, res) => {
     try {
-        // TODO: Add authentication middleware
-        
+
         const { sanitizeObject } = require('../utils/validators');
         const sanitizedQuery = sanitizeObject(req.query);
 
@@ -121,8 +120,7 @@ exports.getContactSubmissions = async (req, res) => {
  */
 exports.renderContactSubmissionsPage = async (req, res) => {
     try {
-        // TODO: Add authentication middleware
-        
+
         // Get new submissions count for badge
         const newCount = await contactService.getNewSubmissionsCount();
 
@@ -147,8 +145,7 @@ exports.renderContactSubmissionsPage = async (req, res) => {
  */
 exports.updateSubmissionStatus = async (req, res) => {
     try {
-        // TODO: Add authentication middleware
-        
+
         const { id } = req.params;
         const { status } = req.body;
 
@@ -189,8 +186,7 @@ exports.updateSubmissionStatus = async (req, res) => {
  */
 exports.deleteSubmission = async (req, res) => {
     try {
-        // TODO: Add authentication middleware
-        
+
         const { id } = req.params;
 
         const submission = await contactService.deleteSubmission(id);

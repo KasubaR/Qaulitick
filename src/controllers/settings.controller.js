@@ -1,5 +1,6 @@
 const settingsService = require('../services/settings.service');
 const emailService = require('../services/email.service');
+const lencoService = require('../services/lenco.service');
 
 /**
  * Settings Controller
@@ -241,19 +242,29 @@ exports.testPayment = async (req, res) => {
             });
         }
         
-        // TODO: Implement actual payment gateway connection test
-        // For now, just validate that settings exist
-        // In the future, this could make an actual API call to Lenco to verify credentials
-        
+        // Make a real API call to Lenco to verify credentials — getBanks is a lightweight
+        // authenticated GET that fails immediately with 401 if the key is invalid.
+        try {
+            await lencoService.getBanks();
+        } catch (lencoErr) {
+            return res.status(502).json({
+                success: false,
+                message: 'Payment gateway credentials are invalid or Lenco is unreachable.',
+                data: {
+                    configured: true,
+                    environment: paymentSettings.lencoEnvironment || 'production',
+                    connected: false
+                }
+            });
+        }
+
         res.json({
             success: true,
-            message: 'Payment gateway settings are configured',
+            message: 'Payment gateway connected successfully',
             data: {
                 configured: true,
                 environment: paymentSettings.lencoEnvironment || 'production',
-                baseUrl: paymentSettings.lencoApiBaseUrl ? 'Configured' : 'Not configured',
-                publicKey: paymentSettings.lencoPublicKey ? 'Configured' : 'Not configured',
-                note: 'Connection test not yet implemented. Please verify settings manually.'
+                connected: true
             }
         });
     } catch (error) {

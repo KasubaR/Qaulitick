@@ -654,7 +654,7 @@ exports.dispatchOrder = async (req, res) => {
             history.push({
                 status: 'shipped',
                 notes: 'Order dispatched by admin',
-                updatedBy: 'admin',
+                updatedBy: req.admin?.email || 'admin',
                 updatedAt: new Date().toISOString()
             });
 
@@ -739,7 +739,7 @@ exports.addOrderNote = async (req, res) => {
             });
         }
         
-        await order.addNote(note, 'admin'); // TODO: Get from authenticated user
+        await order.addNote(note, req.admin?.email || 'admin');
         
         res.json({
             success: true,
