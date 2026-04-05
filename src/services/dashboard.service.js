@@ -60,24 +60,42 @@ class DashboardService {
             const currentRevenueValue = orderRevenue + laybyRevenue;
             const previousRevenueValue = 0;
 
-            // Unique customer emails only after payment is completed on at least one order
-            // (order.customer JSON and/or linked users row — UNION dedupes same address)
+            // Unique customer emails from:
+            //   - Standard orders with paymentStatus = 'completed'
+            //   - Layby orders with at least one installment paid (balanceRemaining < orderTotal)
+            // UNION dedupes the same email appearing in both branches.
             const [{ total }] = await sequelize.query(`
                 SELECT COUNT(*) AS total FROM (
-                    SELECT LOWER(JSON_UNQUOTE(JSON_EXTRACT(customer, '$.email'))) AS email
-                    FROM orders
-                    WHERE paymentStatus = 'completed'
-                      AND status NOT IN ('cancelled', 'payment_failed')
-                      AND JSON_UNQUOTE(JSON_EXTRACT(customer, '$.email')) IS NOT NULL
-                      AND TRIM(JSON_UNQUOTE(JSON_EXTRACT(customer, '$.email'))) != ''
+                    SELECT LOWER(JSON_UNQUOTE(JSON_EXTRACT(o.customer, '$.email'))) AS email
+                    FROM orders o
+                    WHERE o.status NOT IN ('cancelled', 'payment_failed')
+                      AND JSON_UNQUOTE(JSON_EXTRACT(o.customer, '$.email')) IS NOT NULL
+                      AND TRIM(JSON_UNQUOTE(JSON_EXTRACT(o.customer, '$.email'))) != ''
+                      AND (
+                          (o.checkoutMode != 'layby' AND o.paymentStatus = 'completed')
+                          OR
+                          (o.checkoutMode = 'layby' AND EXISTS (
+                              SELECT 1 FROM layby_plans lp
+                              WHERE lp.orderId = o.id
+                                AND lp.balanceRemaining < lp.orderTotal
+                          ))
+                      )
                     UNION
                     SELECT LOWER(u.email) AS email
                     FROM orders o
                     INNER JOIN users u ON u.id = o.userId
-                    WHERE o.paymentStatus = 'completed'
-                      AND o.status NOT IN ('cancelled', 'payment_failed')
+                    WHERE o.status NOT IN ('cancelled', 'payment_failed')
                       AND u.email IS NOT NULL
                       AND TRIM(u.email) != ''
+                      AND (
+                          (o.checkoutMode != 'layby' AND o.paymentStatus = 'completed')
+                          OR
+                          (o.checkoutMode = 'layby' AND EXISTS (
+                              SELECT 1 FROM layby_plans lp
+                              WHERE lp.orderId = o.id
+                                AND lp.balanceRemaining < lp.orderTotal
+                          ))
+                      )
                 ) AS unique_customers
             `, { type: QueryTypes.SELECT });
 
