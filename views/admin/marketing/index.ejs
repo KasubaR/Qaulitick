@@ -63,10 +63,36 @@
     <script src="/js/admin/sidebar.js"></script>
     <script src="/js/admin/orders-badge.js"></script>
     <script>
-        // TODO: Load stats from API
-        // document.getElementById('activeFlashSales').textContent = flashSalesCount;
-        // document.getElementById('featuredProductsCount').textContent = featuredCount;
-        // document.getElementById('activeOffers').textContent = offersCount;
+        (async () => {
+            try {
+                const [featuredRes, flashRes] = await Promise.all([
+                    fetch('/api/marketing/featured-products'),
+                    fetch('/api/admin/marketing/flash-sales')
+                ]);
+
+                if (featuredRes.ok) {
+                    const data = await featuredRes.json();
+                    const el = document.getElementById('featuredProductsCount');
+                    if (el) el.textContent = Array.isArray(data.products) ? data.products.length : 0;
+                }
+
+                if (flashRes.ok) {
+                    const data = await flashRes.json();
+                    const now = Date.now();
+                    const active = Array.isArray(data.flashSales)
+                        ? data.flashSales.filter(s =>
+                            s.status === 'active' &&
+                            new Date(s.startDate) <= now &&
+                            new Date(s.endDate) >= now
+                          ).length
+                        : 0;
+                    const el = document.getElementById('activeFlashSales');
+                    if (el) el.textContent = active;
+                }
+            } catch {
+                // Stats are non-critical — silently leave the defaults at 0
+            }
+        })();
     </script>
 
 </body>
