@@ -33,6 +33,7 @@ const MAX_PCT = Number.isNaN(maxParsed)
     : Math.min(100, Math.max(MIN_PCT, maxParsed));
 
 const PLAN_PERIOD_DAYS = Math.max(1, parseIntEnv('LAYBY_PLAN_PERIOD_DAYS', 90));
+const GRACE_PERIOD_DAYS = Math.max(0, parseIntEnv('LAYBY_GRACE_PERIOD_DAYS', 0));
 
 const USE_SCHEDULED_INSTALLMENTS = process.env.LAYBY_SCHEDULED_INSTALLMENTS === 'true';
 const INSTALLMENT_COUNT = Math.max(1, parseIntEnv('LAYBY_INSTALLMENT_COUNT', 4));
@@ -51,6 +52,7 @@ module.exports = {
     MIN_PCT,
     MAX_PCT,
     PLAN_PERIOD_DAYS,
+    GRACE_PERIOD_DAYS,
     USE_SCHEDULED_INSTALLMENTS,
     INSTALLMENT_COUNT,
     USE_FIXED_INSTALLMENT_INTERVAL,

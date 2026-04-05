@@ -198,22 +198,26 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
         const items = updatedOrder.items || [];
 
         if (paymentStatus === 'completed' && previousPaymentStatus !== 'completed') {
-            for (const item of items) {
-                const qty = parseInt(item.quantity) || 1;
-                const [rows] = await Product.update(
-                    { stock: sequelize.literal(`stock - ${qty}`) },
-                    {
-                        where: {
-                            id: parseInt(item.productId, 10),
-                            stock: { [Op.gte]: qty }
+            // Layby orders have stock reserved at order creation — do not decrement again here.
+            // Only standard orders defer stock decrement to payment completion.
+            if (updatedOrder.checkoutMode !== 'layby') {
+                for (const item of items) {
+                    const qty = parseInt(item.quantity) || 1;
+                    const [rows] = await Product.update(
+                        { stock: sequelize.literal(`stock - ${qty}`) },
+                        {
+                            where: {
+                                id: parseInt(item.productId, 10),
+                                stock: { [Op.gte]: qty }
+                            }
                         }
+                    );
+                    if (rows === 0) {
+                        console.warn(`[Order Service] Stock decrement skipped for product ${item.productId} on order ${orderNumber} — may have already been applied`);
                     }
-                );
-                if (rows === 0) {
-                    console.warn(`[Order Service] Stock decrement skipped for product ${item.productId} on order ${orderNumber} — may have already been applied`);
                 }
+                console.log(`[Order Service] Stock decremented for order ${orderNumber}`);
             }
-            console.log(`[Order Service] Stock decremented for order ${orderNumber}`);
 
         } else if ((paymentStatus === 'failed' || paymentStatus === 'cancelled') &&
                    previousPaymentStatus !== 'failed' && previousPaymentStatus !== 'cancelled') {

@@ -226,11 +226,31 @@ async function completePasswordReset(rawToken, newPassword) {
                 transaction: t
             });
         });
-        return { ok: true };
+        return { ok: true, userId: row.userId };
     } catch (e) {
         logger.error({ err: e, op: 'completePasswordReset' }, 'Transaction failed during password reset');
         return { ok: false, reason: 'failed' };
     }
+}
+
+/**
+ * @param {number} userId
+ */
+async function suspendUser(userId) {
+    const user = await User.findByPk(userId);
+    if (!user) return null;
+    await user.update({ isActive: false });
+    return user;
+}
+
+/**
+ * @param {number} userId
+ */
+async function activateUser(userId) {
+    const user = await User.findByPk(userId);
+    if (!user) return null;
+    await user.update({ isActive: true });
+    return user;
 }
 
 module.exports = {
@@ -247,5 +267,7 @@ module.exports = {
     createPasswordResetRequest,
     findValidPasswordResetToken,
     completePasswordReset,
-    PASSWORD_RESET_EXPIRY_MINUTES
+    PASSWORD_RESET_EXPIRY_MINUTES,
+    suspendUser,
+    activateUser
 };

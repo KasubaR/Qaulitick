@@ -9,6 +9,7 @@ const featuredProductService = require('./featuredProduct.service');
 const Order = require('../models/Order.model');
 const Product = require('../models/Product.model');
 const { LaybyPlan, LaybyPayment } = require('../models');
+const { GRACE_PERIOD_DAYS } = require('../config/layby');
 const { sequelize } = require('../config/mysql');
 const { Op } = require('sequelize');
 
@@ -118,7 +119,7 @@ async function flagOverdueLaybyInstallments() {
             const periodDays = sched && sched.planPeriodDays ? sched.planPeriodDays : null;
             if (!periodDays) continue;
 
-            const expiresAt = new Date(plan.createdAt.getTime() + periodDays * 86400000);
+            const expiresAt = new Date(plan.createdAt.getTime() + (periodDays + GRACE_PERIOD_DAYS) * 86400000);
             if (now < expiresAt) continue;
             if (Number(plan.balanceRemaining) <= 0) continue;
 
@@ -127,11 +128,42 @@ async function flagOverdueLaybyInstallments() {
 
             const order = await Order.findByPk(plan.orderId);
             if (order) {
+                // Restore main stock and color variant stock reserved at layby creation
+                const items = order.items || [];
+                for (const item of items) {
+                    const qty = parseInt(item.quantity) || 1;
+                    const productId = parseInt(item.productId, 10);
+                    if (!productId) continue;
+
+                    try {
+                        // Restore main stock (decremented at layby order creation)
+                        await Product.update(
+                            { stock: sequelize.literal(`stock + ${qty}`) },
+                            { where: { id: productId } }
+                        );
+
+                        // Restore color variant stock if applicable (decremented at order creation)
+                        if (item.selectedColor) {
+                            const product = await Product.findByPk(productId);
+                            if (product) {
+                                const updatedColors = (product.colors || []).map(c =>
+                                    c.name === item.selectedColor
+                                        ? { ...c, stock: (c.stock || 0) + qty }
+                                        : c
+                                );
+                                await product.update({ colors: updatedColors });
+                            }
+                        }
+                    } catch (stockErr) {
+                        console.error(`[Scheduler] Stock restore failed for product ${productId} on expired layby plan ${plan.id}:`, stockErr);
+                    }
+                }
+
                 order.history = order.history || [];
                 order.history.push({
                     status: order.status,
                     paymentStatus: order.paymentStatus,
-                    notes: `Layby plan cancelled — plan period of ${periodDays} days exceeded with balance remaining`,
+                    notes: `Layby plan cancelled — plan period of ${periodDays} days${GRACE_PERIOD_DAYS > 0 ? ` + ${GRACE_PERIOD_DAYS}-day grace period` : ''} exceeded with balance remaining`,
                     updatedBy: 'system',
                     updatedAt: new Date().toISOString(),
                     source: 'layby_expiry_cron'

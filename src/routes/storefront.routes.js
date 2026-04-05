@@ -367,6 +367,7 @@ router.post('/account/address', requireCustomerAuth, csrfTokenValidator(), custo
 router.get('/account/orders', requireCustomerAuth, customerAccountController.renderOrders);
 router.get('/account/layby', requireCustomerAuth, customerAccountController.renderLayby);
 router.post('/account/layby/:id/pay', requireCustomerAuth, csrfTokenValidator(), customerAccountController.startLaybyPayment);
+router.post('/account/logout-all-devices', requireCustomerAuth, csrfTokenValidator(), customerAccountController.logoutAllDevices);
 
 // ============================================
 // Product & Marketing page routes

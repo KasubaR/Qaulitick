@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const userService = require('../services/user.service');
 const emailService = require('../services/email.service');
+const { deleteAllSessionsForUser } = require('../services/session.service');
 const {
     sanitizeString,
     sanitizeObject,
@@ -428,6 +429,11 @@ exports.handleResetPassword = async (req, res) => {
                 error: 'This reset link is invalid or has expired. Please request a new one.',
                 csrfToken: res.locals.csrfToken || ''
             });
+        }
+
+        // Invalidate all active sessions for this user across all devices
+        if (result.userId) {
+            await deleteAllSessionsForUser(result.userId);
         }
 
         req.session.destroy((err) => {

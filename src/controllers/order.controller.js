@@ -265,6 +265,30 @@ exports.createOrder = async (req, res) => {
                     depositPercentInput: rawLaybyDepositPercent,
                     transaction: t
                 });
+
+                // Reserve main stock immediately for layby orders.
+                // Standard orders defer this to payment completion (updateOrderStatusFromPayment),
+                // but layby plans can stay open for 90 days — reserving now prevents overselling.
+                for (const item of validatedItems) {
+                    const qty = parseInt(item.quantity) || 1;
+                    const [reservedRows] = await Product.update(
+                        { stock: sequelize.literal(`stock - ${qty}`) },
+                        {
+                            where: {
+                                id: parseInt(item.productId, 10),
+                                stock: { [Op.gte]: qty }
+                            },
+                            transaction: t
+                        }
+                    );
+                    if (reservedRows === 0) {
+                        const err = new Error(
+                            `Stock reservation failed for "${item.name}" — insufficient stock`
+                        );
+                        err.statusCode = 409;
+                        throw err;
+                    }
+                }
             }
 
             return created;

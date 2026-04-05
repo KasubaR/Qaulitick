@@ -4,9 +4,53 @@
  * Customers are derived from the orders table (grouped by customer.email JSON field).
  */
 
-const { Op, literal } = require('sequelize');
+const { Op } = require('sequelize');
 const Order = require('../models/Order.model');
 const Payment = require('../models/Payment.model');
+const LaybyPlan = require('../models/LaybyPlan.model');
+
+// Attributes needed for customer aggregation
+const ORDER_ATTRS = ['id', 'customer', 'totals', 'createdAt', 'checkoutMode', 'paymentStatus', 'status'];
+
+/**
+ * For a set of orders, fetch a map of orderId → amount actually paid.
+ * Standard orders: totals.total if paymentStatus='completed', else 0.
+ * Layby orders: orderTotal - balanceRemaining (deposits + installments received so far).
+ */
+async function buildAmountPaidMap(orders) {
+    const map = {};
+
+    const laybyOrderIds = orders
+        .filter(o => o.checkoutMode === 'layby')
+        .map(o => o.id)
+        .filter(Boolean);
+
+    if (laybyOrderIds.length > 0) {
+        const plans = await LaybyPlan.findAll({
+            where: { orderId: { [Op.in]: laybyOrderIds } },
+            attributes: ['orderId', 'orderTotal', 'balanceRemaining'],
+            raw: true
+        });
+        for (const plan of plans) {
+            map[plan.orderId] = Math.max(
+                0,
+                Number(plan.orderTotal) - Number(plan.balanceRemaining)
+            );
+        }
+    }
+
+    for (const o of orders) {
+        if (o.checkoutMode === 'layby') {
+            // Default to 0 if no plan row found (defensive)
+            if (map[o.id] === undefined) map[o.id] = 0;
+        } else {
+            const totals = typeof o.totals === 'string' ? JSON.parse(o.totals) : (o.totals || {});
+            map[o.id] = o.paymentStatus === 'completed' ? (Number(totals.total) || 0) : 0;
+        }
+    }
+
+    return map;
+}
 
 class CustomerService {
 
@@ -15,21 +59,18 @@ class CustomerService {
             const { search, customerType, startDate, endDate, sortBy = 'newest' } = filters;
             const { page = 1, limit = 50 } = pagination;
 
-            // Fetch all non-cancelled orders and aggregate in JS
-            // (customer + totals are JSON columns — SQL GROUP BY on JSON is cumbersome)
             const orders = await Order.findAll({
                 where: { status: { [Op.ne]: 'cancelled' } },
-                attributes: ['customer', 'totals', 'createdAt'],
+                attributes: ORDER_ATTRS,
                 raw: true
             });
 
-            // Aggregate by customer email
-            const customerMap = this._aggregateOrders(orders);
+            const amountPaidMap = await buildAmountPaidMap(orders);
+            const customerMap = this._aggregateOrders(orders, amountPaidMap);
             let customers = Object.values(customerMap);
 
             const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-            // Assign status
             customers = customers.map(c => ({
                 ...c,
                 status: c.totalSpent >= 10000 ? 'vip'
@@ -37,7 +78,6 @@ class CustomerService {
                       : 'active'
             }));
 
-            // Search filter
             if (search) {
                 const term = search.trim().toLowerCase();
                 customers = customers.filter(c =>
@@ -47,16 +87,13 @@ class CustomerService {
                 );
             }
 
-            // Customer type filter
             if (customerType === 'vip')    customers = customers.filter(c => c.status === 'vip');
             if (customerType === 'new')    customers = customers.filter(c => c.status === 'new');
             if (customerType === 'active') customers = customers.filter(c => c.status === 'active');
 
-            // Date range filter (by firstOrderDate)
             if (startDate) customers = customers.filter(c => c.firstOrderDate >= new Date(startDate));
             if (endDate)   customers = customers.filter(c => c.firstOrderDate <= new Date(endDate));
 
-            // Sort
             customers = this._sort(customers, sortBy);
 
             const totalCount = customers.length;
@@ -85,25 +122,28 @@ class CustomerService {
         try {
             const orders = await Order.findAll({
                 where: { status: { [Op.ne]: 'cancelled' } },
-                attributes: ['customer', 'totals', 'createdAt'],
+                attributes: ORDER_ATTRS,
                 raw: true
             });
 
-            const customerMap = this._aggregateOrders(orders);
+            const amountPaidMap = await buildAmountPaidMap(orders);
+            const customerMap = this._aggregateOrders(orders, amountPaidMap);
             const customers = Object.values(customerMap);
 
             const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
             let totalRevenue = 0;
             let newCustomers = 0;
+            let activeCustomers = 0;
 
             for (const c of customers) {
                 totalRevenue += c.totalSpent;
                 if (c.firstOrderDate >= thirtyDaysAgo) newCustomers++;
+                if (c.totalSpent > 0) activeCustomers++;
             }
 
             return {
                 totalCustomers: customers.length,
-                activeCustomers: customers.length,
+                activeCustomers,
                 newCustomers,
                 totalRevenue
             };
@@ -119,15 +159,15 @@ class CustomerService {
 
             const allOrders = await Order.findAll({
                 where: { status: { [Op.ne]: 'cancelled' } },
-                attributes: ['customer', 'totals', 'createdAt'],
+                attributes: ORDER_ATTRS,
                 raw: true
             });
 
-            const customerMap = this._aggregateOrders(allOrders);
+            const amountPaidMap = await buildAmountPaidMap(allOrders);
+            const customerMap = this._aggregateOrders(allOrders, amountPaidMap);
             const customerData = customerMap[normalizedEmail];
             if (!customerData) return null;
 
-            // Get full order records for this customer
             const orders = await Order.findAll({
                 order: [['createdAt', 'DESC']],
                 raw: true
@@ -146,12 +186,13 @@ class CustomerService {
                         createdAt:   o.createdAt,
                         updatedAt:   o.updatedAt,
                         total:       totals.total || 0,
+                        amountPaid:  amountPaidMap[o.id] ?? (totals.total || 0),
                         status:      o.status,
+                        checkoutMode: o.checkoutMode,
                         itemCount:   items.length
                     };
                 });
 
-            // Get payments for this customer
             const payments = await Payment.findAll({
                 order: [['createdAt', 'DESC']],
                 raw: true
@@ -186,7 +227,6 @@ class CustomerService {
     async getRegisteredUsers(filters = {}, pagination = {}) {
         try {
             const User = require('../models/User.model');
-            const { Op } = require('sequelize');
             const { search } = filters;
             const { page = 1, limit = 50 } = pagination;
 
@@ -233,11 +273,12 @@ class CustomerService {
 
             const orders = await Order.findAll({
                 where: { status: { [Op.ne]: 'cancelled' } },
-                attributes: ['customer', 'totals', 'createdAt'],
+                attributes: ORDER_ATTRS,
                 raw: true
             });
 
-            const customerMap = this._aggregateOrders(orders);
+            const amountPaidMap = await buildAmountPaidMap(orders);
+            const customerMap = this._aggregateOrders(orders, amountPaidMap);
             const term = query.trim().toLowerCase();
 
             return Object.values(customerMap)
@@ -262,11 +303,14 @@ class CustomerService {
 
     // ── private helpers ───────────────────────────────────────────────────────
 
-    _aggregateOrders(orders) {
+    /**
+     * @param {object[]} orders - Raw order rows (must include id, checkoutMode, paymentStatus)
+     * @param {Object.<number, number>} amountPaidMap - orderId → amount actually received
+     */
+    _aggregateOrders(orders, amountPaidMap = {}) {
         const map = {};
         for (const o of orders) {
             const customer = typeof o.customer === 'string' ? JSON.parse(o.customer) : (o.customer || {});
-            const totals   = typeof o.totals   === 'string' ? JSON.parse(o.totals)   : (o.totals   || {});
             const email    = (customer.email || '').toLowerCase();
             if (!email) continue;
 
@@ -285,10 +329,12 @@ class CustomerService {
 
             const entry = map[email];
             entry.totalOrders++;
-            entry.totalSpent += totals.total || 0;
+            entry.totalSpent += amountPaidMap[o.id] ?? 0;
             if (orderDate < entry.firstOrderDate) entry.firstOrderDate = orderDate;
             if (orderDate > entry.lastOrderDate)  entry.lastOrderDate  = orderDate;
-            entry.averageOrderValue = entry.totalSpent / entry.totalOrders;
+            entry.averageOrderValue = entry.totalOrders > 0
+                ? entry.totalSpent / entry.totalOrders
+                : 0;
         }
         return map;
     }

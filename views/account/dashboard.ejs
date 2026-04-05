@@ -38,6 +38,12 @@
             <a class="account-btn-primary" href="/account/profile">Edit profile</a>
             <a class="account-btn-secondary" href="/account/orders">View orders</a>
         </div>
+        <div class="account-actions" style="margin-top:1rem;">
+            <form method="post" action="/account/logout-all-devices">
+                <input type="hidden" name="csrfToken" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                <button type="submit" class="account-btn-secondary">Sign out all devices</button>
+            </form>
+        </div>
     </div>
 </div>
 

@@ -37,7 +37,7 @@ module.exports = session({
         httpOnly: true,
         secure: sessionCookieSecure(),
         sameSite: 'strict',
-        maxAge: parseInt(process.env.SESSION_MAX_AGE || '28800000', 10) // 8 hours
+        maxAge: parseInt(process.env.SESSION_MAX_AGE || '14400000', 10) // 4 hours
     },
     rolling: true
 });

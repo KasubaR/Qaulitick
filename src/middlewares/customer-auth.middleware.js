@@ -25,7 +25,7 @@ async function optionalCustomer(req, res, next) {
         if (!id) return next();
 
         const user = await User.findByPk(id);
-        if (!user) {
+        if (!user || user.isActive === false) {
             req.session.userId = null;
             return next();
         }
@@ -55,7 +55,7 @@ async function getAuthenticatedCustomer(req) {
     const id = req.session?.userId;
     if (!id) return null;
     const user = await User.findByPk(id);
-    if (!user) {
+    if (!user || user.isActive === false) {
         req.session.userId = null;
         return null;
     }

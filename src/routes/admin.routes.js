@@ -291,6 +291,18 @@ router.get('/api/admin/registered-users',
     authenticateAdmin,
     customerController.getRegisteredUsers
 );
+router.post('/api/admin/users/:id/suspend',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 30 }),
+    requireAdminAuth,
+    csrfTokenValidator(),
+    customerController.suspendUser
+);
+router.post('/api/admin/users/:id/activate',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 30 }),
+    requireAdminAuth,
+    csrfTokenValidator(),
+    customerController.activateUser
+);
 
 // ============================================
 // Admin Inventory API

@@ -8,6 +8,8 @@
  */
 
 const customerService = require('../services/customer.service');
+const userService = require('../services/user.service');
+const { deleteAllSessionsForUser } = require('../services/session.service');
 
 /**
  * Get paginated customers list with filters
@@ -150,6 +152,41 @@ exports.getRegisteredUsers = async (req, res) => {
     } catch (error) {
         console.error('[Customer Controller] Error getting registered users:', error);
         res.status(500).json({ success: false, message: 'Failed to fetch registered users' });
+    }
+};
+
+exports.suspendUser = async (req, res) => {
+    try {
+        const userId = parseInt(req.params.id, 10);
+        if (Number.isNaN(userId)) {
+            return res.status(400).json({ success: false, message: 'Invalid user ID' });
+        }
+        const user = await userService.suspendUser(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+        await deleteAllSessionsForUser(userId);
+        return res.json({ success: true, message: 'User suspended and sessions invalidated' });
+    } catch (error) {
+        console.error('[Customer Controller] suspendUser error:', error);
+        return res.status(500).json({ success: false, message: 'Failed to suspend user' });
+    }
+};
+
+exports.activateUser = async (req, res) => {
+    try {
+        const userId = parseInt(req.params.id, 10);
+        if (Number.isNaN(userId)) {
+            return res.status(400).json({ success: false, message: 'Invalid user ID' });
+        }
+        const user = await userService.activateUser(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+        return res.json({ success: true, message: 'User activated' });
+    } catch (error) {
+        console.error('[Customer Controller] activateUser error:', error);
+        return res.status(500).json({ success: false, message: 'Failed to activate user' });
     }
 };
 

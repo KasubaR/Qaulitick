@@ -2,6 +2,8 @@ const { Order, LaybyPlan, LaybyPayment, Payment } = require('../models');
 const userService = require('../services/user.service');
 const productService = require('../services/product.service');
 const { sanitizeObject, validatePhone } = require('../utils/validators');
+const { deleteAllSessionsForUser } = require('../services/session.service');
+const { cookieName: sessionCookieName } = require('../config/session.constants');
 const logger = require('../utils/logger').child({ module: 'CustomerAccountController' });
 
 exports.renderDashboard = (req, res) => {
@@ -12,7 +14,8 @@ exports.renderDashboard = (req, res) => {
         accountSection: 'dashboard',
         customer: u,
         emailVerified: !!u.emailVerifiedAt,
-        message: typeof req.query.message === 'string' ? req.query.message : null
+        message: typeof req.query.message === 'string' ? req.query.message : null,
+        csrfToken: res.locals.csrfToken || ''
     });
 };
 
@@ -250,6 +253,26 @@ exports.renderLayby = async (req, res) => {
             payCustomerInfo: { name: '', email: '', phone: '' },
             error: 'Could not load layby plans.'
         });
+    }
+};
+
+exports.logoutAllDevices = async (req, res) => {
+    try {
+        const userId = req.session.userId;
+        // Delete every session for this user (including the current one)
+        await deleteAllSessionsForUser(userId);
+        res.clearCookie(sessionCookieName, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            path: '/'
+        });
+        return res.redirect('/login?message=' + encodeURIComponent(
+            'You have been signed out of all devices.'
+        ));
+    } catch (err) {
+        logger.error({ err }, 'logoutAllDevices failed');
+        return res.redirect('/account?message=' + encodeURIComponent('Could not sign out all devices. Try again.'));
     }
 };
 
