@@ -159,6 +159,21 @@ class FilterManager {
         // Filter products - reload from API with filters
         // Note: Filtering is now done server-side via API
         loadProducts();
+
+        // Scroll to product grid so filtered results are visible
+        const productSection = document.getElementById('productGrid') || document.querySelector('.product-grid-section');
+        if (productSection) {
+            productSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Close mobile filter sidebar if open
+        const sidebar = document.getElementById('filterSidebar');
+        if (sidebar && sidebar.classList.contains('active')) {
+            sidebar.classList.remove('active');
+        }
+
         return;
         
         // Legacy client-side filtering (kept for reference, but not used)
