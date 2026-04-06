@@ -1,8 +1,7 @@
 // Admin Products - Arrange / drag-and-drop display order
 
 (function (window) {
-    const DRAG_OVER_CLASS = 'arrange-row--dragover';
-    let allProducts = [];   // full flat list loaded for arrange mode
+    let allProducts = [];
     let dragSrc = null;
 
     function open() {
@@ -14,7 +13,6 @@
         if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading…'; }
 
         try {
-            // Load all products (no pagination) sorted by current sortOrder
             const result = await AdminProductsAPI.loadProducts({ sortBy: 'sort_order', status: 'all' }, 1, 9999);
             allProducts = result.products || [];
             renderList(allProducts);
@@ -42,19 +40,19 @@
                 'padding:10px 14px',
                 'cursor:grab',
                 'user-select:none',
-                'border-bottom:1px solid var(--admin-border,#2a2a2a)',
-                'background:var(--admin-card,#1a1a1a)',
+                'border-bottom:1px solid var(--border)',
+                'background:var(--surface)',
                 'transition:background 0.15s'
             ].join(';');
 
             const thumb = (Array.isArray(p.images) && p.images[0]) ? p.images[0] : '/images/placeholder.png';
 
             row.innerHTML =
-                '<span style="color:#555;font-size:18px;flex-shrink:0;"><i class="fas fa-grip-vertical"></i></span>' +
+                '<span style="color:var(--text-faint);font-size:18px;flex-shrink:0;"><i class="fas fa-grip-vertical"></i></span>' +
                 '<img src="' + thumb + '" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.src=\'/images/placeholder.png\'">' +
-                '<span style="flex:1;font-size:14px;color:var(--admin-text,#e0e0e0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(p.model || p.name || 'Product') + '</span>' +
-                '<span style="font-size:12px;color:#666;">' + escapeHtml(p.brand || '') + '</span>' +
-                '<span style="font-size:11px;color:#444;min-width:28px;text-align:right;">#' + (index + 1) + '</span>';
+                '<span style="flex:1;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(p.model || p.name || 'Product') + '</span>' +
+                '<span style="font-size:12px;color:var(--text-muted);">' + escapeHtml(p.brand || '') + '</span>' +
+                '<span style="font-size:11px;color:var(--text-faint);min-width:28px;text-align:right;">#' + (index + 1) + '</span>';
 
             row.addEventListener('dragstart', onDragStart);
             row.addEventListener('dragover', onDragOver);
@@ -84,12 +82,12 @@
     function onDragOver(e) {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        this.style.background = 'var(--admin-hover,#252525)';
+        this.style.background = 'var(--surface-2)';
         return false;
     }
 
     function onDragLeave() {
-        this.style.background = '';
+        this.style.background = 'var(--surface)';
     }
 
     function onDrop(e) {
@@ -106,14 +104,14 @@
             }
             renumberRows();
         }
-        this.style.background = '';
+        this.style.background = 'var(--surface)';
         return false;
     }
 
     function onDragEnd() {
         document.querySelectorAll('#arrangeList .arrange-row').forEach(r => {
             r.style.opacity = '';
-            r.style.background = '';
+            r.style.background = 'var(--surface)';
         });
     }
 
@@ -129,11 +127,8 @@
         try {
             await AdminProductsAPI.reorderProducts(orderedIds);
             close();
-            // Reload the table to reflect the new order
             if (typeof loadProducts === 'function') {
                 loadProducts({}, 1, false);
-            } else if (typeof window.reloadProducts === 'function') {
-                window.reloadProducts();
             }
             showToast('Product order saved successfully', 'success');
         } catch (err) {
@@ -161,7 +156,6 @@
             window.showAdminToast(message, type);
             return;
         }
-        // Fallback simple toast
         const t = document.createElement('div');
         t.textContent = message;
         t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#2ecc71;color:#fff;padding:12px 20px;border-radius:6px;font-size:14px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.3)';
@@ -183,7 +177,6 @@
         const saveBtn = document.getElementById('saveArrangeBtn');
         if (saveBtn) saveBtn.addEventListener('click', save);
 
-        // Close when clicking backdrop
         const modal = document.getElementById('arrangeModal');
         if (modal) {
             modal.addEventListener('click', function (e) {
