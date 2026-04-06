@@ -54,7 +54,7 @@ router.get('/admin/analytics', requireAdminAuth, analyticsController.renderAnaly
 
 router.get('/admin/products', requireAdminAuth, async (req, res) => {
     try {
-        const products = await productService.getAllProducts({}, { sort: [['createdAt', 'DESC']] });
+        const products = await productService.getAllProducts({}, { sort: [['sortOrder', 'ASC'], ['createdAt', 'DESC']] });
         res.render('admin/products', {
             title: 'Product Management | Admin Panel',
             page: 'admin',
@@ -152,6 +152,13 @@ router.delete('/api/products/bulk',
     authenticateAdmin,
     csrfTokenValidator(),
     productController.bulkDeleteProducts
+);
+
+router.put('/api/products/reorder',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }),
+    authenticateAdmin,
+    csrfTokenValidator(),
+    productController.reorderProducts
 );
 
 // :id must be numeric only — otherwise "search", "export", etc. match :id and break those routes

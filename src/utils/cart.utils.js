@@ -110,9 +110,9 @@ async function parseAndValidateCartCookie(req) {
                 }
                 
                 // CRITICAL: Recalculate price from database (ignore client-provided price)
-                const originalPrice = productObj.price || 0;
-                const discount = productObj.discount || 0;
                 const authoritativePrice = getSellingUnitPrice(productObj);
+                const originalPrice = Number(productObj.originalPrice) > authoritativePrice ? Number(productObj.originalPrice) : authoritativePrice;
+                const discount = productObj.discount || 0;
                 
                 // Warn if client price doesn't match server price
                 const clientPrice = parseFloat(item.price) || 0;

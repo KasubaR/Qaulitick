@@ -337,11 +337,11 @@ const normalizedColors = (product.colors || []).map(function (c) {
                                 <span>(<%= related.rating %>)</span>
                             </div>
                             <div class="related-price">
-                                <% if (related.discount > 0) { %>
-                                    <span class="related-original">K<%= related.price.toLocaleString() %></span>
-                                    <span class="related-current">K<%= (related.price * (1 - related.discount / 100)).toLocaleString() %></span>
+                                <% if (related.discount > 0 && related.originalPrice > related.finalPrice) { %>
+                                    <span class="related-original">K<%= related.originalPrice.toLocaleString() %></span>
+                                    <span class="related-current">K<%= related.finalPrice.toLocaleString() %></span>
                                 <% } else { %>
-                                    <span class="related-current">K<%= related.price.toLocaleString() %></span>
+                                    <span class="related-current">K<%= related.finalPrice.toLocaleString() %></span>
                                 <% } %>
                             </div>
                         </div>

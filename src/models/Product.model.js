@@ -63,6 +63,11 @@ const Product = sequelize.define('Product', {
     status: {
         type: DataTypes.ENUM('active', 'inactive', 'discontinued', 'out_of_stock'),
         defaultValue: 'active'
+    },
+    sortOrder: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0
     }
 }, {
     tableName: 'products',

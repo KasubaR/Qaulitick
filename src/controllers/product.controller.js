@@ -334,14 +334,15 @@ exports.renderProductDetails = async (req, res) => {
             .slice(0, 4)
             .map(p => {
                 const pObj = normalizeProduct(toPlain(p));
-                const pOriginalPrice = pObj.price || 0;
+                const pFinalPrice = getSellingUnitPrice(pObj);
+                const pOriginalPrice = Number(pObj.originalPrice) > pFinalPrice ? Number(pObj.originalPrice) : pFinalPrice;
                 const pDiscount = pObj.discount || 0;
                 const pAvailable = Math.max(0, Number(pObj.stock) || 0);
                 return {
                     ...pObj,
                     originalPrice: pOriginalPrice,
-                    finalPrice: getSellingUnitPrice(pObj),
-                    savings: calculateSavings(pOriginalPrice, pDiscount),
+                    finalPrice: pFinalPrice,
+                    savings: pOriginalPrice > pFinalPrice ? Math.round(pOriginalPrice - pFinalPrice) : 0,
                     availableStock: pAvailable,
                     stockStatus: getStockStatus(pAvailable, pObj.lowStockThreshold)
                 };
@@ -1331,6 +1332,26 @@ exports.deleteProductImage = async (req, res) => {
             success: false,
             message: 'Failed to delete image'
         });
+    }
+};
+
+/**
+ * Reorder products by updating sortOrder for each
+ * PUT /api/products/reorder
+ * Body: { orderedIds: [id, id, ...] }
+ */
+exports.reorderProducts = async (req, res) => {
+    try {
+        const { orderedIds } = req.body;
+        if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'orderedIds array is required' });
+        }
+        await productService.reorderProducts(orderedIds);
+        clearCache();
+        res.json({ success: true, message: 'Product order saved' });
+    } catch (error) {
+        console.error('[Product Controller] Error reordering products:', error);
+        res.status(500).json({ success: false, message: 'Failed to save product order' });
     }
 };
 

@@ -163,9 +163,9 @@ exports.createOrder = async (req, res) => {
                 }
 
                 // Server-side price — ignore whatever the client sent.
-                const originalPrice = productObj.price || 0;
-                const discount = productObj.discount || 0;
                 const serverPrice = getSellingUnitPrice(productObj);
+                const originalPrice = Number(productObj.originalPrice) > serverPrice ? Number(productObj.originalPrice) : serverPrice;
+                const discount = productObj.discount || 0;
 
                 const clientPrice = parseFloat(item.price) || 0;
                 if (Math.abs(clientPrice - serverPrice) > 0.01) {

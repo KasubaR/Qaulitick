@@ -39,6 +39,9 @@
                 </div>
                 
                 <div class="header-right">
+                    <button class="btn btn-secondary" id="arrangeProductsBtn" title="Drag to reorder products">
+                        <i class="fas fa-sort"></i> Arrange
+                    </button>
                     <%- include('../partials/admin-button', { variant: 'primary', id: 'addProductBtn', icon: 'fa-plus', label: 'Add Product' }) %>
                 </div>
             </header>
@@ -87,7 +90,7 @@
                         <div class="filter-group">
                             <label>Sort By</label>
                             <select id="sortBy" class="filter-select">
-                                <option value="latest">Latest</option>
+                                <option value="latest">Custom Order</option>
                                 <option value="price-asc">Price: Low to High</option>
                                 <option value="price-desc">Price: High to Low</option>
                                 <option value="stock-asc">Stock: Low to High</option>
@@ -431,6 +434,26 @@
         });
     })();
     </script>
+    <!-- Arrange Products Modal -->
+    <div class="modal" id="arrangeModal" style="display:none;">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2><i class="fas fa-sort"></i> Arrange Products</h2>
+                <button class="modal-close" id="closeArrangeModal">&times;</button>
+            </div>
+            <div style="padding:16px 24px 8px;color:#aaa;font-size:13px;">
+                Drag rows to set the display order. Customers will see products in this order on the storefront.
+            </div>
+            <div style="padding:0 24px 24px;">
+                <div id="arrangeList" style="border:1px solid var(--admin-border,#2a2a2a);border-radius:6px;overflow:hidden;max-height:60vh;overflow-y:auto;"></div>
+                <div style="display:flex;gap:12px;margin-top:16px;justify-content:flex-end;">
+                    <button class="btn btn-secondary" id="cancelArrangeBtn">Cancel</button>
+                    <button class="btn btn-primary" id="saveArrangeBtn"><i class="fas fa-save"></i> Save Order</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="/js/admin/auth-utils.js"></script>
     <script src="/js/admin/admin-products.api.js"></script>
     <script src="/js/admin/admin-products.images.js"></script>
@@ -438,6 +461,7 @@
     <script src="/js/admin/sidebar.js"></script>
     <script src="/js/admin/orders-badge.js"></script>
     <script src="/js/admin/products.js"></script>
+    <script src="/js/admin/admin-products.arrange.js"></script>
 </body>
 </html>
 

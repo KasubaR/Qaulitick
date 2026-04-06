@@ -61,9 +61,9 @@ exports.addToCart = async (req, res) => {
         }
 
         // Selling price is stored on the product row; discount is badge-only (not applied again)
-        const originalPrice = productObj.price || 0;
-        const discount = productObj.discount || 0;
         const finalPrice = getSellingUnitPrice(productObj);
+        const originalPrice = Number(productObj.originalPrice) > finalPrice ? Number(productObj.originalPrice) : finalPrice;
+        const discount = productObj.discount || 0;
 
         // Return cart item data (client will store in localStorage)
         res.json({
@@ -231,9 +231,9 @@ exports.validateCart = async (req, res) => {
                 }
 
                 // CRITICAL: Recalculate price from database (ignore client-provided price)
-                const originalPrice = productObj.price || 0;
-                const discount = productObj.discount || 0;
                 const authoritativePrice = getSellingUnitPrice(productObj);
+                const originalPrice = Number(productObj.originalPrice) > authoritativePrice ? Number(productObj.originalPrice) : authoritativePrice;
+                const discount = productObj.discount || 0;
 
                 // Warn if client price doesn't match server price
                 const clientPrice = parseFloat(item.price) || 0;

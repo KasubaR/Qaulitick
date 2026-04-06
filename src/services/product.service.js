@@ -18,7 +18,7 @@ class ProductService {
 
     async getAllProducts(filters = {}, options = {}) {
         try {
-            const { sort = [['createdAt', 'DESC']], limit, skip = 0 } = options;
+            const { sort = [['sortOrder', 'ASC'], ['createdAt', 'DESC']], limit, skip = 0 } = options;
             const where = this._buildWhere(filters);
             const findOptions = { where, order: sort, offset: skip };
             if (limit) findOptions.limit = limit;
@@ -224,7 +224,7 @@ class ProductService {
 
     async getPaginatedProducts(options = {}) {
         try {
-            const { page = 1, limit = 12, filters = {}, sort = [['createdAt', 'DESC']] } = options;
+            const { page = 1, limit = 12, filters = {}, sort = [['sortOrder', 'ASC'], ['createdAt', 'DESC']] } = options;
             const offset = (page - 1) * limit;
             const where = this._buildWhere(filters);
 
@@ -398,7 +398,8 @@ class ProductService {
         }
 
         if (filters.brand) {
-            const brands = filters.brand.split(',').map(b => b.trim()).filter(Boolean);
+            const brandRaw = Array.isArray(filters.brand) ? filters.brand.join(',') : String(filters.brand);
+            const brands = brandRaw.split(',').map(b => b.trim()).filter(Boolean);
             if (brands.length === 1) {
                 where.brand = { [Op.like]: `%${brands[0]}%` };
             } else if (brands.length > 1) {
@@ -444,13 +445,27 @@ class ProductService {
 
     _buildOrder(sortBy) {
         switch (sortBy) {
-            case 'price_asc':  return [['price', 'ASC']];
-            case 'price_desc': return [['price', 'DESC']];
-            case 'rating':     return [['rating', 'DESC']];
-            case 'name':       return [['model', 'ASC']];
+            case 'price_asc':   return [['price', 'ASC']];
+            case 'price_desc':  return [['price', 'DESC']];
+            case 'rating':      return [['rating', 'DESC']];
+            case 'name':        return [['model', 'ASC']];
+            case 'sort_order':  return [['sortOrder', 'ASC'], ['createdAt', 'DESC']];
             case 'newest':
-            default:           return [['createdAt', 'DESC']];
+            default:            return [['sortOrder', 'ASC'], ['createdAt', 'DESC']];
         }
+    }
+
+    async reorderProducts(orderedIds) {
+        const { sequelize } = require('../config/mysql');
+        const ids = orderedIds.map(id => parseInt(id, 10)).filter(n => !isNaN(n));
+        if (ids.length === 0) return;
+        await sequelize.transaction(async (t) => {
+            await Promise.all(
+                ids.map((id, index) =>
+                    Product.update({ sortOrder: index }, { where: { id }, transaction: t })
+                )
+            );
+        });
     }
 }
 

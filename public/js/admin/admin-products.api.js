@@ -197,6 +197,18 @@
         });
     }
 
+    /**
+     * Save a new product display order
+     * @param {number[]} orderedIds - Product IDs in desired display order
+     * @returns {Promise<void>}
+     */
+    async function reorderProducts(orderedIds) {
+        await apiRequest(`${BASE_URL}/reorder`, {
+            method: 'PUT',
+            body: JSON.stringify({ orderedIds })
+        });
+    }
+
     // Expose API on global window object
     window.AdminProductsAPI = {
         loadProducts: loadProducts,
@@ -204,7 +216,8 @@
         getProductById: getProductById,
         createProduct: createProduct,
         updateProduct: updateProduct,
-        deleteProduct: deleteProduct
+        deleteProduct: deleteProduct,
+        reorderProducts: reorderProducts
     };
 })(window);
 
