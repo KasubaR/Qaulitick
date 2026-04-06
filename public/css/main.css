@@ -311,6 +311,12 @@ footer {
     text-transform: uppercase;
 }
 
+.footer-column p {
+    font-size: 0.78rem;
+    line-height: 1.7;
+    color: rgba(229, 225, 216, 0.7);
+}
+
 .footer-column a {
     display: block;
     color: rgba(229, 225, 216, 0.7);
