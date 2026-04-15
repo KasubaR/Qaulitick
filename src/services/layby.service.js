@@ -107,7 +107,7 @@ async function createLaybyPlanAndPayments({ order, userId, depositPercentInput, 
                     depositPercentClamped: pct
                 },
                 status: 'active',
-                nextDueAt: now
+                nextDueAt: balanceDueAt
             },
             { transaction }
         );
@@ -128,7 +128,7 @@ async function createLaybyPlanAndPayments({ order, userId, depositPercentInput, 
         });
 
         await LaybyPayment.bulkCreate(rows, { transaction });
-        await plan.update({ nextDueAt: now }, { transaction });
+        await plan.update({ nextDueAt: balanceDueAt }, { transaction });
 
         logger.info(
             { orderId: order.id, planId: plan.id, total, deposit, mode: 'flexible' },
@@ -163,7 +163,7 @@ async function createLaybyPlanAndPayments({ order, userId, depositPercentInput, 
                       depositPercentClamped: pct
                   },
             status: 'active',
-            nextDueAt: now
+            nextDueAt: null  // set after rows are built so we have rows[1].dueAt
         },
         { transaction }
     );
@@ -192,7 +192,7 @@ async function createLaybyPlanAndPayments({ order, userId, depositPercentInput, 
     }
 
     await LaybyPayment.bulkCreate(rows, { transaction });
-    await plan.update({ nextDueAt: now }, { transaction });
+    await plan.update({ nextDueAt: rows[1].dueAt }, { transaction });
 
     logger.info(
         { orderId: order.id, planId: plan.id, total, deposit, installments: INSTALLMENT_COUNT, mode: 'scheduled' },

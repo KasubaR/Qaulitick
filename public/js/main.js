@@ -320,8 +320,9 @@ async function addToCart(productName, price, productId = null) {
     }
 }
 
-// Make addToCart available globally
+// Make cart functions available globally
 window.addToCart = addToCart;
+window.setCartItems = setCartItems;
 
 function updateCartCount() {
     if (!cartCount) return; // Element doesn't exist on this page

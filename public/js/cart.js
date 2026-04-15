@@ -16,6 +16,11 @@ function initializeCartPage() {
     if (serverRenderedItems && serverRenderedItems.length > 0) {
         // Use server-rendered items (SSR) - no need to reload from cookies
         cartPageItems = serverRenderedItems;
+        // Sync server-corrected prices back to cookie/localStorage so future
+        // requests don't trigger stale-price mismatch warnings.
+        if (typeof window.setCartItems === 'function') {
+            window.setCartItems(serverRenderedItems);
+        }
     } else {
         // No server-rendered items, load from cookies/localStorage (client-side only)
         loadCartItems();
