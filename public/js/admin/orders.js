@@ -474,6 +474,7 @@ function setupStatusButtons() {
     });
     
     // Payment verification button
+    const VERIFY_PAYMENT_BTN_HTML = '<i class="fas fa-sync-alt"></i> Verify payment with Lenco';
     document.getElementById('verifyPaymentBtn')?.addEventListener('click', async () => {
         if (!currentOrderId) {
             showNotification('No order selected', 'error');
@@ -484,7 +485,7 @@ function setupStatusButtons() {
             const verifyBtn = document.getElementById('verifyPaymentBtn');
             if (verifyBtn) {
                 verifyBtn.disabled = true;
-                verifyBtn.textContent = 'Verifying...';
+                verifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
             }
             
             const result = await AdminOrdersAPI.verifyOrderPayment(currentOrderId);
@@ -501,7 +502,7 @@ function setupStatusButtons() {
             
             if (verifyBtn) {
                 verifyBtn.disabled = false;
-                verifyBtn.textContent = 'Verify Payment';
+                verifyBtn.innerHTML = VERIFY_PAYMENT_BTN_HTML;
             }
         } catch (error) {
             console.error('Error verifying payment:', error);
@@ -510,7 +511,7 @@ function setupStatusButtons() {
             const verifyBtn = document.getElementById('verifyPaymentBtn');
             if (verifyBtn) {
                 verifyBtn.disabled = false;
-                verifyBtn.textContent = 'Verify Payment';
+                verifyBtn.innerHTML = VERIFY_PAYMENT_BTN_HTML;
             }
         }
     });

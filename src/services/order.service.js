@@ -132,7 +132,14 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
             historyNote = notes || `Payment ${paymentStatus}`;
         } else if (paymentStatus === 'completed') {
             // Payment completed successfully
-            if (order.status === 'pending' || order.status === 'payment_pending') {
+            // Include cancelled / payment_failed so admin verify or late webhooks can reconcile
+            // when the order was wrongly marked cancelled (e.g. expiry cron, bad webhook) but Lenco shows paid.
+            if (
+                order.status === 'pending' ||
+                order.status === 'payment_pending' ||
+                order.status === 'cancelled' ||
+                order.status === 'payment_failed'
+            ) {
                 newOrderStatus = 'paid';
             }
             newPaymentStatus = 'completed';
