@@ -96,6 +96,7 @@ async function flagOverdueLaybyInstallments() {
         {
             where: {
                 status: 'pending',
+                sequence: { [Op.gt]: 1 }, // exclude deposit row — it's due on creation, not a future date
                 dueAt: { [Op.lt]: now }
             }
         }

@@ -11,6 +11,7 @@
  */
 
 const { sequelize } = require('../config/mysql');
+const { Op } = require('sequelize');
 const {
     MIN_PCT,
     MAX_PCT,
@@ -128,7 +129,6 @@ async function createLaybyPlanAndPayments({ order, userId, depositPercentInput, 
         });
 
         await LaybyPayment.bulkCreate(rows, { transaction });
-        await plan.update({ nextDueAt: balanceDueAt }, { transaction });
 
         logger.info(
             { orderId: order.id, planId: plan.id, total, deposit, mode: 'flexible' },
@@ -192,7 +192,6 @@ async function createLaybyPlanAndPayments({ order, userId, depositPercentInput, 
     }
 
     await LaybyPayment.bulkCreate(rows, { transaction });
-    await plan.update({ nextDueAt: rows[1].dueAt }, { transaction });
 
     logger.info(
         { orderId: order.id, planId: plan.id, total, deposit, installments: INSTALLMENT_COUNT, mode: 'scheduled' },
@@ -299,7 +298,7 @@ async function recordLaybyInstallmentPaid(payment) {
         await installment.save({ transaction: t });
 
         const nextPending = await LaybyPayment.findOne({
-            where: { laybyPlanId: plan.id, status: 'pending' },
+            where: { laybyPlanId: plan.id, status: { [Op.in]: ['pending', 'overdue'] } },
             order: [['sequence', 'ASC']],
             transaction: t
         });
@@ -401,6 +400,9 @@ async function confirmInstallmentOffline(laybyPaymentId, admin) {
 
             if (flexBalance && newBal > 0) {
                 installment.amount = newBal;
+                installment.status = 'paid';
+                installment.paidAt = now;
+                installment.adminConfirmedAt = now;
                 await installment.save({ transaction: t });
 
                 plan.balanceRemaining = newBal;
@@ -460,7 +462,7 @@ async function confirmInstallmentOffline(laybyPaymentId, admin) {
             await installment.save({ transaction: t });
 
             const nextPending = await LaybyPayment.findOne({
-                where: { laybyPlanId: plan.id, status: 'pending' },
+                where: { laybyPlanId: plan.id, status: { [Op.in]: ['pending', 'overdue'] } },
                 order: [['sequence', 'ASC']],
                 transaction: t
             });
