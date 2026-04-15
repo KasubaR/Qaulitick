@@ -1204,10 +1204,11 @@ function showNotification(message, type = 'info') {
     notification.className = `order-notification order-notification-${type}`;
     notification.style.display = 'block';
     
-    // Auto-hide after 3 seconds
+    // Auto-hide (errors stay longer to ensure message is readable)
+    const delay = type === 'error' ? 5000 : 3000;
     setTimeout(() => {
         notification.style.display = 'none';
-    }, 3000);
+    }, delay);
 }
 
 function getCurrentFilters() {

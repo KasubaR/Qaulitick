@@ -221,8 +221,12 @@ async function makeApiRequest(config, retryCount = 0) {
 /**
  * Validate API Response
  * Lenco API response format: { status: boolean, message: string, data: object }
+ *
+ * @param {object} response
+ * @param {string[]} expectedFields
+ * @param {{ requireAny?: boolean }} [options] - If requireAny is true, warn only when none of expectedFields are present (OR). Default is AND (all must be present for no warning).
  */
-function validateApiResponse(response, expectedFields = []) {
+function validateApiResponse(response, expectedFields = [], options = {}) {
     if (!response || !response.data) {
         throw new Error('Invalid response: Response or response.data is missing');
     }
@@ -246,13 +250,24 @@ function validateApiResponse(response, expectedFields = []) {
     
     // Validate expected fields if provided
     if (expectedFields.length > 0) {
-        const missingFields = expectedFields.filter(field => !(field in data));
-        if (missingFields.length > 0) {
-            log('warn', 'Response missing expected fields', {
-                missingFields,
-                receivedFields: Object.keys(data),
-                fullResponse: responseData
-            });
+        if (options.requireAny) {
+            const hasAny = expectedFields.some((field) => field in data);
+            if (!hasAny) {
+                log('warn', 'Response missing expected fields (need at least one of)', {
+                    expectedAnyOf: expectedFields,
+                    receivedFields: Object.keys(data),
+                    fullResponse: responseData
+                });
+            }
+        } else {
+            const missingFields = expectedFields.filter(field => !(field in data));
+            if (missingFields.length > 0) {
+                log('warn', 'Response missing expected fields', {
+                    missingFields,
+                    receivedFields: Object.keys(data),
+                    fullResponse: responseData
+                });
+            }
         }
     }
     
@@ -615,7 +630,8 @@ async function initiateBankTransfer(orderData, bankDetails) {
         });
 
         // Validate response (Lenco format: { status: boolean, message: string, data: object })
-        validateApiResponse(response, ['transactionId', 'id']);
+        // Bank transfer may return id only (like mobile money) or transactionId — accept either
+        validateApiResponse(response, ['transactionId', 'id', 'transaction_id'], { requireAny: true });
         
         // Extract data from response.data.data (Lenco wraps results in 'data' key)
         const responseData = response.data;
@@ -1089,9 +1105,16 @@ async function cancelCollection(collectionId) {
         return true;
     } catch (error) {
         // 404 = already gone, 4xx = already terminal — treat as success
-        const code = error.code || error.status;
-        if (code === 404 || (code >= 400 && code < 500)) {
-            log('info', 'Collection already terminal or not found on Lenco', { collectionId, code });
+        // Use details.status for HTTP status (enhanced errors from makeApiRequest). Do not use
+        // error.code for numeric comparison when it may be a Node system code string (e.g. ECONNREFUSED).
+        const httpStatus =
+            typeof error.details?.status === 'number'
+                ? error.details.status
+                : typeof error.code === 'number'
+                  ? error.code
+                  : undefined;
+        if (httpStatus === 404 || (httpStatus !== undefined && httpStatus >= 400 && httpStatus < 500)) {
+            log('info', 'Collection already terminal or not found on Lenco', { collectionId, httpStatus });
             return true;
         }
         log('warn', 'Failed to cancel collection on Lenco', { collectionId, error: error.message });
