@@ -118,47 +118,78 @@ async function flagOverdueLaybyInstallments() {
                 ? plan.installmentSchedule
                 : null;
             const periodDays = sched && sched.planPeriodDays ? sched.planPeriodDays : null;
-            if (!periodDays) continue;
 
-            const expiresAt = new Date(plan.createdAt.getTime() + (periodDays + GRACE_PERIOD_DAYS) * 86400000);
+            let expiresAt;
+            let expiryDescription;
+            if (periodDays) {
+                expiresAt = new Date(plan.createdAt.getTime() + (periodDays + GRACE_PERIOD_DAYS) * 86400000);
+                expiryDescription = `plan period of ${periodDays} days${GRACE_PERIOD_DAYS > 0 ? ` + ${GRACE_PERIOD_DAYS}-day grace period` : ''}`;
+            } else {
+                // Fixed-interval plans (equal_interval_after_deposit) store no planPeriodDays.
+                // Derive expiry from the last installment's dueAt + grace period.
+                const lastInstallment = await LaybyPayment.findOne({
+                    where: { laybyPlanId: plan.id },
+                    order: [['sequence', 'DESC']]
+                });
+                if (!lastInstallment) continue;
+                expiresAt = new Date(lastInstallment.dueAt.getTime() + GRACE_PERIOD_DAYS * 86400000);
+                expiryDescription = `last installment due date${GRACE_PERIOD_DAYS > 0 ? ` + ${GRACE_PERIOD_DAYS}-day grace period` : ''}`;
+            }
+
             if (now < expiresAt) continue;
             if (Number(plan.balanceRemaining) <= 0) continue;
 
-            plan.status = 'cancelled';
-            await plan.save();
+            // Wrap in a transaction and re-fetch with FOR UPDATE so concurrent runs
+            // (scheduler retry, admin cancel, etc.) cannot double-restore stock.
+            const t = await sequelize.transaction();
+            try {
+                const lockedPlan = await LaybyPlan.findByPk(plan.id, {
+                    lock: t.LOCK.UPDATE,
+                    transaction: t
+                });
 
-            const order = await Order.findByPk(plan.orderId);
-            if (order) {
-                // Restore top-level stock reserved at layby order creation (colors JSON is not decremented for layby).
-                const items = order.items || [];
-                for (const item of items) {
-                    const qty = parseInt(item.quantity) || 1;
-                    const productId = parseInt(item.productId, 10);
-                    if (!productId) continue;
-
-                    try {
-                        await Product.update(
-                            { stock: sequelize.literal(`stock + ${qty}`) },
-                            { where: { id: productId } }
-                        );
-                    } catch (stockErr) {
-                        console.error(`[Scheduler] Stock restore failed for product ${productId} on expired layby plan ${plan.id}:`, stockErr);
-                    }
+                // Another path already cancelled this plan — skip without touching stock.
+                if (!lockedPlan || lockedPlan.status !== 'active') {
+                    await t.rollback();
+                    continue;
                 }
 
-                order.history = order.history || [];
-                order.history.push({
-                    status: order.status,
-                    paymentStatus: order.paymentStatus,
-                    notes: `Layby plan cancelled — plan period of ${periodDays} days${GRACE_PERIOD_DAYS > 0 ? ` + ${GRACE_PERIOD_DAYS}-day grace period` : ''} exceeded with balance remaining`,
-                    updatedBy: 'system',
-                    updatedAt: new Date().toISOString(),
-                    source: 'layby_expiry_cron'
-                });
-                await order.save();
-            }
+                lockedPlan.status = 'cancelled';
+                await lockedPlan.save({ transaction: t });
 
-            cancelledCount++;
+                const order = await Order.findByPk(plan.orderId, { transaction: t });
+                if (order) {
+                    // Restore top-level stock reserved at layby order creation (colors JSON is not decremented for layby).
+                    const items = order.items || [];
+                    for (const item of items) {
+                        const qty = parseInt(item.quantity) || 1;
+                        const productId = parseInt(item.productId, 10);
+                        if (!productId) continue;
+
+                        await Product.update(
+                            { stock: sequelize.literal(`stock + ${qty}`) },
+                            { where: { id: productId }, transaction: t }
+                        );
+                    }
+
+                    order.history = order.history || [];
+                    order.history.push({
+                        status: order.status,
+                        paymentStatus: order.paymentStatus,
+                        notes: `Layby plan cancelled — ${expiryDescription} exceeded with balance remaining`,
+                        updatedBy: 'system',
+                        updatedAt: new Date().toISOString(),
+                        source: 'layby_expiry_cron'
+                    });
+                    await order.save({ transaction: t });
+                }
+
+                await t.commit();
+                cancelledCount++;
+            } catch (txErr) {
+                await t.rollback();
+                throw txErr;
+            }
         } catch (err) {
             console.error(`[Scheduler] Error processing layby plan ${plan.id}:`, err);
         }
