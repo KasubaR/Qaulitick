@@ -474,44 +474,44 @@ function setupStatusButtons() {
     });
     
     // Payment verification button
-    const VERIFY_PAYMENT_BTN_HTML = '<i class="fas fa-sync-alt"></i> Verify payment with Lenco';
     document.getElementById('verifyPaymentBtn')?.addEventListener('click', async () => {
         if (!currentOrderId) {
             showNotification('No order selected', 'error');
             return;
         }
-        
+
+        const verifyBtn = document.getElementById('verifyPaymentBtn');
+        if (verifyBtn?.classList.contains('verify-payment-btn--verified')) {
+            return;
+        }
+
         try {
-            const verifyBtn = document.getElementById('verifyPaymentBtn');
             if (verifyBtn) {
                 verifyBtn.disabled = true;
                 verifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
             }
-            
+
             const result = await AdminOrdersAPI.verifyOrderPayment(currentOrderId);
-            
+
             if (result.verified) {
                 showNotification('Payment verified successfully', 'success');
             } else {
                 showNotification('Payment verification attempted. Using database status.', 'warning');
             }
-            
-            // Reload order details
+
             await loadOrderDetails(currentOrderId);
             await loadOrders();
-            
-            if (verifyBtn) {
-                verifyBtn.disabled = false;
-                verifyBtn.innerHTML = VERIFY_PAYMENT_BTN_HTML;
-            }
         } catch (error) {
             console.error('Error verifying payment:', error);
             showNotification(error.message || 'Failed to verify payment', 'error');
-            
-            const verifyBtn = document.getElementById('verifyPaymentBtn');
-            if (verifyBtn) {
-                verifyBtn.disabled = false;
-                verifyBtn.innerHTML = VERIFY_PAYMENT_BTN_HTML;
+
+            try {
+                await loadOrderDetails(currentOrderId);
+            } catch {
+                if (verifyBtn) {
+                    verifyBtn.disabled = false;
+                    verifyBtn.innerHTML = VERIFY_PAYMENT_BTN_DEFAULT_HTML;
+                }
             }
         }
     });
@@ -860,6 +860,36 @@ function setupTableDelegation() {
     });
 }
 
+const VERIFY_PAYMENT_BTN_DEFAULT_HTML = '<i class="fas fa-sync-alt"></i> Verify payment with Lenco';
+
+/**
+ * Lenco verify control: green "Verified" + disabled when payment is completed; otherwise actionable.
+ */
+function syncVerifyPaymentButton(order) {
+    const btn = document.getElementById('verifyPaymentBtn');
+    const hint = document.getElementById('verifyPaymentHint');
+    if (!btn) return;
+
+    const isPaid = order?.paymentStatus === 'completed';
+    if (isPaid) {
+        btn.disabled = true;
+        btn.classList.remove('btn-secondary');
+        btn.classList.add('verify-payment-btn--verified');
+        btn.innerHTML = '<i class="fas fa-check-circle"></i> Verified';
+        btn.setAttribute('aria-label', 'Payment verified with Lenco');
+        btn.removeAttribute('title');
+        if (hint) hint.hidden = true;
+    } else {
+        btn.disabled = false;
+        btn.classList.add('btn-secondary');
+        btn.classList.remove('verify-payment-btn--verified');
+        btn.innerHTML = VERIFY_PAYMENT_BTN_DEFAULT_HTML;
+        btn.setAttribute('title', 'Fetch latest status from Lenco and update this order');
+        btn.removeAttribute('aria-label');
+        if (hint) hint.hidden = false;
+    }
+}
+
 // Populate order details
 function populateOrderDetails(order) {
     currentOrderStatus = order?.status || null;
@@ -893,6 +923,7 @@ function populateOrderDetails(order) {
     document.getElementById('orderShipping').textContent = `K${order.totals?.delivery?.toLocaleString() || '0'}`;
     document.getElementById('orderTotal').textContent = `K${order.totals?.total?.toLocaleString() || '0'}`;
     syncShippingUi(order);
+    syncVerifyPaymentButton(order);
 }
 
 function syncShippingUi(order) {

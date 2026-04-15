@@ -192,6 +192,14 @@
                 <div class="tab-content">
                     <!-- Overview Tab -->
                     <div class="tab-pane active" id="overviewTab">
+                        <div class="overview-verify-strip" aria-label="Lenco payment verification">
+                            <div class="verify-payment-block verify-payment-block--top">
+                                <button type="button" class="btn-secondary" id="verifyPaymentBtn" title="Fetch latest status from Lenco and update this order">
+                                    <i class="fas fa-sync-alt"></i> Verify payment with Lenco
+                                </button>
+                                <p class="verify-payment-hint" id="verifyPaymentHint">Use if the customer paid but this order still shows pending or cancelled.</p>
+                            </div>
+                        </div>
                         <div class="details-grid">
                             <div class="details-section">
                                 <h3>Customer Information</h3>
@@ -247,12 +255,6 @@
                                     <div class="info-item">
                                         <span class="info-label">Transaction ID:</span>
                                         <span class="info-value" id="transactionId">-</span>
-                                    </div>
-                                    <div class="verify-payment-block">
-                                        <button type="button" class="btn-secondary" id="verifyPaymentBtn" title="Fetch latest status from Lenco and update this order">
-                                            <i class="fas fa-sync-alt"></i> Verify payment with Lenco
-                                        </button>
-                                        <p class="verify-payment-hint" id="verifyPaymentHint">Use if the customer paid but this order still shows pending or cancelled.</p>
                                     </div>
                                 </div>
                             </div>
