@@ -57,7 +57,7 @@ function renderPlans(plans) {
     if (!plans.length) {
         const tr = document.createElement('tr');
         const td = document.createElement('td');
-        td.colSpan = 8;
+        td.colSpan = 9;
         td.className = 'empty-state';
         td.textContent = 'No layby plans match your filters.';
         tr.appendChild(td);
@@ -115,7 +115,7 @@ async function loadPlans() {
     const pageNumbers = document.getElementById('pageNumbers');
 
     if (body) {
-        body.innerHTML = '<tr><td colspan="8" class="empty-state">Loading…</td></tr>';
+        body.innerHTML = '<tr><td colspan="9" class="empty-state">Loading…</td></tr>';
     }
 
     try {
@@ -156,7 +156,7 @@ async function loadPlans() {
         if (body) {
             const tr = document.createElement('tr');
             const td = document.createElement('td');
-            td.colSpan = 8;
+            td.colSpan = 9;
             td.className = 'empty-state';
             td.textContent = e.message || 'Failed to load';
             tr.appendChild(td);

@@ -261,6 +261,7 @@ async function recordLaybyInstallmentPaid(payment) {
             // Partial payment: reduce installment amount but keep it pending so the
             // customer can continue paying. Only mark 'paid' when balance reaches zero.
             installment.amount = newBal;
+            installment.paymentId = payment.id;
             await installment.save({ transaction: t });
 
             plan.balanceRemaining = newBal;

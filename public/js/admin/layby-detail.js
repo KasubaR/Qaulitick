@@ -184,6 +184,10 @@ function installmentPaySummary(row) {
     return pay ? `${row.providerStatusLabel || pay.status}${pay.lencoReference ? ` (${pay.lencoReference})` : ''}` : 'No provider payment';
 }
 
+function canConfirmOffline(row, planStatus) {
+    return ['pending', 'overdue'].includes(row.status) && planStatus === 'active';
+}
+
 function buildInstallmentRow(row, planStatus) {
     const tr = document.createElement('tr');
     tr.setAttribute('data-installment-id', String(row.id));
@@ -205,7 +209,7 @@ function buildInstallmentRow(row, planStatus) {
     );
 
     const tdBtn = document.createElement('td');
-    if (row.status === 'pending' && planStatus === 'active') {
+    if (canConfirmOffline(row, planStatus)) {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'btn-outline layby-confirm-offline-btn';
@@ -239,7 +243,7 @@ function updateInstallmentRow(tr, row, planStatus) {
     }
     const tdBtn = tds[7];
     if (!tdBtn) return;
-    const wantBtn = row.status === 'pending' && planStatus === 'active';
+    const wantBtn = canConfirmOffline(row, planStatus);
     const btnEl = tdBtn.querySelector('.layby-confirm-offline-btn');
     if (wantBtn) {
         if (!btnEl || btnEl.getAttribute('data-installment-id') !== String(row.id)) {
