@@ -21,7 +21,7 @@ const {
     USE_FIXED_INSTALLMENT_INTERVAL,
     FIXED_INTERVAL_DAYS
 } = require('../config/layby');
-const { LaybyPlan, LaybyPayment, Order, Payment } = require('../models');
+const { LaybyPlan, LaybyPayment, Order, Payment, Product } = require('../models');
 const logger = require('../utils/logger').child({ module: 'LaybyService' });
 const emailService = require('./email.service');
 
@@ -258,10 +258,9 @@ async function recordLaybyInstallmentPaid(payment) {
         const flexBalance = isFlexibleBalanceInstallment(plan, installment);
 
         if (flexBalance && newBal > 0) {
+            // Partial payment: reduce installment amount but keep it pending so the
+            // customer can continue paying. Only mark 'paid' when balance reaches zero.
             installment.amount = newBal;
-            installment.status = 'paid';
-            installment.paidAt = new Date();
-            installment.paymentId = payment.id;
             await installment.save({ transaction: t });
 
             plan.balanceRemaining = newBal;
@@ -369,7 +368,7 @@ async function confirmInstallmentOffline(laybyPaymentId, admin) {
                 return { alreadyApplied: true };
             }
 
-            if (installment.status !== 'pending') {
+            if (!['pending', 'overdue'].includes(installment.status)) {
                 return { error: 'NOT_PENDING' };
             }
 
@@ -399,10 +398,26 @@ async function confirmInstallmentOffline(laybyPaymentId, admin) {
             const flexBalance = isFlexibleBalanceInstallment(plan, installment);
 
             if (flexBalance && newBal > 0) {
+                // Partial payment: reduce installment amount but keep it pending so the
+                // customer can continue paying. Only mark 'paid' when balance reaches zero.
                 installment.amount = newBal;
-                installment.status = 'paid';
-                installment.paidAt = now;
                 installment.adminConfirmedAt = now;
+                const offlinePayment = await Payment.create({
+                    orderNumber: order.orderNumber,
+                    paymentMethod: 'cash_on_delivery',
+                    amount: paidAmt,
+                    currency: 'ZMW',
+                    status: 'completed',
+                    completedAt: now,
+                    laybyPaymentId: installment.id,
+                    metadata: {
+                        source: 'layby_admin_offline',
+                        partial: true,
+                        adminId: admin && admin.adminId ? admin.adminId : null,
+                        adminEmail: admin && admin.adminEmail ? admin.adminEmail : null
+                    }
+                }, { transaction: t });
+                installment.paymentId = offlinePayment.id;
                 await installment.save({ transaction: t });
 
                 plan.balanceRemaining = newBal;
@@ -521,10 +536,78 @@ async function confirmInstallmentOffline(laybyPaymentId, admin) {
     }
 }
 
+/**
+ * Cancel an active layby plan and restore stock that was reserved at layby order creation.
+ * Idempotent for already-cancelled plans; refuses completed plans.
+ *
+ * @param {number} planId
+ * @param {{ actor?: string, source?: string, reason?: string }} opts
+ */
+async function cancelLaybyPlan(planId, opts = {}) {
+    const id = parseInt(String(planId), 10);
+    if (Number.isNaN(id)) {
+        return { error: 'INVALID_ID' };
+    }
+
+    const actor = opts.actor || 'system';
+    const source = opts.source || 'layby_cancel';
+    const reason = opts.reason || 'Layby plan cancelled';
+
+    return sequelize.transaction(async (t) => {
+        const plan = await LaybyPlan.findByPk(id, {
+            transaction: t,
+            lock: t.LOCK.UPDATE
+        });
+        if (!plan) {
+            return { error: 'NOT_FOUND' };
+        }
+        if (plan.status === 'cancelled') {
+            return { alreadyCancelled: true, plan };
+        }
+        if (plan.status === 'completed') {
+            return { error: 'PLAN_COMPLETED' };
+        }
+
+        const order = await Order.findByPk(plan.orderId, { transaction: t, lock: t.LOCK.UPDATE });
+        if (order) {
+            const items = order.items || [];
+            for (const item of items) {
+                const qty = parseInt(item.quantity, 10) || 1;
+                const productId = parseInt(item.productId, 10);
+                if (!productId) continue;
+
+                await Product.update(
+                    { stock: sequelize.literal(`stock + ${qty}`) },
+                    { where: { id: productId }, transaction: t }
+                );
+            }
+
+            order.status = 'cancelled';
+            order.history = Array.isArray(order.history) ? [...order.history] : [];
+            order.history.push({
+                status: order.status,
+                paymentStatus: order.paymentStatus,
+                notes: reason,
+                updatedBy: actor,
+                updatedAt: new Date().toISOString(),
+                source
+            });
+            await order.save({ transaction: t });
+        }
+
+        plan.status = 'cancelled';
+        await plan.save({ transaction: t });
+
+        logger.info({ planId: id, orderNumber: order?.orderNumber, actor, source }, 'Layby plan cancelled');
+        return { plan, order };
+    });
+}
+
 module.exports = {
     createLaybyPlanAndPayments,
     recordLaybyInstallmentPaid,
     confirmInstallmentOffline,
+    cancelLaybyPlan,
     clampDepositPercent,
     isFlexibleBalanceInstallment,
     MIN_PCT,

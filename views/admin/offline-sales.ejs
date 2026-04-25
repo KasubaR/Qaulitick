@@ -21,16 +21,26 @@
                     <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
                         <i class="fas fa-bars"></i>
                     </button>
-                    <h1 class="page-title">Offline sales</h1>
+                    <h1 class="page-title"><%= viewMode === 'history' ? 'Offline sales history' : 'Add offline sale' %></h1>
                 </div>
             </header>
 
-            <p class="offline-sales-intro">Record in-store or phone sales. Stock is reduced immediately.</p>
+            <p class="offline-sales-intro">
+                <%= viewMode === 'history'
+                    ? 'Review recently recorded offline sales.'
+                    : 'Record in-store or phone sales. Stock is reduced immediately.' %>
+            </p>
+
+            <div class="offline-view-switch" role="navigation" aria-label="Offline sales views">
+                <a href="/admin/offline-sales/add" class="btn-secondary <%= viewMode === 'add' ? 'is-active' : '' %>">Add offline sale</a>
+                <a href="/admin/offline-sales" class="btn-secondary <%= viewMode === 'history' ? 'is-active' : '' %>">View history</a>
+            </div>
 
             <div class="offline-sales-content">
+                <% if (viewMode !== 'history') { %>
                 <section class="table-card offline-record-card" aria-labelledby="recordSaleHeading">
                     <div class="table-header">
-                        <h2 id="recordSaleHeading" class="offline-section-title">Record a sale</h2>
+                        <h2 id="recordSaleHeading" class="offline-section-title">Record offline sale</h2>
                     </div>
                     <div class="offline-record-body">
                         <div class="offline-meta-grid">
@@ -98,7 +108,9 @@
                         <div id="offlineFormMessage" class="offline-form-message offline-form-message--hidden" role="status"></div>
                     </div>
                 </section>
+                <% } %>
 
+                <% if (viewMode === 'history') { %>
                 <section class="table-card offline-history-card" aria-labelledby="recentSalesHeading">
                     <div class="table-header">
                         <h2 id="recentSalesHeading" class="offline-section-title">Recent offline sales</h2>
@@ -131,6 +143,7 @@
                         hidden: false
                     }) %>
                 </section>
+                <% } %>
             </div>
         </main>
     </div>

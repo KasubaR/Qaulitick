@@ -57,8 +57,14 @@
                             <dd id="summaryCustomer">—</dd>
                             <dt>Plan status</dt>
                             <dd id="summaryPlanStatus">—</dd>
+                            <dt>Payment arrangement</dt>
+                            <dd id="summaryArrangement">—</dd>
                             <dt>Balance / total</dt>
                             <dd id="summaryBalance" class="layby-detail-dd--money">—</dd>
+                            <dt>Amount paid</dt>
+                            <dd id="summaryAmountPaid" class="layby-detail-dd--money">—</dd>
+                            <dt>Next action</dt>
+                            <dd id="summaryNextAction">—</dd>
                             <dt>Next due</dt>
                             <dd id="summaryNextDue">—</dd>
                         </dl>
@@ -74,7 +80,7 @@
                             </select>
                             <button type="button" class="btn-primary" id="savePlanStatusBtn">Save status</button>
                         </div>
-                        <p class="layby-detail-hint">Completed requires zero balance. Cancel only from active. Reactivate only from cancelled.</p>
+                        <p class="layby-detail-hint">Completed requires zero balance. Cancellation restores reserved stock and cannot be reversed here.</p>
                     </div>
                 </section>
 
@@ -87,11 +93,12 @@
                             <thead>
                                 <tr>
                                     <th>#</th>
-                                    <th>Amount</th>
-                                    <th>Due</th>
-                                    <th>Status</th>
+                                    <th>Scheduled amount</th>
+                                    <th>Due date</th>
+                                    <th>Installment status</th>
                                     <th>Admin confirmed</th>
-                                    <th>Linked payment</th>
+                                    <th>Payment source</th>
+                                    <th>Provider status</th>
                                     <th></th>
                                 </tr>
                             </thead>

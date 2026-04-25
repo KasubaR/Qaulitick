@@ -112,6 +112,35 @@ Defined in `src/models/LaybyPayment.model.js`.
 
 3. **Payment rows:** Each Lenco collection (or retry) is a `payments` row; latest row is often surfaced to admins. Layby can link a `Payment` to `laybyPaymentId`.
 
+4. **Layby display labels:** Customer/admin UI should not expose raw layby-related enum values directly. Display labels are derived in `src/utils/laybyStatusPresenter.js` so staff and customers see business wording such as `Deposit due`, `Balance outstanding`, `Overdue payment`, `Payment received`, and `Fully paid`.
+
+---
+
+## Layby display vocabulary
+
+Persisted statuses remain compact enums, but the UI derives clearer labels:
+
+| Persisted layer | Example raw value | Layby-facing label |
+|-----------------|-------------------|--------------------|
+| `orders.status` | `payment_pending` | `Layby awaiting payment` / `Balance outstanding` depending on plan progress |
+| `orders.paymentStatus` | `processing` | `Layby balance outstanding` |
+| `layby_plans.status` | `active` | `Active layby - balance outstanding` or `Active layby - overdue payment` |
+| `layby_plans.status` | `completed` | `Fully paid` |
+| `layby_payments.status` | `pending`, sequence 1 | `Deposit due` |
+| `layby_payments.status` | `pending`, sequence 2+ | `Payment due` |
+| `layby_payments.status` | `overdue` | `Overdue payment` |
+| `payments.status` | `processing` | `Awaiting provider confirmation` |
+| `payments.status` | `completed` | `Payment received` |
+
+Customer and admin layby APIs/views can also surface derived fields such as `amountPaid`, `progressPercent`, `paymentArrangementLabel`, `nextActionLabel`, `nextDueLabel`, `isOverdue`, `hasPaymentInProgress`, and `nextPayableInstallmentId`.
+
+### Layby payment attempts
+
+- Customers may start online payment for `pending` **or** `overdue` layby installments while the plan is active.
+- Flexible balance plans keep the balance row open for partial payments; each payment reduces the remaining balance until the plan is fully paid.
+- Admin offline confirmations create `payments` audit rows, including partial flexible offline confirmations.
+- Admin and scheduler cancellation should go through `laybyService.cancelLaybyPlan` so reserved stock is restored once and order history is written consistently.
+
 ---
 
 ## Suggested improvements

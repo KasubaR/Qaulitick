@@ -43,9 +43,9 @@
             <i class="fas fa-warehouse"></i>
             <span>Inventory</span>
         </a>
-        <a href="/admin/offline-sales" class="nav-item <%= typeof activePage !== 'undefined' && activePage === 'offline-sales' ? 'active' : '' %>">
+        <a href="/admin/offline-sales/add" class="nav-item <%= typeof activePage !== 'undefined' && activePage === 'offline-sales' ? 'active' : '' %>">
             <i class="fas fa-store"></i>
-            <span>Offline sales</span>
+            <span>Add offline sale</span>
         </a>
         <a href="/admin/marketing" class="nav-item <%= (typeof activePage !== 'undefined' && activePage === 'marketing') || (typeof activeSubPage !== 'undefined' && ['flash-sales', 'featured-products'].includes(activeSubPage)) ? 'active' : '' %>">
             <i class="fas fa-bullhorn"></i>

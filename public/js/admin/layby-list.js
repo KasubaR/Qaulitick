@@ -33,6 +33,21 @@ function formatDate(iso) {
     return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
 }
 
+function formatZmw(n, currency) {
+    const x = Number(n);
+    if (Number.isNaN(x)) return '—';
+    return `${x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency || 'ZMW'}`;
+}
+
+function appendStatusCell(tr, label, isOverdue) {
+    const td = document.createElement('td');
+    const badge = document.createElement('span');
+    badge.className = 'layby-admin-status-badge' + (isOverdue ? ' is-overdue' : '');
+    badge.textContent = label || '—';
+    td.appendChild(badge);
+    tr.appendChild(td);
+}
+
 function renderPlans(plans) {
     const body = document.getElementById('laybyBody');
     if (!body) return;
@@ -54,20 +69,27 @@ function renderPlans(plans) {
         const tr = document.createElement('tr');
         const orderNum = p.order && p.order.orderNumber ? p.order.orderNumber : '—';
         const email = p.user && p.user.email ? p.user.email : '—';
-        const balance = p.balanceRemaining != null ? `${p.balanceRemaining} ${p.currency || 'ZMW'}` : '—';
-        const total = p.orderTotal != null ? `${p.orderTotal} ${p.currency || 'ZMW'}` : '—';
 
         const cells = [
             String(p.id),
             orderNum,
-            email,
-            p.status || '—',
-            balance,
-            total,
-            formatDate(p.nextDueAt)
+            email
         ];
 
         cells.forEach((text) => {
+            const td = document.createElement('td');
+            td.textContent = text;
+            tr.appendChild(td);
+        });
+
+        appendStatusCell(tr, p.laybyDisplayStatus || p.status, p.isOverdue);
+
+        [
+            formatZmw(p.amountPaid, p.currency),
+            formatZmw(p.balanceRemaining, p.currency),
+            p.nextActionLabel || '—',
+            p.nextDueLabel || formatDate(p.nextDueAt)
+        ].forEach((text) => {
             const td = document.createElement('td');
             td.textContent = text;
             tr.appendChild(td);

@@ -9,8 +9,8 @@ const featuredProductService = require('./featuredProduct.service');
 const Order = require('../models/Order.model');
 const Product = require('../models/Product.model');
 const { LaybyPlan, LaybyPayment } = require('../models');
+const laybyService = require('./layby.service');
 const { GRACE_PERIOD_DAYS } = require('../config/layby');
-const { sequelize } = require('../config/mysql');
 const { Op } = require('sequelize');
 
 const PENDING_TTL_MS     = 10 * 60 * 1000; // 10 minutes for pending orders
@@ -139,56 +139,13 @@ async function flagOverdueLaybyInstallments() {
             if (now < expiresAt) continue;
             if (Number(plan.balanceRemaining) <= 0) continue;
 
-            // Wrap in a transaction and re-fetch with FOR UPDATE so concurrent runs
-            // (scheduler retry, admin cancel, etc.) cannot double-restore stock.
-            const t = await sequelize.transaction();
-            try {
-                const lockedPlan = await LaybyPlan.findByPk(plan.id, {
-                    lock: t.LOCK.UPDATE,
-                    transaction: t
-                });
-
-                // Another path already cancelled this plan — skip without touching stock.
-                if (!lockedPlan || lockedPlan.status !== 'active') {
-                    await t.rollback();
-                    continue;
-                }
-
-                lockedPlan.status = 'cancelled';
-                await lockedPlan.save({ transaction: t });
-
-                const order = await Order.findByPk(plan.orderId, { transaction: t });
-                if (order) {
-                    // Restore top-level stock reserved at layby order creation (colors JSON is not decremented for layby).
-                    const items = order.items || [];
-                    for (const item of items) {
-                        const qty = parseInt(item.quantity) || 1;
-                        const productId = parseInt(item.productId, 10);
-                        if (!productId) continue;
-
-                        await Product.update(
-                            { stock: sequelize.literal(`stock + ${qty}`) },
-                            { where: { id: productId }, transaction: t }
-                        );
-                    }
-
-                    order.history = order.history || [];
-                    order.history.push({
-                        status: order.status,
-                        paymentStatus: order.paymentStatus,
-                        notes: `Layby plan cancelled — ${expiryDescription} exceeded with balance remaining`,
-                        updatedBy: 'system',
-                        updatedAt: new Date().toISOString(),
-                        source: 'layby_expiry_cron'
-                    });
-                    await order.save({ transaction: t });
-                }
-
-                await t.commit();
+            const result = await laybyService.cancelLaybyPlan(plan.id, {
+                actor: 'system',
+                source: 'layby_expiry_cron',
+                reason: `Layby plan cancelled — ${expiryDescription} exceeded with balance remaining`
+            });
+            if (result && !result.error && !result.alreadyCancelled) {
                 cancelledCount++;
-            } catch (txErr) {
-                await t.rollback();
-                throw txErr;
             }
         } catch (err) {
             console.error(`[Scheduler] Error processing layby plan ${plan.id}:`, err);

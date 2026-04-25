@@ -91,11 +91,22 @@ router.get('/admin/inventory', requireAdminAuth, (req, res) => {
     res.render('admin/inventory', { title: 'Inventory Management | Admin Panel', page: 'admin' });
 });
 
-router.get('/admin/offline-sales', requireAdminAuth, (req, res) => {
+router.get('/admin/offline-sales/add', requireAdminAuth, (req, res) => {
     res.render('admin/offline-sales', {
-        title: 'Offline sales | Admin Panel',
+        title: 'Add offline sale | Admin Panel',
         page: 'admin',
         activePage: 'offline-sales',
+        viewMode: 'add',
+        csrfToken: res.locals.csrfToken || ''
+    });
+});
+
+router.get('/admin/offline-sales', requireAdminAuth, (req, res) => {
+    res.render('admin/offline-sales', {
+        title: 'Offline sales history | Admin Panel',
+        page: 'admin',
+        activePage: 'offline-sales',
+        viewMode: 'history',
         csrfToken: res.locals.csrfToken || ''
     });
 });

@@ -12,6 +12,23 @@
     text-decoration: none;
 }
 
+.layby-admin-status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: var(--surface-2, #f1f5f9);
+    color: var(--text, #1e293b);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.layby-admin-status-badge.is-overdue {
+    background: rgba(245, 158, 11, 0.14);
+    color: #92400e;
+}
+
 .layby-detail-content--hidden {
     display: none;
 }

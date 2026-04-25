@@ -5,6 +5,7 @@ const productService = require('../services/product.service');
 const { sanitizeObject, validatePhone } = require('../utils/validators');
 const { deleteAllSessionsForUser } = require('../services/session.service');
 const { cookieName: sessionCookieName } = require('../config/session.constants');
+const { enrichLaybyPlan } = require('../utils/laybyStatusPresenter');
 const logger = require('../utils/logger').child({ module: 'CustomerAccountController' });
 
 /** Max layby plans loaded per account/layby request (includes nested installments). */
@@ -235,7 +236,7 @@ exports.renderLayby = async (req, res) => {
                             model: Payment,
                             as: 'payment',
                             required: false,
-                            attributes: ['id', 'status', 'lencoReference', 'transactionId', 'createdAt']
+                            attributes: ['id', 'status', 'paymentMethod', 'metadata', 'lencoReference', 'transactionId', 'createdAt', 'amount']
                         }
                     ]
                 },
@@ -250,7 +251,7 @@ exports.renderLayby = async (req, res) => {
             title: 'Layby plans | Qualitick Collections',
             page: 'account',
             accountSection: 'layby',
-            plans: plans.map((p) => p.toJSON()),
+            plans: plans.map((p) => enrichLaybyPlan(p)),
             laybyPlansPage,
             laybyPlansTotal: plansTotal,
             laybyPlansPerPage,
@@ -331,7 +332,7 @@ exports.startLaybyPayment = async (req, res) => {
         }
 
         const nextPayment = await LaybyPayment.findOne({
-            where: { laybyPlanId: plan.id, status: 'pending' },
+            where: { laybyPlanId: plan.id, status: ['pending', 'overdue'] },
             order: [['sequence', 'ASC']]
         });
 

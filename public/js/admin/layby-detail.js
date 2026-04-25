@@ -181,15 +181,22 @@ function hideError() {
 
 function installmentPaySummary(row) {
     const pay = row.payment;
-    return pay ? `${pay.status}${pay.lencoReference ? ` (${pay.lencoReference})` : ''}` : '—';
+    return pay ? `${row.providerStatusLabel || pay.status}${pay.lencoReference ? ` (${pay.lencoReference})` : ''}` : 'No provider payment';
 }
 
 function buildInstallmentRow(row, planStatus) {
     const tr = document.createElement('tr');
     tr.setAttribute('data-installment-id', String(row.id));
 
-    const paySummary = installmentPaySummary(row);
-    [String(row.sequence), formatZmw(row.amount), formatDate(row.dueAt), row.status, formatDate(row.adminConfirmedAt), paySummary].forEach(
+    [
+        String(row.sequence),
+        formatZmw(row.amount),
+        row.dueLabel || formatDate(row.dueAt),
+        row.displayStatus || row.status,
+        formatDate(row.adminConfirmedAt),
+        row.paymentSourceLabel || 'None',
+        installmentPaySummary(row)
+    ].forEach(
         (text) => {
             const td = document.createElement('td');
             td.textContent = text;
@@ -203,7 +210,8 @@ function buildInstallmentRow(row, planStatus) {
         btn.type = 'button';
         btn.className = 'btn-outline layby-confirm-offline-btn';
         btn.setAttribute('data-installment-id', String(row.id));
-        btn.textContent = 'Confirm offline';
+        btn.setAttribute('data-installment-amount', String(row.amount || ''));
+        btn.textContent = 'Mark as paid offline';
         tdBtn.appendChild(btn);
     } else {
         tdBtn.textContent = '—';
@@ -213,23 +221,23 @@ function buildInstallmentRow(row, planStatus) {
 }
 
 function updateInstallmentRow(tr, row, planStatus) {
-    const paySummary = installmentPaySummary(row);
     const texts = [
         String(row.sequence),
         formatZmw(row.amount),
-        formatDate(row.dueAt),
-        row.status,
+        row.dueLabel || formatDate(row.dueAt),
+        row.displayStatus || row.status,
         formatDate(row.adminConfirmedAt),
-        paySummary
+        row.paymentSourceLabel || 'None',
+        installmentPaySummary(row)
     ];
     const tds = tr.querySelectorAll('td');
-    for (let c = 0; c < 6; c++) {
+    for (let c = 0; c < 7; c++) {
         const td = tds[c];
         if (td && td.textContent !== texts[c]) {
             td.textContent = texts[c];
         }
     }
-    const tdBtn = tds[6];
+    const tdBtn = tds[7];
     if (!tdBtn) return;
     const wantBtn = row.status === 'pending' && planStatus === 'active';
     const btnEl = tdBtn.querySelector('.layby-confirm-offline-btn');
@@ -240,7 +248,8 @@ function updateInstallmentRow(tr, row, planStatus) {
             btn.type = 'button';
             btn.className = 'btn-outline layby-confirm-offline-btn';
             btn.setAttribute('data-installment-id', String(row.id));
-            btn.textContent = 'Confirm offline';
+            btn.setAttribute('data-installment-amount', String(row.amount || ''));
+            btn.textContent = 'Mark as paid offline';
             tdBtn.appendChild(btn);
         }
     } else if (btnEl || tdBtn.textContent !== '—') {
@@ -322,13 +331,16 @@ function fillSummary(plan) {
     setText('summaryCheckout', order.checkoutMode || '—');
     const cust = [user.name, user.email].filter(Boolean).join(' · ');
     setText('summaryCustomer', cust || '—');
-    setText('summaryPlanStatus', plan.status || '—');
+    setText('summaryPlanStatus', plan.laybyDisplayStatus || plan.status || '—');
+    setText('summaryArrangement', plan.paymentArrangementLabel || '—');
     const cur = plan.currency || 'ZMW';
     setText(
         'summaryBalance',
         `${formatZmw(plan.balanceRemaining)} / ${formatZmw(plan.orderTotal)} ${cur}`
     );
-    setText('summaryNextDue', formatDate(plan.nextDueAt));
+    setText('summaryAmountPaid', `${formatZmw(plan.amountPaid)} ${cur}`);
+    setText('summaryNextAction', plan.nextActionLabel || '—');
+    setText('summaryNextDue', plan.nextDueLabel || formatDate(plan.nextDueAt));
 
     renderOrderSummary(order);
 
@@ -389,8 +401,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!btn) return;
         const iid = parseInt(btn.getAttribute('data-installment-id'), 10);
         if (Number.isNaN(iid)) return;
+        const amount = btn.getAttribute('data-installment-amount');
         const sure = await showConfirmModal(
-            'Record this installment as paid offline (cash / bank / in-store)? This cannot be undone.'
+            `Mark ${amount ? formatZmw(amount) : 'this installment'} as paid offline (cash / bank / in-store)? This cannot be undone.`
         );
         if (!sure) return;
         btn.disabled = true;

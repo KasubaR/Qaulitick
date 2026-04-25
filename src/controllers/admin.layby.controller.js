@@ -8,12 +8,13 @@
 const { Op } = require('sequelize');
 const { LaybyPlan, LaybyPayment, Order, User, Payment } = require('../models');
 const laybyService = require('../services/layby.service');
+const { enrichLaybyPlan } = require('../utils/laybyStatusPresenter');
 const logger = require('../utils/logger').child({ module: 'AdminLaybyController' });
 
 /** Allowed admin PATCH status transitions (LaybyPlan.status). */
 const LAYBY_PLAN_STATUS_TRANSITIONS = {
     active: ['completed', 'cancelled'],
-    cancelled: ['active'],
+    cancelled: [],
     completed: []
 };
 
@@ -54,7 +55,7 @@ function sanitizeLaybyPlanDetailForAdmin(plan) {
             email: j.user.email
         };
     }
-    return j;
+    return enrichLaybyPlan(j);
 }
 
 exports.renderLaybyListPage = (req, res) => {
@@ -108,7 +109,21 @@ exports.listPlans = async (req, res) => {
             where,
             include: [
                 orderInclude,
-                { model: User, as: 'user', attributes: ['id', 'email', 'name'], required: false }
+                { model: User, as: 'user', attributes: ['id', 'email', 'name'], required: false },
+                {
+                    model: LaybyPayment,
+                    as: 'laybyPayments',
+                    separate: true,
+                    order: [['sequence', 'ASC']],
+                    include: [
+                        {
+                            model: Payment,
+                            as: 'payment',
+                            required: false,
+                            attributes: ['id', 'status', 'paymentMethod', 'metadata', 'lencoReference', 'transactionId', 'createdAt', 'amount']
+                        }
+                    ]
+                }
             ],
             order: [['createdAt', 'DESC']],
             limit,
@@ -119,7 +134,7 @@ exports.listPlans = async (req, res) => {
 
         res.json({
             success: true,
-            plans: rows.map((p) => p.toJSON()),
+            plans: rows.map((p) => enrichLaybyPlan(p)),
             total: count,
             page,
             limit,
@@ -165,7 +180,7 @@ exports.getPlan = async (req, res) => {
                             model: Payment,
                             as: 'payment',
                             required: false,
-                            attributes: ['id', 'status', 'lencoReference', 'transactionId', 'createdAt', 'amount']
+                            attributes: ['id', 'status', 'paymentMethod', 'metadata', 'lencoReference', 'transactionId', 'createdAt', 'amount', 'completedAt']
                         }
                     ]
                 }
@@ -193,6 +208,25 @@ exports.updatePlanStatus = async (req, res) => {
         const { status } = req.body || {};
         if (!['active', 'completed', 'cancelled'].includes(status)) {
             return res.status(400).json({ success: false, message: 'Invalid status' });
+        }
+
+        if (status === 'cancelled') {
+            const actor = req.admin?.email || (req.admin?.id ? `admin:${req.admin.id}` : 'admin');
+            const cancelled = await laybyService.cancelLaybyPlan(id, {
+                actor,
+                source: 'layby_admin_cancel',
+                reason: `Layby plan cancelled by ${actor}`
+            });
+            if (cancelled.error === 'NOT_FOUND') {
+                return res.status(404).json({ success: false, message: 'Plan not found' });
+            }
+            if (cancelled.error === 'PLAN_COMPLETED') {
+                return res.status(400).json({ success: false, message: 'Completed plans cannot be cancelled' });
+            }
+            if (cancelled.error) {
+                return res.status(400).json({ success: false, message: 'Could not cancel layby plan' });
+            }
+            return res.json({ success: true, plan: cancelled.plan.toJSON() });
         }
 
         const result = await LaybyPlan.sequelize.transaction(async (t) => {
@@ -251,7 +285,7 @@ exports.confirmInstallmentOffline = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid installment id' });
         }
         if (out.error === 'NOT_PENDING') {
-            return res.status(400).json({ success: false, message: 'Only pending installments can be confirmed' });
+            return res.status(400).json({ success: false, message: 'Only pending or overdue installments can be confirmed' });
         }
         if (out.error === 'PLAN_NOT_ACTIVE') {
             return res.status(400).json({ success: false, message: 'Plan must be active to confirm payments' });

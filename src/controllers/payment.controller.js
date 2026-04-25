@@ -152,7 +152,7 @@ exports.processPayment = async (req, res) => {
                     message: 'Order does not match this layby installment.'
                 });
             }
-            if (installment.status !== 'pending') {
+            if (!['pending', 'overdue'].includes(installment.status)) {
                 return res.status(400).json({
                     success: false,
                     message: 'This installment is not awaiting payment.'
