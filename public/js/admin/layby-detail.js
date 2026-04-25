@@ -133,12 +133,21 @@ function getVisibleInstallments(plan) {
     const isFlexible = schedule?.policy === 'flexible_within_period';
     if (!isFlexible) return rows;
 
-    // Flexible plans store the remaining balance in sequence >= 2 while it's still unpaid.
-    // Keep the installments table focused on actual completed installments by hiding
-    // this running-balance placeholder until it is paid.
+    // Flexible plans store the rolling remaining balance in sequence >= 2.
+    // Hide only a pure placeholder row (no payment evidence yet), but keep rows
+    // that already have payment activity so admins can see installment progress.
     return rows.filter((row) => {
-        const isBalancePlaceholder = Number(row.sequence) >= 2 && ['pending', 'overdue'].includes(row.status);
-        return !isBalancePlaceholder;
+        const isBalanceBucket = Number(row.sequence) >= 2;
+        const isOpen = ['pending', 'overdue'].includes(String(row.status || '').toLowerCase());
+        const hasPaymentEvidence = Boolean(
+            row.paymentId ||
+            row.adminConfirmedAt ||
+            row.payment ||
+            row.paymentSourceLabel ||
+            row.providerStatusLabel
+        );
+        const isPurePlaceholder = isBalanceBucket && isOpen && !hasPaymentEvidence;
+        return !isPurePlaceholder;
     });
 }
 
