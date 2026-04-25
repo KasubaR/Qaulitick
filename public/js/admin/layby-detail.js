@@ -128,27 +128,7 @@ function deriveNextAction(plan) {
 }
 
 function getVisibleInstallments(plan) {
-    const rows = Array.isArray(plan?.laybyPayments) ? plan.laybyPayments : [];
-    const schedule = parseSchedule(plan?.installmentSchedule);
-    const isFlexible = schedule?.policy === 'flexible_within_period';
-    if (!isFlexible) return rows;
-
-    // Flexible plans store the rolling remaining balance in sequence >= 2.
-    // Hide only a pure placeholder row (no payment evidence yet), but keep rows
-    // that already have payment activity so admins can see installment progress.
-    return rows.filter((row) => {
-        const isBalanceBucket = Number(row.sequence) >= 2;
-        const isOpen = ['pending', 'overdue'].includes(String(row.status || '').toLowerCase());
-        const hasPaymentEvidence = Boolean(
-            row.paymentId ||
-            row.adminConfirmedAt ||
-            row.payment ||
-            row.paymentSourceLabel ||
-            row.providerStatusLabel
-        );
-        const isPurePlaceholder = isBalanceBucket && isOpen && !hasPaymentEvidence;
-        return !isPurePlaceholder;
-    });
+    return Array.isArray(plan?.laybyPayments) ? plan.laybyPayments : [];
 }
 
 /**
@@ -276,7 +256,7 @@ function buildInstallmentRow(row, planStatus) {
     );
 
     const tdBtn = document.createElement('td');
-    if (row.status === 'pending' && planStatus === 'active') {
+    if (['pending', 'overdue'].includes(row.status) && planStatus === 'active') {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'btn-outline layby-confirm-offline-btn';
@@ -310,7 +290,7 @@ function updateInstallmentRow(tr, row, planStatus) {
     }
     const tdBtn = tds[7];
     if (!tdBtn) return;
-    const wantBtn = row.status === 'pending' && planStatus === 'active';
+    const wantBtn = ['pending', 'overdue'].includes(row.status) && planStatus === 'active';
     const btnEl = tdBtn.querySelector('.layby-confirm-offline-btn');
     if (wantBtn) {
         if (!btnEl || btnEl.getAttribute('data-installment-id') !== String(row.id)) {
@@ -421,6 +401,39 @@ function fillSummary(plan) {
     }
 }
 
+function renderPaymentHistory(payments) {
+    const body = document.getElementById('paymentHistoryBody');
+    if (!body) return;
+    if (!payments || !payments.length) {
+        body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;">No payments yet</td></tr>';
+        return;
+    }
+    body.replaceChildren();
+    payments.forEach((p) => {
+        const tr = document.createElement('tr');
+        const customer = p.customerInfo
+            ? [p.customerInfo.name, p.customerInfo.email].filter(Boolean).join(' · ')
+            : '—';
+        const provider = p.lencoProvider ? p.lencoProvider.toUpperCase() : (p.metadata?.source === 'layby_admin_offline' ? 'Offline' : '—');
+        const ref = p.lencoReference || p.transactionId || '—';
+        const date = p.completedAt || p.createdAt;
+        [
+            formatDate(date),
+            formatZmw(p.amount),
+            p.paymentMethod ? p.paymentMethod.replace(/_/g, ' ') : '—',
+            provider,
+            p.status,
+            ref,
+            customer
+        ].forEach((text) => {
+            const td = document.createElement('td');
+            td.textContent = text;
+            tr.appendChild(td);
+        });
+        body.appendChild(tr);
+    });
+}
+
 async function loadPlan(planId) {
     try {
         const data = await window.AdminLaybyAPI.getPlan(planId);
@@ -432,6 +445,7 @@ async function loadPlan(planId) {
         hideError();
         fillSummary(plan);
         renderInstallments(getVisibleInstallments(plan), plan.status);
+        renderPaymentHistory(data.paymentHistory || []);
     } catch (e) {
         showError(e.message || 'Failed to load plan');
         notify(e.message || 'Failed to load plan', 'error');

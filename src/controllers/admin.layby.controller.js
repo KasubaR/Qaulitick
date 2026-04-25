@@ -191,7 +191,24 @@ exports.getPlan = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Plan not found' });
         }
 
-        res.json({ success: true, plan: sanitizeLaybyPlanDetailForAdmin(plan) });
+        const installmentIds = (plan.laybyPayments || []).map((lp) => lp.id).filter(Boolean);
+        const paymentHistory = installmentIds.length
+            ? await Payment.findAll({
+                  where: { laybyPaymentId: { [Op.in]: installmentIds } },
+                  attributes: [
+                      'id', 'amount', 'currency', 'status', 'paymentMethod',
+                      'lencoProvider', 'lencoReference', 'transactionId',
+                      'customerInfo', 'completedAt', 'createdAt', 'laybyPaymentId', 'metadata'
+                  ],
+                  order: [['createdAt', 'DESC']]
+              })
+            : [];
+
+        res.json({
+            success: true,
+            plan: sanitizeLaybyPlanDetailForAdmin(plan),
+            paymentHistory: paymentHistory.map((p) => p.toJSON())
+        });
     } catch (err) {
         logger.error({ err }, 'getPlan failed');
         res.status(500).json({ success: false, message: 'Failed to load plan' });
