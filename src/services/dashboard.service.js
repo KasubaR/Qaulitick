@@ -2,7 +2,7 @@
  * Dashboard Service
  *
  * Handles all dashboard-related data aggregation and statistics
- * Aggregates data from Orders, Products, and Payments
+ * Aggregates data from Orders, Products, Payments, Layby, and OfflineSale
  */
 
 const { Op, QueryTypes } = require('sequelize');
@@ -11,6 +11,7 @@ const Order = require('../models/Order.model');
 const Product = require('../models/Product.model');
 const Payment = require('../models/Payment.model');
 const User = require('../models/User.model');
+const OfflineSale = require('../models/OfflineSale.model');
 
 class DashboardService {
     /**
@@ -25,7 +26,8 @@ class DashboardService {
                 totalProducts,
                 lowStockCount,
                 revenueResult,
-                laybyResult
+                laybyResult,
+                offlineAgg
             ] = await Promise.all([
                 Order.count({
                     where: {
@@ -52,12 +54,20 @@ class DashboardService {
                     SELECT COALESCE(SUM(amount), 0) AS laybyRevenue
                     FROM layby_payments
                     WHERE status = 'paid'
+                `, { type: QueryTypes.SELECT }),
+                sequelize.query(`
+                    SELECT
+                        COALESCE(SUM(JSON_EXTRACT(totals, '$.total')), 0) AS offlineRevenue,
+                        COUNT(*) AS offlineSaleCount
+                    FROM offline_sales
                 `, { type: QueryTypes.SELECT })
             ]);
 
             const orderRevenue = Number(revenueResult[0]?.revenue) || 0;
             const laybyRevenue = Number(laybyResult[0]?.laybyRevenue) || 0;
-            const currentRevenueValue = orderRevenue + laybyRevenue;
+            const offlineRevenue = Number(offlineAgg[0]?.offlineRevenue) || 0;
+            const offlineSaleCount = Number(offlineAgg[0]?.offlineSaleCount) || 0;
+            const currentRevenueValue = orderRevenue + laybyRevenue + offlineRevenue;
             const previousRevenueValue = 0;
 
             // Unique customer emails from:
@@ -113,6 +123,8 @@ class DashboardService {
                 totalCustomers: currentCustomersCount,
                 totalProducts: totalProducts,
                 totalRevenue: currentRevenueValue,
+                offlineRevenue,
+                offlineSaleCount,
                 lowStockCount: lowStockCount,
                 salesChange: salesChange,
                 ordersChange: ordersChange,
@@ -306,26 +318,44 @@ class DashboardService {
     async getBestSellingProducts(limit = 10) {
         try {
             const validStatuses = ['paid', 'confirmed', 'processing', 'packed', 'shipped', 'delivered'];
-            const orders = await Order.findAll({
-                where: { status: { [Op.in]: validStatuses } },
-                attributes: ['items'],
-                raw: true
-            });
+            const [orders, offlineSales] = await Promise.all([
+                Order.findAll({
+                    where: { status: { [Op.in]: validStatuses } },
+                    attributes: ['items'],
+                    raw: true
+                }),
+                OfflineSale.findAll({
+                    attributes: ['items'],
+                    raw: true
+                })
+            ]);
 
-            // Aggregate product sales from JSON items field
+            // Aggregate product sales from JSON items field (online orders + offline sales)
             const salesMap = {};
-            for (const order of orders) {
-                const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
+            const accumulateItems = (items) => {
                 for (const item of items) {
                     const pid = String(item.productId || item.id || '');
                     if (!pid) continue;
                     if (!salesMap[pid]) {
                         salesMap[pid] = { productId: pid, totalQuantity: 0, totalRevenue: 0, productName: item.name || '' };
                     }
-                    salesMap[pid].totalQuantity += item.quantity || 0;
-                    salesMap[pid].totalRevenue += (item.price || 0) * (item.quantity || 0);
+                    const qty = item.quantity || 0;
+                    const lineRev = item.lineTotal != null
+                        ? Number(item.lineTotal)
+                        : (item.price || 0) * qty;
+                    salesMap[pid].totalQuantity += qty;
+                    salesMap[pid].totalRevenue += lineRev;
                     if (!salesMap[pid].productName) salesMap[pid].productName = item.name || '';
                 }
+            };
+
+            for (const order of orders) {
+                const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
+                accumulateItems(items);
+            }
+            for (const sale of offlineSales) {
+                const items = typeof sale.items === 'string' ? JSON.parse(sale.items) : (sale.items || []);
+                accumulateItems(Array.isArray(items) ? items : []);
             }
 
             const sorted = Object.values(salesMap)
@@ -370,11 +400,17 @@ class DashboardService {
     async getTopCustomers(limit = 10) {
         try {
             const validStatuses = ['paid', 'confirmed', 'processing', 'packed', 'shipped', 'delivered'];
-            const orders = await Order.findAll({
-                where: { status: { [Op.in]: validStatuses } },
-                attributes: ['customer', 'totals'],
-                raw: true
-            });
+            const [orders, offlineRows] = await Promise.all([
+                Order.findAll({
+                    where: { status: { [Op.in]: validStatuses } },
+                    attributes: ['customer', 'totals'],
+                    raw: true
+                }),
+                OfflineSale.findAll({
+                    attributes: ['customerName', 'customerEmail', 'customerPhone', 'totals'],
+                    raw: true
+                })
+            ]);
 
             const customerMap = {};
             for (const order of orders) {
@@ -387,6 +423,25 @@ class DashboardService {
                 }
                 customerMap[email].orderCount += 1;
                 customerMap[email].totalSpent += totals.total || 0;
+            }
+
+            for (const row of offlineRows) {
+                const email = (row.customerEmail || '').trim();
+                if (!email) continue;
+                const totals = typeof row.totals === 'string' ? JSON.parse(row.totals) : (row.totals || {});
+                if (!customerMap[email]) {
+                    customerMap[email] = {
+                        name: row.customerName || '',
+                        email,
+                        phone: row.customerPhone || '',
+                        orderCount: 0,
+                        totalSpent: 0
+                    };
+                }
+                customerMap[email].orderCount += 1;
+                customerMap[email].totalSpent += totals.total || 0;
+                if (!customerMap[email].name && row.customerName) customerMap[email].name = row.customerName;
+                if (!customerMap[email].phone && row.customerPhone) customerMap[email].phone = row.customerPhone;
             }
 
             return Object.values(customerMap)
@@ -406,59 +461,37 @@ class DashboardService {
      */
     async getSalesChartData(period = 'daily') {
         try {
-            const now = new Date();
-            let startDate, dateFormat, groupKey;
+            const { startDate, groupKeyFromDate, dateFormat } = this._getTimeSeriesBucketConfig(period);
 
-            switch (period) {
-                case 'monthly':
-                    startDate = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-                    groupKey = order => {
-                        const d = new Date(order.createdAt);
-                        return `${d.getFullYear()}-${d.getMonth()}`;
-                    };
-                    dateFormat = key => {
-                        const [year, month] = key.split('-').map(Number);
-                        return new Date(year, month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-                    };
-                    break;
-                case 'weekly':
-                case 'daily':
-                default:
-                    startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                    groupKey = order => {
-                        const d = new Date(order.createdAt);
-                        return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-                    };
-                    dateFormat = key => {
-                        const [year, month, day] = key.split('-').map(Number);
-                        return new Date(year, month, day).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-                    };
-                    break;
-            }
+            const [orders, offlineSales] = await Promise.all([
+                Order.findAll({
+                    where: {
+                        createdAt: { [Op.gte]: startDate },
+                        status: { [Op.ne]: 'cancelled' }
+                    },
+                    attributes: ['createdAt'],
+                    raw: true
+                }),
+                OfflineSale.findAll({
+                    where: { soldAt: { [Op.gte]: startDate } },
+                    attributes: ['soldAt'],
+                    raw: true
+                })
+            ]);
 
-            const orders = await Order.findAll({
-                where: {
-                    createdAt: { [Op.gte]: startDate },
-                    status: { [Op.ne]: 'cancelled' }
-                },
-                attributes: ['createdAt'],
-                raw: true
-            });
-
-            const grouped = {};
+            const orderBuckets = {};
             orders.forEach(order => {
-                const key = groupKey(order);
-                grouped[key] = (grouped[key] || 0) + 1;
+                const key = groupKeyFromDate(new Date(order.createdAt));
+                orderBuckets[key] = (orderBuckets[key] || 0) + 1;
             });
 
-            const sortedKeys = Object.keys(grouped).sort();
-            const labels = sortedKeys.map(dateFormat);
-            const data = sortedKeys.map(k => grouped[k]);
+            const offlineBuckets = {};
+            offlineSales.forEach(sale => {
+                const key = groupKeyFromDate(new Date(sale.soldAt));
+                offlineBuckets[key] = (offlineBuckets[key] || 0) + 1;
+            });
 
-            return {
-                labels: labels.length > 0 ? labels : this.getDefaultLabels(period),
-                data: data.length > 0 ? data : this.getDefaultData(period)
-            };
+            return this._mergeTimeSeriesBucketMaps(orderBuckets, offlineBuckets, dateFormat, period);
         } catch (error) {
             console.error('[Dashboard Service] Error getting sales chart data:', error);
             throw error;
@@ -472,65 +505,91 @@ class DashboardService {
      */
     async getRevenueChartData(period = 'monthly') {
         try {
-            const now = new Date();
-            let startDate, dateFormat, groupKey;
+            const { startDate, groupKeyFromDate, dateFormat } = this._getTimeSeriesBucketConfig(period);
             const validStatuses = ['paid', 'confirmed', 'processing', 'packed', 'shipped', 'delivered'];
 
-            switch (period) {
-                case 'monthly':
-                    startDate = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-                    groupKey = order => {
-                        const d = new Date(order.createdAt);
-                        return `${d.getFullYear()}-${d.getMonth()}`;
-                    };
-                    dateFormat = key => {
-                        const [year, month] = key.split('-').map(Number);
-                        return new Date(year, month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-                    };
-                    break;
-                case 'weekly':
-                case 'daily':
-                default:
-                    startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                    groupKey = order => {
-                        const d = new Date(order.createdAt);
-                        return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-                    };
-                    dateFormat = key => {
-                        const [year, month, day] = key.split('-').map(Number);
-                        return new Date(year, month, day).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-                    };
-                    break;
-            }
+            const [orders, offlineSales] = await Promise.all([
+                Order.findAll({
+                    where: {
+                        createdAt: { [Op.gte]: startDate },
+                        status: { [Op.in]: validStatuses }
+                    },
+                    attributes: ['createdAt', 'totals'],
+                    raw: true
+                }),
+                OfflineSale.findAll({
+                    where: { soldAt: { [Op.gte]: startDate } },
+                    attributes: ['soldAt', 'totals'],
+                    raw: true
+                })
+            ]);
 
-            const orders = await Order.findAll({
-                where: {
-                    createdAt: { [Op.gte]: startDate },
-                    status: { [Op.in]: validStatuses }
-                },
-                attributes: ['createdAt', 'totals'],
-                raw: true
-            });
-
-            const grouped = {};
+            const orderBuckets = {};
             orders.forEach(order => {
-                const key = groupKey(order);
+                const key = groupKeyFromDate(new Date(order.createdAt));
                 const totals = typeof order.totals === 'string' ? JSON.parse(order.totals) : (order.totals || {});
-                grouped[key] = (grouped[key] || 0) + (totals.total || 0);
+                orderBuckets[key] = (orderBuckets[key] || 0) + (Number(totals.total) || 0);
             });
 
-            const sortedKeys = Object.keys(grouped).sort();
-            const labels = sortedKeys.map(dateFormat);
-            const data = sortedKeys.map(k => grouped[k]);
+            const offlineBuckets = {};
+            offlineSales.forEach(sale => {
+                const key = groupKeyFromDate(new Date(sale.soldAt));
+                const totals = typeof sale.totals === 'string' ? JSON.parse(sale.totals) : (sale.totals || {});
+                offlineBuckets[key] = (offlineBuckets[key] || 0) + (Number(totals.total) || 0);
+            });
 
-            return {
-                labels: labels.length > 0 ? labels : this.getDefaultLabels(period),
-                data: data.length > 0 ? data : this.getDefaultData(period)
-            };
+            return this._mergeTimeSeriesBucketMaps(orderBuckets, offlineBuckets, dateFormat, period);
         } catch (error) {
             console.error('[Dashboard Service] Error getting revenue chart data:', error);
             throw error;
         }
+    }
+
+    /**
+     * Shared date bucketing for sales count & revenue charts (aligned with chart period UI).
+     * @param {string} period 'daily' | 'weekly' | 'monthly'
+     */
+    _getTimeSeriesBucketConfig(period) {
+        const now = new Date();
+        switch (period) {
+            case 'monthly':
+                return {
+                    startDate: new Date(now.getFullYear(), now.getMonth() - 6, 1),
+                    groupKeyFromDate: (d) => `${d.getFullYear()}-${d.getMonth()}`,
+                    dateFormat: (key) => {
+                        const [year, month] = key.split('-').map(Number);
+                        return new Date(year, month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    }
+                };
+            case 'weekly':
+            case 'daily':
+            default:
+                return {
+                    startDate: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+                    groupKeyFromDate: (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`,
+                    dateFormat: (key) => {
+                        const [year, month, day] = key.split('-').map(Number);
+                        return new Date(year, month, day).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                    }
+                };
+        }
+    }
+
+    /**
+     * Union of bucket keys (sorted), summed values — used for orders + offline_sales in charts.
+     */
+    _mergeTimeSeriesBucketMaps(mapA, mapB, dateFormat, period) {
+        const keys = [...new Set([...Object.keys(mapA), ...Object.keys(mapB)])].sort();
+        if (keys.length === 0) {
+            return {
+                labels: this.getDefaultLabels(period),
+                data: this.getDefaultData(period)
+            };
+        }
+        return {
+            labels: keys.map(dateFormat),
+            data: keys.map(k => (Number(mapA[k]) || 0) + (Number(mapB[k]) || 0))
+        };
     }
 
     /**

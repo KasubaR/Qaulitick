@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
+    <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
+    <link rel="stylesheet" href="/css/admin/admin.css">
+    <link rel="stylesheet" href="/css/admin/offline-sales.css">
+</head>
+<body class="admin-page">
+    <div class="admin-container">
+        <%- include('../partials/admin-sidebar', { activePage: 'offline-sales' }) %>
+
+        <main class="admin-main">
+            <header class="admin-header">
+                <div class="header-left">
+                    <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 class="page-title">Offline sales</h1>
+                </div>
+            </header>
+
+            <p class="offline-sales-intro">Record in-store or phone sales. Stock is reduced immediately.</p>
+
+            <div class="offline-sales-content">
+                <section class="table-card offline-record-card" aria-labelledby="recordSaleHeading">
+                    <div class="table-header">
+                        <h2 id="recordSaleHeading" class="offline-section-title">Record a sale</h2>
+                    </div>
+                    <div class="offline-record-body">
+                        <div class="offline-meta-grid">
+                            <div class="form-group">
+                                <label for="soldAtInput">Sale date &amp; time</label>
+                                <input type="datetime-local" id="soldAtInput" class="form-input">
+                            </div>
+                            <div class="form-group">
+                                <label for="customerNameInput">Customer name <span class="label-optional">(optional)</span></label>
+                                <input type="text" id="customerNameInput" class="form-input" maxlength="200" autocomplete="name">
+                            </div>
+                            <div class="form-group">
+                                <label for="customerEmailInput">Email <span class="label-optional">(optional)</span></label>
+                                <input type="email" id="customerEmailInput" class="form-input" maxlength="255" autocomplete="email">
+                            </div>
+                            <div class="form-group">
+                                <label for="customerPhoneInput">Phone <span class="label-optional">(optional)</span></label>
+                                <input type="tel" id="customerPhoneInput" class="form-input" maxlength="50" autocomplete="tel">
+                            </div>
+                        </div>
+                        <div class="form-group offline-notes-group">
+                            <label for="notesInput">Notes <span class="label-optional">(optional)</span></label>
+                            <textarea id="notesInput" class="form-input" rows="2" maxlength="2000"></textarea>
+                        </div>
+
+                        <div class="offline-lines-toolbar">
+                            <button type="button" class="btn-secondary" id="addOfflineLineBtn">
+                                <i class="fas fa-plus"></i> Add line
+                            </button>
+                        </div>
+
+                        <div class="table-container offline-lines-wrap">
+                            <table class="admin-table offline-lines-table" id="offlineLinesTable">
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th>Color</th>
+                                        <th class="th-narrow">Qty</th>
+                                        <th class="th-narrow">Unit (ZMW)</th>
+                                        <th class="th-narrow">Line total</th>
+                                        <th class="th-actions"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="offlineLineRows"></tbody>
+                            </table>
+                            <p id="offlineLinesEmpty" class="offline-lines-empty">No lines yet. Click &quot;Add line&quot; to search and select a product.</p>
+                        </div>
+
+                        <div class="offline-totals-bar">
+                            <div class="offline-total-row">
+                                <span>Subtotal</span>
+                                <strong id="offlineSubtotalDisplay">K0.00</strong>
+                            </div>
+                            <div class="offline-total-row offline-total-row--grand">
+                                <span>Total</span>
+                                <strong id="offlineGrandTotalDisplay">K0.00</strong>
+                            </div>
+                        </div>
+
+                        <div class="offline-form-actions">
+                            <button type="button" class="btn-primary" id="submitOfflineSaleBtn">
+                                <i class="fas fa-check"></i> Save sale
+                            </button>
+                        </div>
+                        <div id="offlineFormMessage" class="offline-form-message offline-form-message--hidden" role="status"></div>
+                    </div>
+                </section>
+
+                <section class="table-card offline-history-card" aria-labelledby="recentSalesHeading">
+                    <div class="table-header">
+                        <h2 id="recentSalesHeading" class="offline-section-title">Recent offline sales</h2>
+                    </div>
+                    <div class="table-container">
+                        <table class="admin-table" id="offlineSalesHistoryTable">
+                            <thead>
+                                <tr>
+                                    <th>Sale #</th>
+                                    <th>Date</th>
+                                    <th>Total</th>
+                                    <th>Customer</th>
+                                    <th>Recorded by</th>
+                                </tr>
+                            </thead>
+                            <tbody id="offlineSalesHistoryBody">
+                                <tr>
+                                    <td colspan="5" class="empty-state">Loading…</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <%- include('../partials/admin-pagination', {
+                        containerId: 'offlineSalesPagination',
+                        prevId: 'offlineSalesPrev',
+                        nextId: 'offlineSalesNext',
+                        variant: 'simple',
+                        pageInfoId: 'offlineSalesPageInfo',
+                        pageInfoText: 'Page 1 of 1',
+                        hidden: false
+                    }) %>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <div id="offlinePageNotification" class="offline-page-notification" role="alert" aria-live="polite"></div>
+
+    <script src="/js/admin/auth-utils.js"></script>
+    <script src="/js/admin/sidebar.js"></script>
+    <script src="/js/admin/orders-badge.js"></script>
+    <script src="/js/admin/offline-sales.js"></script>
+</body>
+</html>

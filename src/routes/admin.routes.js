@@ -17,6 +17,7 @@ const inventoryController = require('../controllers/inventory.controller');
 const contactController = require('../controllers/contact.controller');
 const adminLaybyController = require('../controllers/admin.layby.controller');
 const reviewAdminController = require('../controllers/review.admin.controller');
+const offlineSaleAdminController = require('../controllers/offlineSale.admin.controller');
 
 const adminOrderRoutes = require('./admin.order.routes');
 
@@ -88,6 +89,15 @@ router.get('/admin/customers', requireAdminAuth, (req, res) => {
 
 router.get('/admin/inventory', requireAdminAuth, (req, res) => {
     res.render('admin/inventory', { title: 'Inventory Management | Admin Panel', page: 'admin' });
+});
+
+router.get('/admin/offline-sales', requireAdminAuth, (req, res) => {
+    res.render('admin/offline-sales', {
+        title: 'Offline sales | Admin Panel',
+        page: 'admin',
+        activePage: 'offline-sales',
+        csrfToken: res.locals.csrfToken || ''
+    });
 });
 
 router.get('/admin/marketing', requireAdminAuth, (req, res) => {
@@ -339,6 +349,21 @@ router.get('/api/admin/inventory/export',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }),
     authenticateAdmin,
     inventoryController.exportInventory
+);
+
+// ============================================
+// Admin offline sales API
+// ============================================
+router.get('/api/admin/offline-sales',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
+    authenticateAdmin,
+    offlineSaleAdminController.listOfflineSales
+);
+router.post('/api/admin/offline-sales',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60 }),
+    authenticateAdmin,
+    csrfTokenValidator(),
+    offlineSaleAdminController.createOfflineSale
 );
 
 // ============================================

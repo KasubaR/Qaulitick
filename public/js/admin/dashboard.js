@@ -505,6 +505,17 @@ async function loadKPIData() {
                 lowStockCountEl.textContent = (data.lowStockCount || 0).toLocaleString();
                 lowStockCountEl.style.opacity = '1';
             }
+
+            const offlineRevenueEl = document.getElementById('offlineRevenueKpi');
+            const offlineSaleCountEl = document.getElementById('offlineSaleCountKpi');
+            if (offlineRevenueEl) {
+                offlineRevenueEl.textContent = formatCurrency(data.offlineRevenue || 0);
+                offlineRevenueEl.style.opacity = '1';
+            }
+            if (offlineSaleCountEl) {
+                offlineSaleCountEl.textContent = (data.offlineSaleCount ?? 0).toLocaleString();
+                offlineSaleCountEl.style.opacity = '1';
+            }
             
             // Update change indicators
             updateChangeIndicator('salesChange', data.salesChange);
@@ -1454,6 +1465,8 @@ async function exportDashboardReport() {
             summary: {
                 totalOrders: stats.success ? stats.data.totalOrders : 0,
                 totalRevenue: stats.success ? stats.data.totalRevenue : 0,
+                offlineRevenue: stats.success ? stats.data.offlineRevenue : 0,
+                offlineSaleCount: stats.success ? stats.data.offlineSaleCount : 0,
                 totalCustomers: stats.success ? stats.data.totalCustomers : 0,
                 totalProducts: stats.success ? stats.data.totalProducts : 0,
                 lowStockCount: stats.success ? stats.data.lowStockCount : 0
@@ -1493,6 +1506,8 @@ async function exportDashboardReport() {
                 csvRows.push(`Total Customers,${stats.data.totalCustomers || 0}`);
                 csvRows.push(`Total Products,${stats.data.totalProducts || 0}`);
                 csvRows.push(`Total Revenue,${stats.data.totalRevenue || 0}`);
+                csvRows.push(`Offline Revenue,${stats.data.offlineRevenue || 0}`);
+                csvRows.push(`Offline Sales Count,${stats.data.offlineSaleCount || 0}`);
                 csvRows.push(`Low Stock Count,${stats.data.lowStockCount || 0}`);
             }
             csvRows.push('');
