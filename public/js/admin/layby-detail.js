@@ -80,6 +80,68 @@ function formatZmw(n) {
     return `K${x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function parseSchedule(raw) {
+    if (!raw) return null;
+    if (typeof raw === 'string') {
+        try {
+            return JSON.parse(raw);
+        } catch {
+            return null;
+        }
+    }
+    return raw && typeof raw === 'object' ? raw : null;
+}
+
+function deriveArrangementLabel(plan) {
+    const schedule = parseSchedule(plan.installmentSchedule);
+    if (schedule?.policy === 'flexible_within_period') {
+        const days = Number(schedule.planPeriodDays) || null;
+        return days ? `Flexible balance within ${days} days` : 'Flexible balance plan';
+    }
+    if (schedule?.policy === 'equal_interval_after_deposit') {
+        const count = Number(plan.installmentCount) || 0;
+        const interval = Number(schedule.intervalDays) || null;
+        return interval
+            ? `${count} scheduled installment${count === 1 ? '' : 's'}, every ${interval} days`
+            : `${count} scheduled installment${count === 1 ? '' : 's'}`;
+    }
+    if (schedule?.policy === 'equal_slices_within_period') {
+        const count = Number(plan.installmentCount) || 0;
+        const days = Number(schedule.planPeriodDays) || null;
+        return days
+            ? `${count} scheduled installment${count === 1 ? '' : 's'} within ${days} days`
+            : `${count} scheduled installment${count === 1 ? '' : 's'}`;
+    }
+    return 'Layby payment arrangement';
+}
+
+function deriveNextAction(plan) {
+    const rows = Array.isArray(plan.laybyPayments) ? plan.laybyPayments : [];
+    const nextPayable = rows.find((row) => ['pending', 'overdue'].includes(row.status));
+    if (plan.status === 'completed') return 'No action - fully paid';
+    if (plan.status === 'cancelled') return 'No action - cancelled';
+    if (!nextPayable) return 'No payment due';
+    if (Number(nextPayable.sequence) === 1) return 'Pay deposit';
+    const schedule = parseSchedule(plan.installmentSchedule);
+    if (schedule?.policy === 'flexible_within_period') return 'Make a layby payment';
+    return `Pay installment #${nextPayable.sequence}`;
+}
+
+function getVisibleInstallments(plan) {
+    const rows = Array.isArray(plan?.laybyPayments) ? plan.laybyPayments : [];
+    const schedule = parseSchedule(plan?.installmentSchedule);
+    const isFlexible = schedule?.policy === 'flexible_within_period';
+    if (!isFlexible) return rows;
+
+    // Flexible plans store the remaining balance in sequence >= 2 while it's still unpaid.
+    // Keep the installments table focused on actual completed installments by hiding
+    // this running-balance placeholder until it is paid.
+    return rows.filter((row) => {
+        const isBalancePlaceholder = Number(row.sequence) >= 2 && ['pending', 'overdue'].includes(row.status);
+        return !isBalancePlaceholder;
+    });
+}
+
 /**
  * Line items + totals from the linked order (admin layby detail).
  */
@@ -184,10 +246,6 @@ function installmentPaySummary(row) {
     return pay ? `${row.providerStatusLabel || pay.status}${pay.lencoReference ? ` (${pay.lencoReference})` : ''}` : 'No provider payment';
 }
 
-function canConfirmOffline(row, planStatus) {
-    return ['pending', 'overdue'].includes(row.status) && planStatus === 'active';
-}
-
 function buildInstallmentRow(row, planStatus) {
     const tr = document.createElement('tr');
     tr.setAttribute('data-installment-id', String(row.id));
@@ -209,7 +267,7 @@ function buildInstallmentRow(row, planStatus) {
     );
 
     const tdBtn = document.createElement('td');
-    if (canConfirmOffline(row, planStatus)) {
+    if (row.status === 'pending' && planStatus === 'active') {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'btn-outline layby-confirm-offline-btn';
@@ -243,7 +301,7 @@ function updateInstallmentRow(tr, row, planStatus) {
     }
     const tdBtn = tds[7];
     if (!tdBtn) return;
-    const wantBtn = canConfirmOffline(row, planStatus);
+    const wantBtn = row.status === 'pending' && planStatus === 'active';
     const btnEl = tdBtn.querySelector('.layby-confirm-offline-btn');
     if (wantBtn) {
         if (!btnEl || btnEl.getAttribute('data-installment-id') !== String(row.id)) {
@@ -336,14 +394,14 @@ function fillSummary(plan) {
     const cust = [user.name, user.email].filter(Boolean).join(' · ');
     setText('summaryCustomer', cust || '—');
     setText('summaryPlanStatus', plan.laybyDisplayStatus || plan.status || '—');
-    setText('summaryArrangement', plan.paymentArrangementLabel || '—');
+    setText('summaryArrangement', plan.paymentArrangementLabel || deriveArrangementLabel(plan));
     const cur = plan.currency || 'ZMW';
-    setText(
-        'summaryBalance',
-        `${formatZmw(plan.balanceRemaining)} / ${formatZmw(plan.orderTotal)} ${cur}`
-    );
-    setText('summaryAmountPaid', `${formatZmw(plan.amountPaid)} ${cur}`);
-    setText('summaryNextAction', plan.nextActionLabel || '—');
+    setText('summaryBalance', `${formatZmw(plan.balanceRemaining)} ${cur}`);
+    setText('summaryTotal', `${formatZmw(plan.orderTotal)} ${cur}`);
+    const amountPaidFallback = Math.max(0, Number(plan.orderTotal || 0) - Number(plan.balanceRemaining || 0));
+    const amountPaid = Number.isFinite(Number(plan.amountPaid)) ? Number(plan.amountPaid) : amountPaidFallback;
+    setText('summaryAmountPaid', `${formatZmw(amountPaid)} ${cur}`);
+    setText('summaryNextAction', plan.nextActionLabel || deriveNextAction(plan));
     setText('summaryNextDue', plan.nextDueLabel || formatDate(plan.nextDueAt));
 
     renderOrderSummary(order);
@@ -364,7 +422,7 @@ async function loadPlan(planId) {
         }
         hideError();
         fillSummary(plan);
-        renderInstallments(plan.laybyPayments || [], plan.status);
+        renderInstallments(getVisibleInstallments(plan), plan.status);
     } catch (e) {
         showError(e.message || 'Failed to load plan');
         notify(e.message || 'Failed to load plan', 'error');

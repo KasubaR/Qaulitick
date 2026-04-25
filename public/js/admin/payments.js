@@ -186,6 +186,7 @@ function setupActionButtons() {
 
         const verifyBtn = document.getElementById('verifyPaymentModalBtn');
         const originalHtml = verifyBtn ? verifyBtn.innerHTML : '';
+        let keepSyncedState = false;
 
         try {
             if (verifyBtn) {
@@ -211,11 +212,12 @@ function setupActionButtons() {
             // Refresh both modal details and list row status.
             await loadPaymentDetails(currentPaymentId);
             await loadPayments(getCurrentFilters());
+            keepSyncedState = true;
         } catch (error) {
             console.error('Error verifying payment:', error);
             showNotification(error.message || 'Failed to verify payment', 'error');
         } finally {
-            if (verifyBtn) {
+            if (verifyBtn && !keepSyncedState) {
                 verifyBtn.disabled = false;
                 verifyBtn.innerHTML = originalHtml || VERIFY_PAYMENT_BTN_DEFAULT_HTML;
             }
