@@ -405,15 +405,12 @@ function renderPaymentHistory(payments) {
     const body = document.getElementById('paymentHistoryBody');
     if (!body) return;
     if (!payments || !payments.length) {
-        body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;">No payments yet</td></tr>';
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;">No payments yet</td></tr>';
         return;
     }
     body.replaceChildren();
     payments.forEach((p) => {
         const tr = document.createElement('tr');
-        const customer = p.customerInfo
-            ? [p.customerInfo.name, p.customerInfo.email].filter(Boolean).join(' · ')
-            : '—';
         const provider = p.lencoProvider ? p.lencoProvider.toUpperCase() : (p.metadata?.source === 'layby_admin_offline' ? 'Offline' : '—');
         const ref = p.lencoReference || p.transactionId || '—';
         const date = p.completedAt || p.createdAt;
@@ -423,8 +420,7 @@ function renderPaymentHistory(payments) {
             p.paymentMethod ? p.paymentMethod.replace(/_/g, ' ') : '—',
             provider,
             p.status,
-            ref,
-            customer
+            ref
         ].forEach((text) => {
             const td = document.createElement('td');
             td.textContent = text;

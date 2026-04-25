@@ -198,7 +198,7 @@ exports.getPlan = async (req, res) => {
                   attributes: [
                       'id', 'amount', 'currency', 'status', 'paymentMethod',
                       'lencoProvider', 'lencoReference', 'transactionId',
-                      'customerInfo', 'completedAt', 'createdAt', 'laybyPaymentId', 'metadata'
+                      'completedAt', 'createdAt', 'laybyPaymentId', 'metadata'
                   ],
                   order: [['createdAt', 'DESC']]
               })
