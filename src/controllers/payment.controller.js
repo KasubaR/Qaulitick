@@ -6,6 +6,10 @@ const Order = require('../models/Order.model');
 const lencoService = require('../services/lenco.service');
 const orderService = require('../services/order.service');
 const laybyService = require('../services/layby.service');
+const {
+    applyPaymentStatusSideEffects,
+    sendAdminPaymentNotificationOnce
+} = require('../services/paymentCompletion.service');
 const LaybyPayment = require('../models/LaybyPayment.model');
 const LaybyPlan = require('../models/LaybyPlan.model');
 const { getAuthenticatedAdmin } = require('../middlewares/auth.middleware');
@@ -45,25 +49,6 @@ async function assertLaybyPaymentVerifyAuthorized(req, payment) {
     }
     return null;
 }
-
-/**
- * Atomically claim the right to send admin email for a terminal payment (completed/failed).
- * Prevents duplicate emails when verify (poll) and webhook run concurrently.
- */
-async function tryClaimPaymentAdminNotification(paymentId) {
-    const [count] = await Payment.update(
-        { notifiedAt: new Date() },
-        {
-            where: {
-                id: paymentId,
-                notifiedAt: { [Op.is]: null },
-                status: { [Op.in]: ['completed', 'failed'] }
-            }
-        }
-    );
-    return count > 0;
-}
-
 
 // Payment retry limit (configurable via environment variable)
 const MAX_PAYMENT_RETRIES = parseInt(process.env.MAX_PAYMENT_RETRIES || '3', 10);
@@ -612,51 +597,22 @@ exports.verifyPayment = async (req, res) => {
                 await Payment.update(updatePayload, { where: { id: payment.id } });
                 payment = await Payment.findByPk(payment.id);
 
-                if (newStatus === 'completed') {
-                    if (payment.laybyPaymentId) {
-                        try {
-                            await laybyService.recordLaybyInstallmentPaid(payment);
-                        } catch (lbErr) {
-                            logger.error({ err: lbErr }, 'Layby installment apply failed after verify');
-                        }
-                    } else {
-                        try {
-                            await orderService.updateOrderStatusFromPayment(
-                                payment.orderNumber,
-                                'completed',
-                                payment.lencoTransactionId,
-                                'Payment completed via Lenco verification'
-                            );
-                            logger.debug({ orderNumber: payment.orderNumber }, 'Order status updated to paid');
-                        } catch (orderError) {
-                            console.error('[Payment Controller] Error updating order status:', orderError);
-                        }
-                    }
-                } else if (newStatus === 'failed' && !payment.laybyPaymentId) {
+                if (['completed', 'failed'].includes(newStatus)) {
                     try {
-                        await orderService.updateOrderStatusFromPayment(
-                            payment.orderNumber,
-                            'failed',
-                            payment.lencoTransactionId,
-                            `Payment failed: ${updatePayload.failureReason}`
-                        );
-                        logger.debug({ orderNumber: payment.orderNumber }, 'Order status updated to payment_failed');
-                    } catch (orderError) {
-                        console.error('[Payment Controller] Error updating order status:', orderError);
+                        await applyPaymentStatusSideEffects(payment, {
+                            source: 'Lenco verification',
+                            note: newStatus === 'completed'
+                                ? 'Payment completed via Lenco verification'
+                                : `Payment failed: ${updatePayload.failureReason || 'Payment failed'}`
+                        });
+                    } catch (sideEffectError) {
+                        logger.error({ err: sideEffectError }, 'Payment side effects failed after verify');
                     }
-                }
 
-                // Admin email: single send per payment row (atomic notifiedAt vs concurrent webhook)
-                if (newStatus === 'completed' || newStatus === 'failed') {
-                    const claimed = await tryClaimPaymentAdminNotification(payment.id);
-                    if (claimed) {
-                        try {
-                            const emailService = require('../services/email.service');
-                            const fresh = await Payment.findByPk(payment.id);
-                            await emailService.sendPaymentNotificationToAdmin(fresh.toJSON());
-                        } catch (emailError) {
-                            console.error('[Payment Controller] Error sending payment notification:', emailError);
-                        }
+                    try {
+                        await sendAdminPaymentNotificationOnce(payment.id);
+                    } catch (emailError) {
+                        logger.error({ err: emailError }, 'Payment notification claim failed after verify');
                     }
                 }
 
@@ -920,42 +876,14 @@ exports.handleLencoWebhook = async (req, res) => {
         // Use payment.orderNumber (from payment record) instead of webhookData.orderNumber
         // because webhook might not include orderNumber in payload
         const orderNumberToUpdate = payment.orderNumber || webhookData.orderNumber;
-        
+
         if (orderNumberToUpdate) {
             try {
-                if (payment.status === 'completed' && payment.laybyPaymentId) {
-                    await laybyService.recordLaybyInstallmentPaid(payment);
-                    logger.debug({ orderNumber: orderNumberToUpdate }, 'Layby installment applied from webhook');
-                } else if (!payment.laybyPaymentId) {
-                    let paymentStatusForOrder = payment.status;
-                    if (payment.status === 'completed') {
-                        paymentStatusForOrder = 'completed';
-                    } else if (payment.status === 'failed') {
-                        paymentStatusForOrder = 'failed';
-                    } else if (payment.status === 'pending') {
-                        paymentStatusForOrder = 'pending';
-                    }
-
-                    const updatedOrder = await orderService.updateOrderStatusFromPayment(
-                        orderNumberToUpdate,
-                        paymentStatusForOrder,
-                        webhookData.transactionId || payment.lencoTransactionId,
-                        `Payment status updated via webhook: ${payment.status}`
-                    );
-
-                    if (updatedOrder) {
-                        logger.debug(
-                            {
-                                orderNumber: orderNumberToUpdate,
-                                status: updatedOrder.status,
-                                paymentStatus: updatedOrder.paymentStatus
-                            },
-                            'Order status updated successfully'
-                        );
-                    } else {
-                        console.warn(`[Payment Controller] Order ${orderNumberToUpdate} not found for status update`);
-                    }
-                }
+                await applyPaymentStatusSideEffects(payment, {
+                    source: 'webhook',
+                    note: `Payment status updated via webhook: ${payment.status}`,
+                    includeNonTerminal: true
+                });
             } catch (error) {
                 console.error('[Payment Controller] Error updating order status:', error);
             }
@@ -965,15 +893,10 @@ exports.handleLencoWebhook = async (req, res) => {
 
         // Admin email after order sync; atomic notifiedAt dedupes concurrent verify (poll)
         if (payment.status === 'completed' || payment.status === 'failed') {
-            const claimed = await tryClaimPaymentAdminNotification(payment.id);
-            if (claimed) {
-                try {
-                    const emailService = require('../services/email.service');
-                    const fresh = await Payment.findByPk(payment.id);
-                    await emailService.sendPaymentNotificationToAdmin(fresh.toJSON());
-                } catch (emailError) {
-                    console.error('[Payment Controller] Error sending payment notification:', emailError);
-                }
+            try {
+                await sendAdminPaymentNotificationOnce(payment.id);
+            } catch (emailError) {
+                logger.error({ err: emailError }, 'Payment notification claim failed after webhook');
             }
         }
 

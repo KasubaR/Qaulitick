@@ -7,14 +7,33 @@
 
 const featuredProductService = require('./featuredProduct.service');
 const Order = require('../models/Order.model');
+const Payment = require('../models/Payment.model');
 const Product = require('../models/Product.model');
 const { LaybyPlan, LaybyPayment } = require('../models');
 const laybyService = require('./layby.service');
+const lencoService = require('./lenco.service');
+const {
+    applyPaymentStatusSideEffects,
+    sendAdminPaymentNotificationOnce
+} = require('./paymentCompletion.service');
 const { GRACE_PERIOD_DAYS } = require('../config/layby');
 const { Op } = require('sequelize');
 
 const PENDING_TTL_MS     = 10 * 60 * 1000; // 10 minutes for pending orders
 const PROCESSING_TTL_MS  = 30 * 60 * 1000; // 30 minutes for processing orders (gateway timeout)
+
+function parsePositiveInt(value, fallback) {
+    const parsed = parseInt(String(value), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const PAYMENT_POLL_INTERVAL_MS = parsePositiveInt(process.env.PAYMENT_POLL_INTERVAL_MS, 5 * 60 * 1000);
+const PAYMENT_POLL_MIN_AGE_MS = parsePositiveInt(process.env.PAYMENT_POLL_MIN_AGE_MS, 2 * 60 * 1000);
+const PAYMENT_POLL_EXPIRY_GRACE_MS = parsePositiveInt(process.env.PAYMENT_POLL_EXPIRY_GRACE_MS, 24 * 60 * 60 * 1000);
+const PAYMENT_POLL_BATCH_LIMIT = Math.min(
+    100,
+    parsePositiveInt(process.env.PAYMENT_POLL_BATCH_LIMIT, 50)
+);
 
 /**
  * Mark stale unpaid orders expired and restore color-variant JSON stock (decremented at checkout).
@@ -157,10 +176,138 @@ async function flagOverdueLaybyInstallments() {
     }
 }
 
+async function pollPendingLencoPayments() {
+    const cutoff = new Date(Date.now() - PAYMENT_POLL_MIN_AGE_MS);
+    const expiryGraceCutoff = new Date(Date.now() - PAYMENT_POLL_EXPIRY_GRACE_MS);
+
+    const payments = await Payment.findAll({
+        where: {
+            status: { [Op.in]: ['pending', 'processing'] },
+            createdAt: { [Op.lt]: cutoff },
+            [Op.and]: [
+                {
+                    [Op.or]: [
+                        { lencoTransactionId: { [Op.ne]: null } },
+                        { transactionId: { [Op.ne]: null } }
+                    ]
+                },
+                {
+                    [Op.or]: [
+                        { expiresAt: { [Op.is]: null } },
+                        { expiresAt: { [Op.gte]: expiryGraceCutoff } }
+                    ]
+                }
+            ]
+        },
+        order: [['createdAt', 'ASC']],
+        limit: PAYMENT_POLL_BATCH_LIMIT
+    });
+
+    if (payments.length === 0) return { checked: 0, updated: 0, terminal: 0, errors: 0 };
+
+    console.log(`[Scheduler] Polling ${payments.length} pending Lenco payment(s)...`);
+
+    const stats = { checked: payments.length, updated: 0, terminal: 0, errors: 0 };
+
+    for (const payment of payments) {
+        try {
+            const merchantReference = (payment.transactionId && String(payment.transactionId).trim()) || null;
+            const lencoResult = await lencoService.verifyPayment(payment.lencoTransactionId, merchantReference);
+            const newStatus = Payment.mapLencoStatusToPaymentStatus(lencoResult.status);
+
+            const updatePayload = {
+                lencoStatus: lencoResult.status,
+                status: newStatus,
+                lencoResponse: lencoResult.rawResponse || lencoResult
+            };
+
+            if (lencoResult.transactionId && !payment.lencoTransactionId) {
+                updatePayload.lencoTransactionId = lencoResult.transactionId;
+            }
+            if (lencoResult.lencoReference) {
+                updatePayload.lencoReference = lencoResult.lencoReference;
+            }
+            if (lencoResult.provider) {
+                updatePayload.lencoProvider = String(lencoResult.provider).toLowerCase();
+            }
+
+            if (newStatus === 'completed') {
+                updatePayload.completedAt = lencoResult.completedAt
+                    ? new Date(lencoResult.completedAt)
+                    : new Date();
+            } else if (newStatus === 'failed') {
+                updatePayload.failedAt = lencoResult.failedAt
+                    ? new Date(lencoResult.failedAt)
+                    : new Date();
+                updatePayload.failureReason = lencoResult.failureReason || 'Payment failed';
+            } else if (newStatus === 'cancelled') {
+                updatePayload.cancelledAt = new Date();
+                updatePayload.failureReason = lencoResult.failureReason || payment.failureReason || null;
+            }
+
+            const [updatedRows] = await Payment.update(updatePayload, {
+                where: {
+                    id: payment.id,
+                    status: { [Op.in]: ['pending', 'processing'] }
+                }
+            });
+
+            if (updatedRows === 0) {
+                continue;
+            }
+
+            stats.updated++;
+
+            if (['completed', 'failed', 'cancelled'].includes(newStatus)) {
+                stats.terminal++;
+                const freshPayment = await Payment.findByPk(payment.id);
+                try {
+                    await applyPaymentStatusSideEffects(freshPayment, {
+                        source: 'payment cron',
+                        note: `Payment status updated via scheduled poll: ${newStatus}`
+                    });
+                } catch (sideEffectError) {
+                    console.error(`[Scheduler] Payment side effects failed for payment ${payment.id}:`, sideEffectError.message);
+                }
+
+                if (['completed', 'failed'].includes(newStatus)) {
+                    await sendAdminPaymentNotificationOnce(payment.id);
+                }
+            }
+        } catch (error) {
+            stats.errors++;
+            console.warn(`[Scheduler] Payment poll failed for payment ${payment.id}:`, error.message);
+        }
+    }
+
+    if (stats.updated > 0 || stats.errors > 0) {
+        console.log(
+            `[Scheduler] Payment poll complete: checked=${stats.checked}, updated=${stats.updated}, terminal=${stats.terminal}, errors=${stats.errors}`
+        );
+    }
+
+    return stats;
+}
+
 class SchedulerService {
     constructor() {
         this.intervals = [];
         this.isRunning = false;
+        this.paymentPollRunning = false;
+    }
+
+    async pollPendingPayments() {
+        if (this.paymentPollRunning) {
+            console.log('[Scheduler] Payment poll already running; skipping overlap');
+            return { skipped: true };
+        }
+
+        this.paymentPollRunning = true;
+        try {
+            return await pollPendingLencoPayments();
+        } finally {
+            this.paymentPollRunning = false;
+        }
     }
 
     /**
@@ -223,7 +370,22 @@ class SchedulerService {
             }
         }, 60 * 60 * 1000); // 1 hour
 
-        this.intervals.push(cleanupDeletedInterval, cleanupInactiveInterval, expireStaleOrdersInterval, laybyOverdueInterval);
+        // Poll pending Lenco payments every 5 minutes as a webhook fallback
+        const paymentPollInterval = setInterval(async () => {
+            try {
+                await this.pollPendingPayments();
+            } catch (error) {
+                console.error('[Scheduler] Error during payment poll:', error);
+            }
+        }, PAYMENT_POLL_INTERVAL_MS);
+
+        this.intervals.push(
+            cleanupDeletedInterval,
+            cleanupInactiveInterval,
+            expireStaleOrdersInterval,
+            laybyOverdueInterval,
+            paymentPollInterval
+        );
 
         // Run initial cleanup on startup (after 1 minute delay to let server fully start)
         setTimeout(async () => {
@@ -236,6 +398,7 @@ class SchedulerService {
 
                 await expireStaleUnpaidOrders();
                 await flagOverdueLaybyInstallments();
+                await this.pollPendingPayments();
             } catch (error) {
                 console.error('[Scheduler] Error during initial cleanup:', error);
             }
@@ -264,7 +427,8 @@ class SchedulerService {
     getStatus() {
         return {
             isRunning: this.isRunning,
-            activeTasks: this.intervals.length
+            activeTasks: this.intervals.length,
+            paymentPollRunning: this.paymentPollRunning
         };
     }
 }
