@@ -31,6 +31,7 @@ function showConfirmDialog(message, { title = 'Confirm', confirmLabel = 'Confirm
 let currentPage = 1;
 let totalPages = 1;
 let currentPaymentId = null;
+const VERIFY_PAYMENT_BTN_DEFAULT_HTML = '<i class="fas fa-sync-alt"></i> Verify payment';
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Check authentication before initializing
@@ -177,6 +178,50 @@ function setupModals() {
 
 // Setup action buttons
 function setupActionButtons() {
+    document.getElementById('verifyPaymentModalBtn')?.addEventListener('click', async () => {
+        if (!currentPaymentId) {
+            showNotification('No payment selected', 'error');
+            return;
+        }
+
+        const verifyBtn = document.getElementById('verifyPaymentModalBtn');
+        const originalHtml = verifyBtn ? verifyBtn.innerHTML : '';
+
+        try {
+            if (verifyBtn) {
+                verifyBtn.disabled = true;
+                verifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+            }
+
+            const payment = await AdminPaymentsAPI.getPaymentById(currentPaymentId);
+            if (!payment) {
+                showNotification('Payment not found', 'error');
+                return;
+            }
+
+            const txId = payment.transactionId || payment.lencoTransactionId || payment.lencoReference;
+            if (!txId) {
+                showNotification('No transaction reference available to verify', 'error');
+                return;
+            }
+
+            const result = await AdminPaymentsAPI.verifyPayment(txId);
+            showNotification(result.message || 'Payment verified', 'success');
+
+            // Refresh both modal details and list row status.
+            await loadPaymentDetails(currentPaymentId);
+            await loadPayments(getCurrentFilters());
+        } catch (error) {
+            console.error('Error verifying payment:', error);
+            showNotification(error.message || 'Failed to verify payment', 'error');
+        } finally {
+            if (verifyBtn) {
+                verifyBtn.disabled = false;
+                verifyBtn.innerHTML = originalHtml || VERIFY_PAYMENT_BTN_DEFAULT_HTML;
+            }
+        }
+    });
+
     // View order
     document.getElementById('viewOrderBtn')?.addEventListener('click', async () => {
         if (!currentPaymentId) {
@@ -456,6 +501,7 @@ function populatePaymentDetails(payment) {
     document.getElementById('failedAt').textContent = payment.failedAt ? formatDate(payment.failedAt) : '-';
     document.getElementById('expiresAt').textContent = payment.expiresAt ? formatDate(payment.expiresAt) : '-';
     document.getElementById('failureReason').textContent = payment.failureReason || '-';
+    syncVerifyPaymentButton(payment);
     
     // Bank details
     const bankDetailsGroup = document.getElementById('bankDetailsGroup');
@@ -489,6 +535,31 @@ function populatePaymentDetails(payment) {
     
     if (payment.webhookPayload) {
         document.getElementById('webhookPayloadData').textContent = JSON.stringify(payment.webhookPayload, null, 2);
+    }
+}
+
+/**
+ * Verify control mirrors orders behavior:
+ * - Completed payments show as "Verified" and disable action.
+ * - Other statuses stay actionable.
+ */
+function syncVerifyPaymentButton(payment) {
+    const btn = document.getElementById('verifyPaymentModalBtn');
+    if (!btn) return;
+
+    const isCompleted = payment?.status === 'completed';
+    if (isCompleted) {
+        btn.disabled = true;
+        btn.classList.remove('btn-secondary');
+        btn.classList.add('btn-outline');
+        btn.innerHTML = '<i class="fas fa-check-circle"></i> Verified';
+        btn.removeAttribute('title');
+    } else {
+        btn.disabled = false;
+        btn.classList.add('btn-secondary');
+        btn.classList.remove('btn-outline');
+        btn.innerHTML = VERIFY_PAYMENT_BTN_DEFAULT_HTML;
+        btn.setAttribute('title', 'Fetch latest status from payment provider');
     }
 }
 
