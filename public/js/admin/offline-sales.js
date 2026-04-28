@@ -373,13 +373,14 @@
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success) throw new Error(data.message || 'Failed to save sale');
 
-            setFormMessage('Sale recorded successfully.', 'success');
             showToast('Sale recorded.', 'success');
+            closeSaleModal();
 
             document.getElementById('customerNameInput').value = '';
             document.getElementById('customerEmailInput').value = '';
             document.getElementById('customerPhoneInput').value = '';
             document.getElementById('notesInput').value = '';
+            setFormMessage('', '');
 
             const tbody = document.getElementById('offlineLineRows');
             if (tbody) tbody.innerHTML = '';
@@ -387,7 +388,6 @@
             lineIdSeq = 0;
             toggleLinesEmpty();
             recalcGrandTotals();
-            initSoldAtDefault();
             listPage = 1;
             await loadHistory(1);
         } catch (err) {
@@ -472,24 +472,42 @@
         el.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
     }
 
+    // ─── Sale modal ───────────────────────────────────────────────────────────
+
+    function openSaleModal() {
+        const modal = document.getElementById('addSaleModal');
+        if (!modal) return;
+        initSoldAtDefault();
+        modal.classList.remove('is-hidden');
+    }
+
+    function closeSaleModal() {
+        document.getElementById('addSaleModal')?.classList.add('is-hidden');
+    }
+
     // ─── Init ─────────────────────────────────────────────────────────────────
 
     document.addEventListener('DOMContentLoaded', async () => {
         const ok = await window.AuthUtils?.initializeAuthCheck?.();
         if (ok === false) return;
 
-        initSoldAtDefault();
+        // Open sale modal
+        document.getElementById('openAddSaleModalBtn')?.addEventListener('click', () => openSaleModal());
+        document.getElementById('closeSaleModalBtn')?.addEventListener('click', () => closeSaleModal());
+        document.getElementById('closeSaleModalBtnFooter')?.addEventListener('click', () => closeSaleModal());
+        document.getElementById('addSaleModal')?.addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeSaleModal();
+        });
 
+        // Line actions inside sale modal
         document.getElementById('addOfflineLineBtn')?.addEventListener('click', () => openLineModal(null));
         document.getElementById('submitOfflineSaleBtn')?.addEventListener('click', () => submitSale());
         document.getElementById('saveLineModalBtn')?.addEventListener('click', () => saveLineModal());
 
-        // Close modal buttons
-        document.querySelectorAll('.offline-modal-close').forEach((btn) => {
+        // Close line picker modal
+        document.querySelectorAll('.offline-line-modal-close').forEach((btn) => {
             btn.addEventListener('click', () => closeLineModal());
         });
-
-        // Close modal on overlay click
         document.getElementById('offlineLineModal')?.addEventListener('click', (e) => {
             if (e.target === e.currentTarget) closeLineModal();
         });
@@ -506,14 +524,14 @@
             });
         }
 
-        // Close search dropdown when clicking outside modal search
+        // Close search dropdown when clicking outside
         document.addEventListener('click', (e) => {
             if (!e.target.closest('#offlineLineModal .offline-product-search')) {
                 closeModalSearchDropdown();
             }
         }, true);
 
-        // Modal totals recalc
+        // Line modal totals recalc
         document.getElementById('modalQty')?.addEventListener('input', recalcModalTotal);
         document.getElementById('modalUnitPrice')?.addEventListener('input', recalcModalTotal);
 

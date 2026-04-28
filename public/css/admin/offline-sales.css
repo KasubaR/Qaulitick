@@ -1,26 +1,5 @@
 /* Offline sales admin page */
 
-.offline-sales-intro {
-    margin: 0 30px 8px;
-    padding: 0 0 0 12px;
-    font-size: 0.9rem;
-    color: var(--text-muted, #888);
-    border-left: 3px solid var(--gold, #af9044);
-    max-width: 42rem;
-}
-
-.offline-view-switch {
-    margin: 0 30px 0;
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.offline-view-switch .btn-secondary.is-active {
-    border-color: var(--gold, #af9044);
-    color: var(--gold, #af9044);
-}
-
 .offline-search-empty {
     padding: 12px 14px;
     font-size: 0.85rem;
@@ -329,6 +308,12 @@
     flex-direction: column;
 }
 
+.offline-modal--large {
+    max-width: 780px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
 .offline-modal-header {
     display: flex;
     align-items: center;
@@ -398,15 +383,19 @@
 }
 
 @media (max-width: 768px) {
-    .offline-view-switch {
-        margin: 0 16px;
-    }
-
     .offline-sales-content {
         padding: 16px;
     }
 
     .offline-meta-grid {
         grid-template-columns: 1fr;
+    }
+
+    .offline-modal--large {
+        max-height: 95vh;
+    }
+
+    .offline-modal-row {
+        grid-template-columns: 1fr 1fr;
     }
 }
