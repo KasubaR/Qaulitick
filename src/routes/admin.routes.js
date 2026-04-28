@@ -464,6 +464,24 @@ router.delete('/api/admin/reviews/:productId/:reviewId/feature',
 );
 
 // ============================================
+// Cron trigger — callable by cPanel cron via curl, no session required
+// Secured by CRON_SECRET env var
+// ============================================
+router.post('/api/admin/cron/poll-payments', async (req, res) => {
+    const token = req.query.token || req.headers['x-cron-secret'];
+    if (!token || !process.env.CRON_SECRET || token !== process.env.CRON_SECRET) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+    try {
+        const schedulerService = require('../services/scheduler.service');
+        const result = await schedulerService.pollPendingPayments();
+        return res.json({ success: true, result });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ============================================
 // Debug (development only)
 // ============================================
 if (process.env.NODE_ENV !== 'production') {

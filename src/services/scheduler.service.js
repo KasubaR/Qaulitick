@@ -387,7 +387,16 @@ class SchedulerService {
             paymentPollInterval
         );
 
-        // Run initial cleanup on startup (after 1 minute delay to let server fully start)
+        // Poll pending payments quickly on startup (10s) to catch anything missed during restarts
+        setTimeout(async () => {
+            try {
+                await this.pollPendingPayments();
+            } catch (error) {
+                console.error('[Scheduler] Error during initial payment poll:', error);
+            }
+        }, 10 * 1000); // 10 seconds
+
+        // Run remaining startup tasks after 1 minute to let server fully start
         setTimeout(async () => {
             try {
                 console.log('[Scheduler] Running initial cleanup of deleted products...');
@@ -398,7 +407,6 @@ class SchedulerService {
 
                 await expireStaleUnpaidOrders();
                 await flagOverdueLaybyInstallments();
-                await this.pollPendingPayments();
             } catch (error) {
                 console.error('[Scheduler] Error during initial cleanup:', error);
             }

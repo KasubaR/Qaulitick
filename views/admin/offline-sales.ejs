@@ -150,6 +150,51 @@
 
     <div id="offlinePageNotification" class="offline-page-notification" role="alert" aria-live="polite"></div>
 
+    <!-- Add / Edit line modal -->
+    <div id="offlineLineModal" class="offline-modal-overlay is-hidden" role="dialog" aria-modal="true" aria-labelledby="offlineLineModalTitle">
+        <div class="offline-modal">
+            <div class="offline-modal-header">
+                <h3 id="offlineLineModalTitle">Add line</h3>
+                <button type="button" class="btn-icon offline-modal-close" aria-label="Close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="offline-modal-body">
+                <div class="form-group">
+                    <label for="modalProductSearch">Product</label>
+                    <div class="offline-product-search">
+                        <input type="text" id="modalProductSearch" class="form-input" placeholder="Search by name, SKU…" autocomplete="off">
+                        <div id="modalSearchResults" class="offline-search-results is-hidden" role="listbox"></div>
+                    </div>
+                    <input type="hidden" id="modalProductId">
+                    <p id="modalProductLabel" class="offline-modal-product-label">No product selected</p>
+                </div>
+                <div class="offline-modal-row">
+                    <div class="form-group">
+                        <label for="modalColorSelect">Color</label>
+                        <select id="modalColorSelect" class="form-select" disabled>
+                            <option value="">—</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="modalQty">Qty</label>
+                        <input type="number" id="modalQty" class="form-input" min="1" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="modalUnitPrice">Unit price (ZMW)</label>
+                        <input type="number" id="modalUnitPrice" class="form-input" min="0" step="0.01" value="">
+                    </div>
+                </div>
+                <div class="offline-modal-total">
+                    <span>Line total:</span>
+                    <strong id="modalLineTotal">K0.00</strong>
+                </div>
+            </div>
+            <div class="offline-modal-footer">
+                <button type="button" class="btn-secondary offline-modal-close">Cancel</button>
+                <button type="button" class="btn-primary" id="saveLineModalBtn"><i class="fas fa-check"></i> Save line</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/js/admin/auth-utils.js"></script>
     <script src="/js/admin/sidebar.js"></script>
     <script src="/js/admin/orders-badge.js"></script>

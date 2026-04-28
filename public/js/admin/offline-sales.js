@@ -6,17 +6,20 @@
     'use strict';
 
     let lineIdSeq = 0;
-    /** @type {Map<number, object>} */
-    const lineProducts = new Map();
-    /** @type {Map<number, ReturnType<typeof setTimeout>>} */
-    const searchTimers = new Map();
+    /** @type {Map<number, {productId:number, name:string, color:string|null, qty:number, unitPrice:number, product:object}>} */
+    const lineData = new Map();
+
+    // Modal state
+    let modalLineId = null; // null = adding new, number = editing existing
+
+    let searchTimer = null;
 
     let listPage = 1;
     const listLimit = 15;
     let listTotalPages = 1;
 
     function csrfToken() {
-        const m = document.querySelector('meta[name="csrf-token"]');
+        const m = document.querySelector('meta[name=”csrf-token”]');
         return m ? m.getAttribute('content') || '' : '';
     }
 
@@ -28,25 +31,13 @@
         return `K${round2(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
 
-    function debounce(key, fn, ms) {
-        const prev = searchTimers.get(key);
-        if (prev) clearTimeout(prev);
-        const t = setTimeout(() => {
-            searchTimers.delete(key);
-            fn();
-        }, ms);
-        searchTimers.set(key, t);
-    }
-
     function showToast(message, type) {
         const el = document.getElementById('offlinePageNotification');
         if (!el) return;
         el.textContent = message;
         el.className = 'offline-page-notification is-visible is-' + (type || 'info');
         const ms = type === 'error' ? 6000 : 3500;
-        setTimeout(() => {
-            el.classList.remove('is-visible');
-        }, ms);
+        setTimeout(() => el.classList.remove('is-visible'), ms);
     }
 
     function setFormMessage(text, variant) {
@@ -67,45 +58,197 @@
         const tbody = document.getElementById('offlineLineRows');
         const empty = document.getElementById('offlineLinesEmpty');
         if (!tbody || !empty) return;
-        const has = tbody.querySelectorAll('tr[data-line-id]').length > 0;
-        empty.classList.toggle('is-hidden', has);
-    }
-
-    function recalcLine(tr) {
-        const qty = Math.max(1, parseInt(tr.querySelector('.offline-qty')?.value, 10) || 1);
-        const unit = round2(parseFloat(tr.querySelector('.offline-unit-price')?.value) || 0);
-        const total = round2(qty * unit);
-        const totalEl = tr.querySelector('.offline-line-total');
-        if (totalEl) totalEl.textContent = formatZmw(total);
-        recalcGrandTotals();
+        empty.classList.toggle('is-hidden', tbody.querySelectorAll('tr[data-line-id]').length > 0);
     }
 
     function recalcGrandTotals() {
-        const rows = document.querySelectorAll('#offlineLineRows tr[data-line-id]');
         let sub = 0;
-        rows.forEach((tr) => {
-            const qty = Math.max(1, parseInt(tr.querySelector('.offline-qty')?.value, 10) || 1);
-            const unit = round2(parseFloat(tr.querySelector('.offline-unit-price')?.value) || 0);
-            sub += round2(qty * unit);
-        });
+        lineData.forEach((d) => { sub += round2(d.qty * d.unitPrice); });
         const subEl = document.getElementById('offlineSubtotalDisplay');
         const grandEl = document.getElementById('offlineGrandTotalDisplay');
         if (subEl) subEl.textContent = formatZmw(sub);
         if (grandEl) grandEl.textContent = formatZmw(sub);
     }
 
-    function closeAllSearchDropdowns() {
-        document.querySelectorAll('.offline-search-results').forEach((d) => {
-            d.classList.add('is-hidden');
-            d.innerHTML = '';
+    // ─── Read-only row rendering ──────────────────────────────────────────────
+
+    function renderLineRow(lineId) {
+        const d = lineData.get(lineId);
+        if (!d) return;
+
+        let tr = document.querySelector(`tr[data-line-id=”${lineId}”]`);
+        const isNew = !tr;
+
+        if (isNew) {
+            tr = document.createElement('tr');
+            tr.dataset.lineId = String(lineId);
+            document.getElementById('offlineLineRows')?.appendChild(tr);
+        }
+
+        tr.innerHTML = `
+            <td><span class=”offline-product-label is-selected”>${escapeHtml(d.name)}</span></td>
+            <td>${escapeHtml(d.color || '—')}</td>
+            <td>${d.qty}</td>
+            <td>${formatZmw(d.unitPrice)}</td>
+            <td class=”offline-line-total-cell”>${formatZmw(round2(d.qty * d.unitPrice))}</td>
+            <td class=”offline-row-actions”>
+                <button type=”button” class=”btn-icon offline-edit-line” aria-label=”Edit line”><i class=”fas fa-edit” aria-hidden=”true”></i></button>
+                <button type=”button” class=”btn-icon offline-remove-line” aria-label=”Remove line”><i class=”fas fa-trash” aria-hidden=”true”></i></button>
+            </td>
+        `;
+
+        tr.querySelector('.offline-edit-line').addEventListener('click', () => openLineModal(lineId));
+        tr.querySelector('.offline-remove-line').addEventListener('click', () => {
+            lineData.delete(lineId);
+            tr.remove();
+            toggleLinesEmpty();
+            recalcGrandTotals();
         });
     }
 
-    function renderSearchResults(lineId, products) {
-        const wrap = document.querySelector(`tr[data-line-id="${lineId}"] .offline-search-results`);
+    // ─── Modal ────────────────────────────────────────────────────────────────
+
+    function getModal() { return document.getElementById('offlineLineModal'); }
+
+    function openLineModal(lineId) {
+        modalLineId = lineId ?? null;
+        const modal = getModal();
+        if (!modal) return;
+
+        const title = modal.querySelector('#offlineLineModalTitle');
+        if (title) title.textContent = modalLineId === null ? 'Add line' : 'Edit line';
+
+        // Reset modal fields
+        document.getElementById('modalProductSearch').value = '';
+        document.getElementById('modalProductId').value = '';
+        document.getElementById('modalProductLabel').textContent = 'No product selected';
+        document.getElementById('modalProductLabel').classList.remove('is-selected');
+        document.getElementById('modalQty').value = '1';
+        document.getElementById('modalUnitPrice').value = '';
+        document.getElementById('modalLineTotal').textContent = 'K0.00';
+
+        const colorSel = document.getElementById('modalColorSelect');
+        colorSel.innerHTML = '<option value=””>—</option>';
+        colorSel.disabled = true;
+
+        closeModalSearchDropdown();
+
+        // If editing, pre-fill from existing line data
+        if (modalLineId !== null) {
+            const d = lineData.get(modalLineId);
+            if (d) {
+                document.getElementById('modalProductId').value = String(d.productId);
+                document.getElementById('modalProductLabel').textContent = d.name;
+                document.getElementById('modalProductLabel').classList.add('is-selected');
+                document.getElementById('modalQty').value = String(d.qty);
+                document.getElementById('modalUnitPrice').value = String(d.unitPrice);
+                recalcModalTotal();
+
+                if (d.product) {
+                    populateModalColors(d.product, d.color);
+                }
+            }
+        }
+
+        modal.classList.remove('is-hidden');
+        document.getElementById('modalProductSearch').focus();
+    }
+
+    function closeLineModal() {
+        getModal()?.classList.add('is-hidden');
+        modalLineId = null;
+        clearTimeout(searchTimer);
+        closeModalSearchDropdown();
+    }
+
+    function recalcModalTotal() {
+        const qty = Math.max(1, parseInt(document.getElementById('modalQty')?.value, 10) || 1);
+        const unit = round2(parseFloat(document.getElementById('modalUnitPrice')?.value) || 0);
+        const el = document.getElementById('modalLineTotal');
+        if (el) el.textContent = formatZmw(round2(qty * unit));
+    }
+
+    function populateModalColors(product, selectedColor) {
+        const colorSel = document.getElementById('modalColorSelect');
+        const colors = Array.isArray(product.colors) ? product.colors : [];
+        colorSel.innerHTML = '';
+        if (colors.length === 0) {
+            colorSel.innerHTML = '<option value=””>—</option>';
+            colorSel.disabled = true;
+        } else {
+            const ph = document.createElement('option');
+            ph.value = '';
+            ph.textContent = 'Select color';
+            colorSel.appendChild(ph);
+            colors.forEach((c) => {
+                const o = document.createElement('option');
+                o.value = c.name;
+                const st = c.stock != null ? Number(c.stock) : '—';
+                o.textContent = `${c.name} (${st} avail.)`;
+                if (selectedColor && c.name === selectedColor) o.selected = true;
+                colorSel.appendChild(o);
+            });
+            colorSel.disabled = false;
+        }
+    }
+
+    function saveLineModal() {
+        const productId = parseInt(document.getElementById('modalProductId').value, 10);
+        if (Number.isNaN(productId) || productId < 1) {
+            showToast('Select a product first', 'error');
+            return;
+        }
+
+        const name = document.getElementById('modalProductLabel').textContent.trim();
+        const qty = Math.max(1, parseInt(document.getElementById('modalQty').value, 10) || 1);
+        const unitPrice = round2(parseFloat(document.getElementById('modalUnitPrice').value) || 0);
+        const colorSel = document.getElementById('modalColorSelect');
+        const color = (!colorSel.disabled && colorSel.value) ? colorSel.value : null;
+
+        // Validate color required
+        const existingProduct = modalLineId !== null
+            ? lineData.get(modalLineId)?.product
+            : null;
+        const searchProduct = window._modalCurrentProduct || existingProduct;
+        if (searchProduct && Array.isArray(searchProduct.colors) && searchProduct.colors.length > 0 && !color) {
+            showToast(`Select a color for “${name}”`, 'error');
+            return;
+        }
+
+        if (modalLineId === null) {
+            // New line
+            lineIdSeq += 1;
+            modalLineId = lineIdSeq;
+        }
+
+        lineData.set(modalLineId, {
+            productId,
+            name,
+            color,
+            qty,
+            unitPrice,
+            product: window._modalCurrentProduct || lineData.get(modalLineId)?.product || null
+        });
+
+        renderLineRow(modalLineId);
+        toggleLinesEmpty();
+        recalcGrandTotals();
+        closeLineModal();
+        window._modalCurrentProduct = null;
+    }
+
+    // ─── Modal product search ─────────────────────────────────────────────────
+
+    function closeModalSearchDropdown() {
+        const d = document.getElementById('modalSearchResults');
+        if (d) { d.classList.add('is-hidden'); d.innerHTML = ''; }
+    }
+
+    function renderModalSearchResults(products) {
+        const wrap = document.getElementById('modalSearchResults');
         if (!wrap) return;
         if (!products || products.length === 0) {
-            wrap.innerHTML = '<ul><li class="offline-search-empty">No products found</li></ul>';
+            wrap.innerHTML = '<ul><li class=”offline-search-empty”>No products found</li></ul>';
             wrap.classList.remove('is-hidden');
             return;
         }
@@ -119,8 +262,8 @@
             const brand = p.brand ? ` · ${p.brand}` : '';
             btn.textContent = `${name}${brand} — ${formatZmw(p.price)}`;
             btn.addEventListener('click', () => {
-                applyProductToLine(lineId, p);
-                closeAllSearchDropdowns();
+                applyProductToModal(p);
+                closeModalSearchDropdown();
             });
             li.appendChild(btn);
             ul.appendChild(li);
@@ -130,182 +273,56 @@
         wrap.classList.remove('is-hidden');
     }
 
-    function applyProductToLine(lineId, product) {
-        const tr = document.querySelector(`tr[data-line-id="${lineId}"]`);
-        if (!tr) return;
-        lineProducts.set(lineId, product);
-
-        const idInput = tr.querySelector('.offline-product-id');
-        if (idInput) idInput.value = String(product.id);
-
-        const label = tr.querySelector('.offline-product-label');
-        if (label) {
-            label.textContent = product.model || product.name || `Product #${product.id}`;
-            label.classList.add('is-selected');
-        }
-
-        const unitInput = tr.querySelector('.offline-unit-price');
+    function applyProductToModal(product) {
+        window._modalCurrentProduct = product;
+        document.getElementById('modalProductId').value = String(product.id);
+        const label = document.getElementById('modalProductLabel');
+        label.textContent = product.model || product.name || `Product #${product.id}`;
+        label.classList.add('is-selected');
+        document.getElementById('modalProductSearch').value = '';
         const price = round2(parseFloat(product.price) || 0);
-        if (unitInput) unitInput.value = String(price);
-
-        const colorSel = tr.querySelector('.offline-color-select');
-        const colors = Array.isArray(product.colors) ? product.colors : [];
-        if (colorSel) {
-            colorSel.innerHTML = '';
-            if (colors.length === 0) {
-                const opt = document.createElement('option');
-                opt.value = '';
-                opt.textContent = '—';
-                colorSel.appendChild(opt);
-                colorSel.disabled = true;
-            } else {
-                const ph = document.createElement('option');
-                ph.value = '';
-                ph.textContent = 'Select color';
-                colorSel.appendChild(ph);
-                colors.forEach((c) => {
-                    const o = document.createElement('option');
-                    o.value = c.name;
-                    const st = c.stock != null ? Number(c.stock) : '—';
-                    o.textContent = `${c.name} (${st} avail.)`;
-                    colorSel.appendChild(o);
-                });
-                colorSel.disabled = false;
-            }
-        }
-
-        const searchInput = tr.querySelector('.offline-product-search-input');
-        if (searchInput) searchInput.value = '';
-
-        recalcLine(tr);
+        document.getElementById('modalUnitPrice').value = String(price);
+        populateModalColors(product, null);
+        recalcModalTotal();
     }
 
-    async function runProductSearch(lineId, q) {
+    async function runModalSearch(q) {
         const query = (q || '').trim();
-        if (query.length < 2) {
-            const wrap = document.querySelector(`tr[data-line-id="${lineId}"] .offline-search-results`);
-            if (wrap) {
-                wrap.classList.add('is-hidden');
-                wrap.innerHTML = '';
-            }
-            return;
-        }
+        if (query.length < 2) { closeModalSearchDropdown(); return; }
         try {
-            const url = `/api/products/search?q=${encodeURIComponent(query)}&limit=12`;
-            const res = await fetch(url, { credentials: 'same-origin' });
+            const res = await fetch(`/api/products/search?q=${encodeURIComponent(query)}&limit=12`, { credentials: 'same-origin' });
             const data = await res.json().catch(() => ({}));
-            if (!res.ok || !data.success) {
-                renderSearchResults(lineId, []);
-                return;
-            }
-            renderSearchResults(lineId, data.products || []);
+            renderModalSearchResults(res.ok && data.success ? (data.products || []) : []);
         } catch {
-            renderSearchResults(lineId, []);
+            renderModalSearchResults([]);
         }
     }
 
-    function bindLineRow(tr) {
-        const lineId = parseInt(tr.dataset.lineId, 10);
-        const searchInput = tr.querySelector('.offline-product-search-input');
-        if (searchInput) {
-            searchInput.addEventListener('input', () => {
-                debounce(lineId, () => runProductSearch(lineId, searchInput.value), 350);
-            });
-            searchInput.addEventListener('focus', () => {
-                if (searchInput.value.trim().length >= 2) {
-                    runProductSearch(lineId, searchInput.value);
-                }
-            });
-        }
-
-        tr.querySelector('.offline-qty')?.addEventListener('input', () => recalcLine(tr));
-        tr.querySelector('.offline-unit-price')?.addEventListener('input', () => recalcLine(tr));
-        tr.querySelector('.offline-color-select')?.addEventListener('change', () => recalcLine(tr));
-
-        tr.querySelector('.offline-remove-line')?.addEventListener('click', () => {
-            lineProducts.delete(lineId);
-            tr.remove();
-            toggleLinesEmpty();
-            recalcGrandTotals();
-        });
-    }
-
-    function addLine() {
-        lineIdSeq += 1;
-        const lineId = lineIdSeq;
-        const tbody = document.getElementById('offlineLineRows');
-        if (!tbody) return;
-
-        const tr = document.createElement('tr');
-        tr.dataset.lineId = String(lineId);
-        tr.innerHTML = `
-            <td class="offline-line-product-cell">
-                <div class="offline-product-search">
-                    <input type="text" class="form-input offline-product-search-input" placeholder="Search by name, SKU…" autocomplete="off" aria-label="Search product">
-                    <div class="offline-search-results is-hidden" role="listbox" aria-label="Search results"></div>
-                </div>
-                <input type="hidden" class="offline-product-id" value="">
-                <span class="offline-product-label">No product selected</span>
-            </td>
-            <td>
-                <select class="form-select offline-color-select" disabled aria-label="Color variant">
-                    <option value="">—</option>
-                </select>
-            </td>
-            <td><input type="number" class="form-input offline-qty" min="1" value="1" aria-label="Quantity"></td>
-            <td><input type="number" class="form-input offline-unit-price" min="0" step="0.01" value="" aria-label="Unit price ZMW"></td>
-            <td class="offline-line-total-cell offline-line-total">K0.00</td>
-            <td>
-                <button type="button" class="btn-icon offline-remove-line" aria-label="Remove line"><i class="fas fa-trash" aria-hidden="true"></i></button>
-            </td>
-        `;
-        tbody.appendChild(tr);
-        bindLineRow(tr);
-        toggleLinesEmpty();
-    }
-
-    function onDocClickCloseSearch(e) {
-        if (!e.target.closest('.offline-product-search')) {
-            closeAllSearchDropdowns();
-        }
-    }
+    // ─── Payload + submit ─────────────────────────────────────────────────────
 
     function collectPayload() {
-        const rows = document.querySelectorAll('#offlineLineRows tr[data-line-id]');
+        if (lineData.size === 0) {
+            throw new Error('Add at least one product line');
+        }
+
         const items = [];
-        for (const tr of rows) {
-            const productId = parseInt(tr.querySelector('.offline-product-id')?.value, 10);
-            if (Number.isNaN(productId) || productId < 1) continue;
-
-            const qty = Math.max(1, parseInt(tr.querySelector('.offline-qty')?.value, 10) || 1);
-            const unitPrice = round2(parseFloat(tr.querySelector('.offline-unit-price')?.value) || 0);
-            const lineTotal = round2(qty * unitPrice);
-            const name = tr.querySelector('.offline-product-label')?.textContent?.trim() || 'Item';
-            const colorSel = tr.querySelector('.offline-color-select');
-            let selectedColor = null;
-            if (colorSel && !colorSel.disabled && colorSel.options.length > 0) {
-                const v = colorSel.value;
-                if (v) selectedColor = v;
+        for (const [lineId, d] of lineData) {
+            if (!d.productId) continue;
+            const prod = d.product;
+            if (prod && Array.isArray(prod.colors) && prod.colors.length > 0 && !d.color) {
+                throw new Error(`Select a color for “${d.name}”`);
             }
-            const lineId = parseInt(tr.dataset.lineId, 10);
-            const prod = lineProducts.get(lineId);
-            if (prod && Array.isArray(prod.colors) && prod.colors.length > 0 && !selectedColor) {
-                throw new Error(`Select a color for “${name}”`);
-            }
-
             items.push({
-                productId,
-                name,
-                quantity: qty,
-                unitPrice,
-                lineTotal,
-                ...(selectedColor ? { selectedColor } : {})
+                productId: d.productId,
+                name: d.name,
+                quantity: d.qty,
+                unitPrice: d.unitPrice,
+                lineTotal: round2(d.qty * d.unitPrice),
+                ...(d.color ? { selectedColor: d.color } : {})
             });
         }
 
-        if (items.length === 0) {
-            throw new Error('Add at least one product line with a selected product');
-        }
+        if (items.length === 0) throw new Error('Add at least one product line with a selected product');
 
         const subtotal = round2(items.reduce((s, it) => s + it.lineTotal, 0));
 
@@ -339,9 +356,7 @@
         }
 
         const btn = document.getElementById('submitOfflineSaleBtn');
-        if (btn) {
-            btn.disabled = true;
-        }
+        if (btn) btn.disabled = true;
 
         try {
             const res = await fetch('/api/admin/offline-sales', {
@@ -356,9 +371,7 @@
             });
 
             const data = await res.json().catch(() => ({}));
-            if (!res.ok || !data.success) {
-                throw new Error(data.message || 'Failed to save sale');
-            }
+            if (!res.ok || !data.success) throw new Error(data.message || 'Failed to save sale');
 
             setFormMessage('Sale recorded successfully.', 'success');
             showToast('Sale recorded.', 'success');
@@ -370,11 +383,10 @@
 
             const tbody = document.getElementById('offlineLineRows');
             if (tbody) tbody.innerHTML = '';
-            lineProducts.clear();
+            lineData.clear();
             lineIdSeq = 0;
             toggleLinesEmpty();
             recalcGrandTotals();
-
             initSoldAtDefault();
             listPage = 1;
             await loadHistory(1);
@@ -386,21 +398,22 @@
         }
     }
 
+    // ─── History ──────────────────────────────────────────────────────────────
+
     async function loadHistory(page) {
         const tbody = document.getElementById('offlineSalesHistoryBody');
         if (!tbody) return;
 
         const p = Math.max(1, page || 1);
-        const url = `/api/admin/offline-sales?page=${p}&limit=${listLimit}`;
         try {
-            const res = await fetch(url, { credentials: 'include' });
+            const res = await fetch(`/api/admin/offline-sales?page=${p}&limit=${listLimit}`, { credentials: 'include' });
             if (res.status === 401 || res.status === 403) {
                 if (window.AuthUtils?.handleAuthError) window.AuthUtils.handleAuthError(res);
                 return;
             }
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success) {
-                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">${data.message || 'Could not load sales'}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan=”5” class=”empty-state”>${data.message || 'Could not load sales'}</td></tr>`;
                 return;
             }
 
@@ -408,9 +421,7 @@
             listPage = data.page || p;
 
             const info = document.getElementById('offlineSalesPageInfo');
-            if (info) {
-                info.textContent = `Page ${listPage} of ${listTotalPages}`;
-            }
+            if (info) info.textContent = `Page ${listPage} of ${listTotalPages}`;
 
             const prev = document.getElementById('offlineSalesPrev');
             const next = document.getElementById('offlineSalesNext');
@@ -419,40 +430,38 @@
 
             const sales = data.sales || [];
             if (sales.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No offline sales yet</td></tr>';
+                tbody.innerHTML = '<tr><td colspan=”5” class=”empty-state”>No offline sales yet</td></tr>';
                 return;
             }
 
-            tbody.innerHTML = sales
-                .map((s) => {
-                    const num = escapeHtml(s.saleNumber || '—');
-                    const dt = s.soldAt ? escapeHtml(new Date(s.soldAt).toLocaleString()) : '—';
-                    const tot = s.totals && s.totals.total != null ? formatZmw(s.totals.total) : '—';
-                    const custParts = [s.customerName, s.customerEmail, s.customerPhone].filter(Boolean);
-                    const cust =
-                        custParts.length > 0 ? escapeHtml(custParts.join(' · ')) : '—';
-                    const by =
-                        escapeHtml(s.createdByAdmin?.email || s.createdByAdminEmail || '') || '—';
-                    return `<tr>
-                        <td><strong>${num}</strong></td>
-                        <td>${dt}</td>
-                        <td>${tot}</td>
-                        <td>${cust}</td>
-                        <td>${by}</td>
-                    </tr>`;
-                })
-                .join('');
+            tbody.innerHTML = sales.map((s) => {
+                const num = escapeHtml(s.saleNumber || '—');
+                const dt = s.soldAt ? escapeHtml(new Date(s.soldAt).toLocaleString()) : '—';
+                const tot = s.totals?.total != null ? formatZmw(s.totals.total) : '—';
+                const custParts = [s.customerName, s.customerEmail, s.customerPhone].filter(Boolean);
+                const cust = custParts.length > 0 ? escapeHtml(custParts.join(' · ')) : '—';
+                const by = escapeHtml(s.createdByAdmin?.email || s.createdByAdminEmail || '') || '—';
+                return `<tr>
+                    <td><strong>${num}</strong></td>
+                    <td>${dt}</td>
+                    <td>${tot}</td>
+                    <td>${cust}</td>
+                    <td>${by}</td>
+                </tr>`;
+            }).join('');
         } catch {
-            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Failed to load sales</td></tr>';
+            tbody.innerHTML = '<tr><td colspan=”5” class=”empty-state”>Failed to load sales</td></tr>';
         }
     }
+
+    // ─── Utilities ────────────────────────────────────────────────────────────
 
     function escapeHtml(s) {
         return String(s)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
+            .replace(/”/g, '&quot;');
     }
 
     function initSoldAtDefault() {
@@ -463,15 +472,52 @@
         el.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
     }
 
+    // ─── Init ─────────────────────────────────────────────────────────────────
+
     document.addEventListener('DOMContentLoaded', async () => {
         const ok = await window.AuthUtils?.initializeAuthCheck?.();
         if (ok === false) return;
 
         initSoldAtDefault();
 
-        document.getElementById('addOfflineLineBtn')?.addEventListener('click', () => addLine());
+        document.getElementById('addOfflineLineBtn')?.addEventListener('click', () => openLineModal(null));
         document.getElementById('submitOfflineSaleBtn')?.addEventListener('click', () => submitSale());
+        document.getElementById('saveLineModalBtn')?.addEventListener('click', () => saveLineModal());
 
+        // Close modal buttons
+        document.querySelectorAll('.offline-modal-close').forEach((btn) => {
+            btn.addEventListener('click', () => closeLineModal());
+        });
+
+        // Close modal on overlay click
+        document.getElementById('offlineLineModal')?.addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeLineModal();
+        });
+
+        // Modal product search
+        const modalSearch = document.getElementById('modalProductSearch');
+        if (modalSearch) {
+            modalSearch.addEventListener('input', () => {
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(() => runModalSearch(modalSearch.value), 350);
+            });
+            modalSearch.addEventListener('focus', () => {
+                if (modalSearch.value.trim().length >= 2) runModalSearch(modalSearch.value);
+            });
+        }
+
+        // Close search dropdown when clicking outside modal search
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#offlineLineModal .offline-product-search')) {
+                closeModalSearchDropdown();
+            }
+        }, true);
+
+        // Modal totals recalc
+        document.getElementById('modalQty')?.addEventListener('input', recalcModalTotal);
+        document.getElementById('modalUnitPrice')?.addEventListener('input', recalcModalTotal);
+
+        // History pagination
         document.getElementById('offlineSalesPrev')?.addEventListener('click', () => {
             if (listPage > 1) loadHistory(listPage - 1);
         });
@@ -479,9 +525,7 @@
             if (listPage < listTotalPages) loadHistory(listPage + 1);
         });
 
-        document.addEventListener('click', onDocClickCloseSearch, true);
-
-        addLine();
+        toggleLinesEmpty();
         loadHistory(1);
     });
 })();

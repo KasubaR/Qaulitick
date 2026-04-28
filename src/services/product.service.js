@@ -5,7 +5,7 @@ const Product = require('../models/Product.model');
 /** Match text inside JSON columns (arrays/objects) by casting to string — plain LIKE on JSON path is unreliable. */
 function jsonDocLike(column, term) {
     return sequelize.where(
-        sequelize.fn('CAST', sequelize.col(column), sequelize.literal('CHAR(16384)')),
+        sequelize.literal(`CAST(\`${column}\` AS CHAR(16384))`),
         { [Op.like]: term }
     );
 }

@@ -284,6 +284,119 @@
     color: #bee3f8;
 }
 
+/* Row actions (edit + delete) */
+.offline-row-actions {
+    white-space: nowrap;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.offline-row-actions .btn-icon:hover {
+    color: var(--text, #eee);
+    border-color: var(--admin-border, #555);
+}
+
+.offline-row-actions .offline-remove-line:hover {
+    color: #e53e3e;
+    border-color: rgba(229, 62, 62, 0.5);
+}
+
+/* Modal overlay */
+.offline-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.offline-modal-overlay.is-hidden {
+    display: none;
+}
+
+.offline-modal {
+    background: var(--surface, #1a1a1a);
+    border: 1px solid var(--admin-border, #333);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 520px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+}
+
+.offline-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--admin-border, #333);
+}
+
+.offline-modal-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--admin-gold, #af9044);
+}
+
+.offline-modal-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.offline-modal-row {
+    display: grid;
+    grid-template-columns: 1fr 80px 130px;
+    gap: 12px;
+    align-items: end;
+}
+
+.offline-modal-product-label {
+    margin: 6px 0 0;
+    font-size: 0.85rem;
+    color: var(--text-muted, #aaa);
+}
+
+.offline-modal-product-label.is-selected {
+    color: var(--text, #eee);
+    font-weight: 500;
+}
+
+.offline-modal-total {
+    display: flex;
+    justify-content: flex-end;
+    align-items: baseline;
+    gap: 12px;
+    font-size: 0.95rem;
+    padding-top: 8px;
+    border-top: 1px solid var(--admin-border, #333);
+}
+
+.offline-modal-total strong {
+    color: var(--admin-gold, #af9044);
+    font-size: 1.05rem;
+}
+
+.offline-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 20px 18px;
+    border-top: 1px solid var(--admin-border, #333);
+}
+
+/* Keep search dropdown above modal content */
+.offline-modal .offline-search-results {
+    z-index: 1010;
+}
+
 @media (max-width: 768px) {
     .offline-view-switch {
         margin: 0 16px;
