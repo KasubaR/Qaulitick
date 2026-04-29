@@ -174,6 +174,49 @@
     margin-bottom: 20px;
 }
 
+.account-dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+.account-dashboard-columns {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 16px;
+}
+
+.account-stat-card {
+    margin-bottom: 0;
+    padding: 18px;
+}
+
+.account-stat-label {
+    margin: 0 0 8px;
+    color: #666;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.account-stat-value {
+    margin: 0 0 10px;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #070707;
+}
+
+.account-stat-link {
+    color: #333;
+    font-size: 13px;
+    text-decoration: none;
+}
+
+.account-stat-link:hover {
+    color: var(--gold, #b8860b);
+}
+
 .account-card h2 {
     font-size: 1.1rem;
     margin-bottom: 16px;
@@ -260,6 +303,10 @@
     flex-wrap: wrap;
     gap: 12px;
     align-items: center;
+}
+
+.account-security-actions form {
+    margin: 0;
 }
 
 .account-btn-primary {
@@ -619,6 +666,146 @@
     padding: 20px 0;
 }
 
+.account-status-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.account-status-chip.is-good {
+    background: #e8f5e9;
+    color: #1b5e20;
+}
+
+.account-status-chip.is-info {
+    background: #e3f2fd;
+    color: #0d47a1;
+}
+
+.account-status-chip.is-warn {
+    background: #fff3e0;
+    color: #8a4b00;
+}
+
+.account-status-chip.is-neutral {
+    background: #f5f5f5;
+    color: #444;
+}
+
+.account-activity-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.account-activity-item {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.account-activity-badge {
+    min-width: 56px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 6px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.account-activity-badge.is-order {
+    background: #efebe9;
+    color: #4e342e;
+}
+
+.account-activity-badge.is-layby {
+    background: #e3f2fd;
+    color: #0d47a1;
+}
+
+.account-activity-content {
+    min-width: 0;
+}
+
+.account-activity-title {
+    margin: 0;
+    font-weight: 600;
+    font-size: 13px;
+    color: #070707;
+}
+
+.account-activity-subtitle {
+    margin: 3px 0 0;
+    font-size: 12px;
+    color: #666;
+}
+
+.order-details-toggle {
+    background: transparent;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.order-details-toggle:hover {
+    border-color: #070707;
+}
+
+.order-details-row--hidden {
+    display: none;
+}
+
+.order-details-row td {
+    background: #fafafa;
+}
+
+.order-details-card h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.order-details-grid {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    margin-bottom: 10px;
+    font-size: 13px;
+}
+
+.order-details-grid p {
+    margin: 0;
+    color: #444;
+}
+
+.order-details-link {
+    font-size: 13px;
+    font-weight: 600;
+    color: #070707;
+    text-decoration: underline;
+}
+
+.review-helper-text {
+    color: #666;
+    font-size: 12px;
+}
+
 .layby-plan-block {
     border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 8px;
@@ -785,6 +972,18 @@
 }
 
 @media (max-width: 600px) {
+    .account-page-wrap {
+        padding: 24px 16px 48px;
+    }
+
+    .account-dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .account-dashboard-columns {
+        grid-template-columns: 1fr;
+    }
+
     .layby-plan-heading {
         flex-direction: column;
     }
@@ -804,5 +1003,36 @@
 
     .account-subnav-logout-btn {
         width: 100%;
+    }
+
+    .account-actions .account-btn-primary,
+    .account-actions .account-btn-secondary {
+        width: 100%;
+    }
+
+    .account-table thead {
+        display: none;
+    }
+
+    .account-table,
+    .account-table tbody,
+    .account-table tr,
+    .account-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .account-table tr {
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        padding: 8px 0;
+    }
+
+    .account-table td {
+        border: none;
+        padding: 6px 0;
+    }
+
+    .order-details-row td {
+        padding: 10px 0;
     }
 }

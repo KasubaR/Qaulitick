@@ -18,7 +18,12 @@
     <% } %>
 
     <% if (typeof orders === 'undefined' || !orders.length) { %>
-        <p class="account-empty">You have no orders linked to this account yet.</p>
+        <div class="account-card">
+            <p class="account-empty">You have no orders linked to this account yet.</p>
+            <div class="account-actions">
+                <a class="account-btn-primary" href="/shop">Start shopping</a>
+            </div>
+        </div>
     <% } else { %>
         <div class="account-card account-table-wrap">
             <table class="account-table">
@@ -30,6 +35,7 @@
                         <th>Date</th>
                         <th>Status</th>
                         <th>Total</th>
+                        <th>Details</th>
                         <th>Review</th>
                     </tr>
                 </thead>
@@ -60,8 +66,22 @@
                             </td>
                             <td><%= o.orderNumber %></td>
                             <td><%= o.createdAt ? new Date(o.createdAt).toLocaleDateString() : '—' %></td>
-                            <td><%= o.status || '—' %></td>
+                            <td>
+                                <span class="account-status-chip <%= ['delivered','paid','confirmed'].includes(String(o.status || '').toLowerCase()) ? 'is-good' : ['payment_pending','packed','shipped'].includes(String(o.status || '').toLowerCase()) ? 'is-info' : 'is-neutral' %>">
+                                    <%= o.status || '—' %>
+                                </span>
+                            </td>
                             <td><%= o.totals && o.totals.total != null ? 'K' + Number(o.totals.total).toLocaleString() : '—' %></td>
+                            <td>
+                                <button
+                                    type="button"
+                                    class="order-details-toggle"
+                                    data-order-detail-trigger="<%= o.orderNumber %>"
+                                    aria-expanded="false"
+                                >
+                                    View
+                                </button>
+                            </td>
                             <td>
                                 <div class="order-review-links">
                                     <% items.forEach(function(item) {
@@ -85,6 +105,20 @@
                                             >Write a Review</button>
                                         <% } %>
                                     <% }); %>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="order-details-row order-details-row--hidden" data-order-detail-row="<%= o.orderNumber %>">
+                            <td colspan="8">
+                                <div class="order-details-card">
+                                    <h3>Order <%= o.orderNumber %></h3>
+                                    <div class="order-details-grid">
+                                        <p><strong>Placed:</strong> <%= o.createdAt ? new Date(o.createdAt).toLocaleString() : '—' %></p>
+                                        <p><strong>Status:</strong> <%= o.status || '—' %></p>
+                                        <p><strong>Payment:</strong> <%= o.paymentStatus || '—' %></p>
+                                        <p><strong>Items:</strong> <%= items.length %></p>
+                                    </div>
+                                    <a class="order-details-link" href="/order-success/<%= o.orderNumber %>">Open order page</a>
                                 </div>
                             </td>
                         </tr>
@@ -139,7 +173,7 @@
             <div class="form-group">
                 <label for="accountReviewEmail">Your Email *</label>
                 <input type="email" id="accountReviewEmail" autocomplete="email" required placeholder="Use the email from your order">
-                <small style="color:#666;font-size:12px;">We'll verify your purchase using this email</small>
+                <small class="review-helper-text">We'll verify your purchase using this email</small>
             </div>
             <% } %>
             <button type="submit" class="btn-primary" id="accountReviewSubmit">Submit Review</button>
@@ -209,6 +243,16 @@
 
     document.querySelectorAll('.order-write-review-btn').forEach(function (btn) {
         btn.addEventListener('click', function () { openModal(btn.dataset.productId); });
+    });
+    document.querySelectorAll('.order-details-toggle').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const key = btn.getAttribute('data-order-detail-trigger');
+            const row = document.querySelector('[data-order-detail-row="' + key + '"]');
+            if (!row) return;
+            const nowExpanded = row.classList.toggle('order-details-row--hidden') === false;
+            btn.setAttribute('aria-expanded', nowExpanded ? 'true' : 'false');
+            btn.textContent = nowExpanded ? 'Hide' : 'View';
+        });
     });
 
     // Star rating

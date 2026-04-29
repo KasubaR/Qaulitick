@@ -146,6 +146,27 @@ nav a.active {
     filter: brightness(0) saturate(100%) invert(58%) sepia(42%) saturate(700%) hue-rotate(5deg) brightness(95%) contrast(90%);
 }
 
+/* Logged-in state: gold icon + green dot indicator */
+.login-icon.is-logged-in {
+    position: relative;
+}
+
+.login-icon.is-logged-in img {
+    filter: brightness(0) saturate(100%) invert(58%) sepia(42%) saturate(700%) hue-rotate(5deg) brightness(95%) contrast(90%);
+}
+
+.login-icon.is-logged-in::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 7px;
+    height: 7px;
+    background: #22c55e;
+    border-radius: 50%;
+    border: 1.5px solid #000;
+}
+
 /* ── BUTTONS ── */
 .btn {
     display: inline-flex;

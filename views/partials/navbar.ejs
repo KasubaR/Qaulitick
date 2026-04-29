@@ -22,7 +22,7 @@
             Cart <span id="cartCount">0</span>
             <img src="/images/icons/Cart-icon.svg" alt="Cart">
         </a>
-        <a href="<%= typeof currentUser !== 'undefined' && currentUser ? '/account' : '/login' %>" class="login-icon" title="<%= typeof currentUser !== 'undefined' && currentUser ? 'My account' : 'Sign in' %>">
+        <a href="<%= typeof currentUser !== 'undefined' && currentUser ? '/account' : '/login' %>" class="login-icon<%= typeof currentUser !== 'undefined' && currentUser ? ' is-logged-in' : '' %>" title="<%= typeof currentUser !== 'undefined' && currentUser ? 'My account' : 'Sign in' %>">
             <img src="/images/icons/login.svg" alt="<%= typeof currentUser !== 'undefined' && currentUser ? 'Account' : 'Sign in' %>">
         </a>
     </div>

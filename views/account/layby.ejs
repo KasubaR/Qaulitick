@@ -54,6 +54,22 @@
                         <span class="layby-plan-meta-label">Next due</span>
                         <strong><%= plan.nextDueLabel || (plan.nextDueAt ? new Date(plan.nextDueAt).toLocaleDateString() : 'No due date') %></strong>
                     </div>
+                    <div>
+                        <span class="layby-plan-meta-label">Due window</span>
+                        <% const dueMs = plan.nextDueAt ? (new Date(plan.nextDueAt).getTime() - Date.now()) : null; %>
+                        <% const dueDays = dueMs != null ? Math.ceil(dueMs / (1000 * 60 * 60 * 24)) : null; %>
+                        <strong>
+                            <% if (dueDays == null) { %>
+                                No due date
+                            <% } else if (dueDays < 0) { %>
+                                Overdue by <%= Math.abs(dueDays) %> day<%= Math.abs(dueDays) === 1 ? '' : 's' %>
+                            <% } else if (dueDays === 0) { %>
+                                Due today
+                            <% } else { %>
+                                Due in <%= dueDays %> day<%= dueDays === 1 ? '' : 's' %>
+                            <% } %>
+                        </strong>
+                    </div>
                 </div>
                 <% if (ot > 0) { %>
                     <div class="layby-progress-wrap">
@@ -99,7 +115,7 @@
                             <input type="number" id="layby-amount-<%= plan.id %>" class="account-layby-amount-input" min="0.01" step="0.01" autocomplete="off" placeholder="Full balance due">
                             <p class="account-layby-amount-hint">Optional for flexible plans: enter an amount to pay part of the balance. Leave blank to pay the full amount currently due.</p>
                         </div>
-                        <button type="button" class="account-btn-secondary account-layby-pay-btn"><%= plan.nextActionLabel || 'Make a layby payment' %></button>
+                        <button type="button" class="account-btn-secondary account-layby-pay-btn"><%= plan.isOverdue ? 'Pay overdue amount' : (plan.nextActionLabel || 'Make a layby payment') %></button>
                         <p class="account-layby-pay-status" aria-live="polite"></p>
                         <div class="account-layby-pay-followup account-layby-pay-followup--hidden">
                             <p class="account-layby-pay-followup-text"></p>

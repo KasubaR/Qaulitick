@@ -16,29 +16,82 @@
     <% if (typeof message !== 'undefined' && message) { %>
         <div class="account-alert account-alert--success" role="status"><%= message %></div>
     <% } %>
+    <% if (typeof securityMessage !== 'undefined' && securityMessage) { %>
+        <div class="account-alert account-alert--success" role="status"><%= securityMessage %></div>
+    <% } %>
     <% if (typeof emailVerified !== 'undefined' && !emailVerified) { %>
         <div class="account-alert account-alert--info" role="status">
             Verify your email to use <strong>layby</strong> at checkout. Check your inbox for the verification link.
         </div>
     <% } %>
 
+    <div class="account-dashboard-grid">
+        <section class="account-card account-stat-card">
+            <p class="account-stat-label">Total orders</p>
+            <p class="account-stat-value"><%= dashboardStats && dashboardStats.totalOrders != null ? dashboardStats.totalOrders : 0 %></p>
+            <a href="/account/orders" class="account-stat-link">View order history</a>
+        </section>
+        <section class="account-card account-stat-card">
+            <p class="account-stat-label">Active layby plans</p>
+            <p class="account-stat-value"><%= dashboardStats && dashboardStats.activeLaybyPlans != null ? dashboardStats.activeLaybyPlans : 0 %></p>
+            <a href="/account/layby" class="account-stat-link">Manage layby payments</a>
+        </section>
+        <section class="account-card account-stat-card">
+            <p class="account-stat-label">Address status</p>
+            <p class="account-stat-value"><%= dashboardStats && dashboardStats.addressCompleted ? 'Complete' : 'Needs update' %></p>
+            <a href="/account/address" class="account-stat-link">Update address</a>
+        </section>
+        <section class="account-card account-stat-card">
+            <p class="account-stat-label">Profile completion</p>
+            <p class="account-stat-value"><%= dashboardStats && dashboardStats.profileCompletionPercent != null ? dashboardStats.profileCompletionPercent : 0 %>%</p>
+            <a href="/account/profile" class="account-stat-link">Complete profile</a>
+        </section>
+    </div>
+
+    <div class="account-dashboard-columns">
+        <section class="account-card">
+            <h2>Account summary</h2>
+            <dl class="account-dl">
+                <dt>Name</dt>
+                <dd><%= typeof customer !== 'undefined' && customer.name ? customer.name : '—' %></dd>
+                <dt>Email</dt>
+                <dd><%= typeof customer !== 'undefined' && customer.email ? customer.email : '—' %></dd>
+                <dt>Phone</dt>
+                <dd><%= typeof customer !== 'undefined' && customer.phone ? customer.phone : '—' %></dd>
+                <dt>Email status</dt>
+                <dd><span class="account-status-chip <%= typeof emailVerified !== 'undefined' && emailVerified ? 'is-good' : 'is-warn' %>"><%= typeof emailVerified !== 'undefined' && emailVerified ? 'Verified' : 'Not verified' %></span></dd>
+            </dl>
+            <div class="account-actions account-dashboard-actions">
+                <a class="account-btn-primary" href="/account/profile">Edit profile</a>
+                <a class="account-btn-secondary" href="/account/orders">View orders</a>
+            </div>
+        </section>
+
+        <section class="account-card">
+            <h2>Recent activity</h2>
+            <% if (!recentActivity || !recentActivity.length) { %>
+                <p class="account-empty">No recent account activity yet.</p>
+            <% } else { %>
+                <ul class="account-activity-list">
+                    <% recentActivity.forEach(function(activity) { %>
+                        <li class="account-activity-item">
+                            <span class="account-activity-badge <%= activity.type === 'layby' ? 'is-layby' : 'is-order' %>"><%= activity.type === 'layby' ? 'Layby' : 'Order' %></span>
+                            <div class="account-activity-content">
+                                <p class="account-activity-title"><%= activity.title %></p>
+                                <p class="account-activity-subtitle"><%= activity.subtitle %></p>
+                            </div>
+                        </li>
+                    <% }); %>
+                </ul>
+            <% } %>
+        </section>
+    </div>
+
     <div class="account-card">
-        <h2>Account summary</h2>
-        <dl class="account-dl">
-            <dt>Name</dt>
-            <dd><%= typeof customer !== 'undefined' && customer.name ? customer.name : '—' %></dd>
-            <dt>Email</dt>
-            <dd><%= typeof customer !== 'undefined' && customer.email ? customer.email : '—' %></dd>
-            <dt>Phone</dt>
-            <dd><%= typeof customer !== 'undefined' && customer.phone ? customer.phone : '—' %></dd>
-            <dt>Email status</dt>
-            <dd><%= typeof emailVerified !== 'undefined' && emailVerified ? 'Verified' : 'Not verified' %></dd>
-        </dl>
-        <div class="account-actions account-dashboard-actions">
-            <a class="account-btn-primary" href="/account/profile">Edit profile</a>
-            <a class="account-btn-secondary" href="/account/orders">View orders</a>
-        </div>
-        <div class="account-actions" style="margin-top:1rem;">
+        <h2>Security</h2>
+        <p class="account-form-hint">Protect your account by updating your password regularly and signing out of old devices.</p>
+        <div class="account-actions account-security-actions">
+            <a class="account-btn-secondary" href="/account/profile#security">Change password</a>
             <form method="post" action="/account/logout-all-devices">
                 <input type="hidden" name="csrfToken" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
                 <button type="submit" class="account-btn-secondary">Sign out all devices</button>

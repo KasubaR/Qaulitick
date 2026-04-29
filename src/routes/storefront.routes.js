@@ -362,6 +362,7 @@ router.post('/reset-password',
 router.get('/account', requireCustomerAuth, customerAccountController.renderDashboard);
 router.get('/account/profile', requireCustomerAuth, customerAccountController.renderProfile);
 router.post('/account/profile', requireCustomerAuth, csrfTokenValidator(), customerAccountController.updateProfile);
+router.post('/account/password', requireCustomerAuth, csrfTokenValidator(), customerAccountController.updatePassword);
 router.get('/account/address', requireCustomerAuth, customerAccountController.renderAddress);
 router.post('/account/address', requireCustomerAuth, csrfTokenValidator(), customerAccountController.updateAddress);
 router.get('/account/orders', requireCustomerAuth, customerAccountController.renderOrders);

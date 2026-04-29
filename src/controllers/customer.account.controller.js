@@ -1,8 +1,8 @@
-const { Order, LaybyPlan, LaybyPayment, Payment } = require('../models');
+const { Order, LaybyPlan, LaybyPayment, Payment, User } = require('../models');
 const { Op } = require('sequelize');
 const userService = require('../services/user.service');
 const productService = require('../services/product.service');
-const { sanitizeObject, validatePhone } = require('../utils/validators');
+const { sanitizeObject, validatePhone, validatePasswordStrength } = require('../utils/validators');
 const { deleteAllSessionsForUser } = require('../services/session.service');
 const { cookieName: sessionCookieName } = require('../config/session.constants');
 const { enrichLaybyPlan } = require('../utils/laybyStatusPresenter');
@@ -11,17 +11,97 @@ const logger = require('../utils/logger').child({ module: 'CustomerAccountContro
 /** Max layby plans loaded per account/layby request (includes nested installments). */
 const LAYBY_ACCOUNT_PLANS_PER_PAGE = 50;
 
-exports.renderDashboard = (req, res) => {
+exports.renderDashboard = async (req, res) => {
     const u = req.customerUser.toJSON();
-    res.render('account/dashboard', {
-        title: 'My account | Qualitick Collections',
-        page: 'account',
-        accountSection: 'dashboard',
-        customer: u,
-        emailVerified: !!u.emailVerifiedAt,
-        message: typeof req.query.message === 'string' ? req.query.message : null,
-        csrfToken: res.locals.csrfToken || ''
-    });
+    try {
+        const [ordersCount, activeLaybyPlans, latestOrders, upcomingLaybyPayments] = await Promise.all([
+            Order.count({ where: { userId: req.customerUser.id } }),
+            LaybyPlan.count({ where: { userId: req.customerUser.id, status: 'active' } }),
+            Order.findAll({
+                where: { userId: req.customerUser.id },
+                order: [['createdAt', 'DESC']],
+                limit: 3,
+                attributes: ['orderNumber', 'status', 'createdAt']
+            }),
+            LaybyPayment.findAll({
+                include: [{
+                    model: LaybyPlan,
+                    as: 'laybyPlan',
+                    required: true,
+                    where: { userId: req.customerUser.id },
+                    attributes: ['id']
+                }],
+                where: { status: { [Op.in]: ['pending', 'overdue'] } },
+                order: [['dueAt', 'ASC']],
+                limit: 3,
+                attributes: ['id', 'sequence', 'status', 'dueAt', 'amount', 'currency', 'createdAt']
+            })
+        ]);
+
+        const activity = [
+            ...latestOrders.map((o) => ({
+                type: 'order',
+                title: `Order ${o.orderNumber || '#' + o.id}`,
+                subtitle: `Status: ${o.status || 'pending'}`,
+                at: o.createdAt
+            })),
+            ...upcomingLaybyPayments.map((p) => ({
+                type: 'layby',
+                title: `Layby installment #${p.sequence}`,
+                subtitle: p.dueAt
+                    ? `Due ${new Date(p.dueAt).toLocaleDateString()}`
+                    : `Amount ${Number(p.amount || 0).toFixed(2)} ${p.currency || 'ZMW'}`,
+                at: p.dueAt || p.createdAt
+            }))
+        ].sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0)).slice(0, 6);
+
+        const profileCompleteness = {
+            hasName: !!(u.name && String(u.name).trim()),
+            hasPhone: !!(u.phone && String(u.phone).trim()),
+            hasAddress: !!(u.deliveryAddress && String(u.deliveryAddress).trim()),
+            hasCity: !!(u.city && String(u.city).trim()),
+            hasProvince: !!(u.province && String(u.province).trim())
+        };
+        const completeFields = Object.values(profileCompleteness).filter(Boolean).length;
+        const completenessPercent = Math.round((completeFields / Object.keys(profileCompleteness).length) * 100);
+
+        return res.render('account/dashboard', {
+            title: 'My account | Qualitick Collections',
+            page: 'account',
+            accountSection: 'dashboard',
+            customer: u,
+            emailVerified: !!u.emailVerifiedAt,
+            message: typeof req.query.message === 'string' ? req.query.message : null,
+            securityMessage: typeof req.query.securityMessage === 'string' ? req.query.securityMessage : null,
+            dashboardStats: {
+                totalOrders: ordersCount,
+                activeLaybyPlans,
+                addressCompleted: !!(u.deliveryAddress && u.city && u.province),
+                profileCompletionPercent: completenessPercent
+            },
+            recentActivity: activity,
+            csrfToken: res.locals.csrfToken || ''
+        });
+    } catch (error) {
+        logger.error({ err: error }, 'renderDashboard metrics failed');
+        return res.render('account/dashboard', {
+            title: 'My account | Qualitick Collections',
+            page: 'account',
+            accountSection: 'dashboard',
+            customer: u,
+            emailVerified: !!u.emailVerifiedAt,
+            message: typeof req.query.message === 'string' ? req.query.message : null,
+            securityMessage: typeof req.query.securityMessage === 'string' ? req.query.securityMessage : null,
+            dashboardStats: {
+                totalOrders: 0,
+                activeLaybyPlans: 0,
+                addressCompleted: !!(u.deliveryAddress && u.city && u.province),
+                profileCompletionPercent: 0
+            },
+            recentActivity: [],
+            csrfToken: res.locals.csrfToken || ''
+        });
+    }
 };
 
 exports.renderProfile = (req, res) => {
@@ -33,6 +113,8 @@ exports.renderProfile = (req, res) => {
         customer: u,
         error: null,
         message: null,
+        securityError: null,
+        securityMessage: null,
         csrfToken: res.locals.csrfToken || ''
     });
 };
@@ -49,6 +131,8 @@ exports.updateProfile = async (req, res) => {
                 customer: req.customerUser.toJSON(),
                 error: 'Name must be at least 2 characters.',
                 message: null,
+            securityError: null,
+            securityMessage: null,
                 csrfToken: res.locals.csrfToken || ''
             });
         }
@@ -60,6 +144,8 @@ exports.updateProfile = async (req, res) => {
                 customer: req.customerUser.toJSON(),
                 error: 'Please enter a valid Zambian phone number.',
                 message: null,
+                securityError: null,
+                securityMessage: null,
                 csrfToken: res.locals.csrfToken || ''
             });
         }
@@ -78,6 +164,8 @@ exports.updateProfile = async (req, res) => {
             customer: refreshed.toJSON(),
             error: null,
             message: 'Profile updated.',
+            securityError: null,
+            securityMessage: null,
             csrfToken: res.locals.csrfToken || ''
         });
     } catch (error) {
@@ -89,8 +177,63 @@ exports.updateProfile = async (req, res) => {
             customer: req.customerUser.toJSON(),
             error: 'Could not update profile. Try again later.',
             message: null,
+            securityError: null,
+            securityMessage: null,
             csrfToken: res.locals.csrfToken || ''
         });
+    }
+};
+
+exports.updatePassword = async (req, res) => {
+    const renderWith = (status, securityError, securityMessage) => {
+        return res.status(status).render('account/profile', {
+            title: 'Profile | Qualitick Collections',
+            page: 'account',
+            accountSection: 'profile',
+            customer: req.customerUser.toJSON(),
+            error: null,
+            message: null,
+            securityError,
+            securityMessage,
+            csrfToken: res.locals.csrfToken || ''
+        });
+    };
+
+    try {
+        const body = sanitizeObject(req.body);
+        const currentPassword = body.currentPassword ? String(body.currentPassword) : '';
+        const newPassword = body.newPassword ? String(body.newPassword) : '';
+        const confirmPassword = body.confirmPassword ? String(body.confirmPassword) : '';
+
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            return renderWith(400, 'Fill in all password fields.', null);
+        }
+        if (!validatePasswordStrength(newPassword)) {
+            return renderWith(400, 'New password must be at least 8 characters and include at least one letter and one number.', null);
+        }
+        if (newPassword !== confirmPassword) {
+            return renderWith(400, 'New password and confirmation do not match.', null);
+        }
+
+        const loginUser = await User.scope('withPasswordHash').findByPk(req.customerUser.id);
+        if (!loginUser) {
+            return renderWith(404, 'Account not found.', null);
+        }
+        const isCurrentValid = await loginUser.comparePassword(currentPassword);
+        if (!isCurrentValid) {
+            return renderWith(400, 'Current password is incorrect.', null);
+        }
+        if (await loginUser.comparePassword(newPassword)) {
+            return renderWith(400, 'Choose a new password that is different from your current password.', null);
+        }
+
+        const passwordHash = await User.hashPassword(newPassword);
+        await loginUser.update({ passwordHash });
+
+        return renderWith(200, null, 'Password updated successfully.');
+    } catch (error) {
+        logger.error({ err: error }, 'updatePassword failed');
+        return renderWith(500, 'Could not update password. Try again later.', null);
     }
 };
 
