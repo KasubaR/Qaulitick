@@ -467,6 +467,41 @@ class ProductService {
             );
         });
     }
+
+    /**
+     * Apply or remove a bulk percentage discount across all non-discontinued products.
+     * percentage 1–99: sets originalPrice (preserving existing base) and reduces price.
+     * percentage 0: restores price to originalPrice and clears the discount.
+     * Returns the count of products updated.
+     */
+    async bulkDiscount(percentage) {
+        const pct = Number(percentage);
+        const products = await Product.findAll({
+            where: { status: { [Op.ne]: 'discontinued' } }
+        });
+
+        let updatedCount = 0;
+        for (const product of products) {
+            const currentPrice = Number(product.price) || 0;
+            const storedOriginal = Number(product.originalPrice) || 0;
+
+            if (pct === 0) {
+                // Remove discount: restore to original price if one was set
+                if (storedOriginal > currentPrice) {
+                    await product.update({ price: storedOriginal, originalPrice: null });
+                    updatedCount++;
+                }
+            } else {
+                // Apply discount: use stored original as base so repeated calls are idempotent
+                const base = storedOriginal > currentPrice ? storedOriginal : currentPrice;
+                const newPrice = Math.max(1, Math.round(base * (1 - pct / 100)));
+                await product.update({ price: newPrice, originalPrice: base });
+                updatedCount++;
+            }
+        }
+
+        return updatedCount;
+    }
 }
 
 const productService = new ProductService();

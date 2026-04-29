@@ -175,6 +175,13 @@ router.delete('/api/products/bulk',
     productController.bulkDeleteProducts
 );
 
+router.post('/api/products/bulk-discount',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }),
+    authenticateAdmin,
+    csrfTokenValidator(),
+    productController.bulkDiscountProducts
+);
+
 router.put('/api/products/reorder',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }),
     authenticateAdmin,

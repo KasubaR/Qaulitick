@@ -141,6 +141,9 @@ function setupEventListeners() {
     // Bulk operations
     setupBulkOperations();
 
+    // Bulk discount
+    setupBulkDiscount();
+
     // Event delegation for action menu items (view, edit, delete, duplicate)
     const productsTable = document.getElementById('productsTable');
     if (productsTable) {
@@ -2382,6 +2385,70 @@ function closeProductActionMenu(productId) {
     const menu = document.getElementById(`productActionMenu-${productId}`);
     if (menu) {
         menu.style.display = 'none';
+    }
+}
+
+// ============================================
+// Bulk Discount
+// ============================================
+
+function setupBulkDiscount() {
+    const modal      = document.getElementById('bulkDiscountModal');
+    const openBtn    = document.getElementById('bulkDiscountBtn');
+    const closeBtn   = document.getElementById('closeBulkDiscountModal');
+    const cancelBtn  = document.getElementById('cancelBulkDiscountBtn');
+    const applyBtn   = document.getElementById('applyBulkDiscountBtn');
+    const removeBtn  = document.getElementById('removeAllDiscountsBtn');
+    const percentInput = document.getElementById('bulkDiscountPercent');
+
+    if (!modal || !openBtn) return;
+
+    function openModal() { modal.style.display = 'flex'; percentInput.value = ''; }
+    function closeModal() { modal.style.display = 'none'; }
+
+    openBtn.addEventListener('click', openModal);
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    applyBtn.addEventListener('click', async () => {
+        const pct = parseInt(percentInput.value, 10);
+        if (!pct || pct < 1 || pct > 99) {
+            showNotification('Enter a discount between 1 and 99.', 'error');
+            return;
+        }
+        await sendBulkDiscount(pct, applyBtn);
+        closeModal();
+    });
+
+    removeBtn.addEventListener('click', async () => {
+        await sendBulkDiscount(0, removeBtn);
+        closeModal();
+    });
+}
+
+async function sendBulkDiscount(percentage, triggerBtn) {
+    const original = triggerBtn.innerHTML;
+    triggerBtn.disabled = true;
+    triggerBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Working…';
+
+    try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const res = await fetch('/api/products/bulk-discount', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+            body: JSON.stringify({ percentage })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+        showNotification(data.message, 'success');
+        // Reload the product table to reflect new prices
+        await loadProducts();
+    } catch (err) {
+        showNotification('Error: ' + err.message, 'error');
+    } finally {
+        triggerBtn.disabled = false;
+        triggerBtn.innerHTML = original;
     }
 }
 

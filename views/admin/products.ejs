@@ -42,6 +42,9 @@
                     <button class="btn btn-secondary" id="arrangeProductsBtn" title="Drag to reorder products">
                         <i class="fas fa-sort"></i> Arrange
                     </button>
+                    <button class="btn btn-secondary" id="bulkDiscountBtn" title="Apply a percentage discount to all products">
+                        <i class="fas fa-percent"></i> Bulk Discount
+                    </button>
                     <%- include('../partials/admin-button', { variant: 'primary', id: 'addProductBtn', icon: 'fa-plus', label: 'Add Product' }) %>
                 </div>
             </header>
@@ -434,6 +437,41 @@
         });
     })();
     </script>
+    <!-- Bulk Discount Modal -->
+    <div class="modal" id="bulkDiscountModal" style="display:none;">
+        <div class="modal-content" style="max-width:460px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-percent"></i> Bulk Discount</h2>
+                <button class="modal-close" id="closeBulkDiscountModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--text-secondary);margin-bottom:20px;">
+                    Apply a percentage discount to <strong>all active products</strong>. Original prices are preserved so you can remove the discount later.
+                </p>
+                <div class="form-group">
+                    <label for="bulkDiscountPercent">Discount Percentage <span class="required">*</span></label>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <input type="number" id="bulkDiscountPercent" class="form-input" min="1" max="99" placeholder="e.g. 20" style="max-width:120px;">
+                        <span style="color:var(--text-secondary);font-size:15px;">% OFF</span>
+                    </div>
+                </div>
+                <hr style="border-color:var(--border);margin:20px 0;">
+                <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px;">
+                    <i class="fas fa-undo" style="margin-right:6px;"></i>Want to restore all original prices?
+                </p>
+                <button type="button" class="btn btn-secondary" id="removeAllDiscountsBtn" style="width:100%;">
+                    <i class="fas fa-times-circle"></i> Remove All Discounts
+                </button>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="cancelBulkDiscountBtn">Cancel</button>
+                <button type="button" class="btn btn-primary" id="applyBulkDiscountBtn">
+                    <i class="fas fa-check"></i> Apply Discount
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Arrange Products Modal -->
     <div class="modal" id="arrangeModal" style="display:none;">
         <div class="modal-content large">

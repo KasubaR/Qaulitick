@@ -1336,6 +1336,32 @@ exports.deleteProductImage = async (req, res) => {
 };
 
 /**
+ * Bulk discount all products by a percentage
+ * POST /api/products/bulk-discount
+ * Body: { percentage } — 1–99 applies discount, 0 removes all discounts
+ */
+exports.bulkDiscountProducts = async (req, res) => {
+    try {
+        const percentage = Number(req.body.percentage);
+        if (isNaN(percentage) || percentage < 0 || percentage > 99) {
+            return res.status(400).json({ success: false, message: 'Percentage must be between 0 and 99' });
+        }
+
+        const updatedCount = await productService.bulkDiscount(percentage);
+        clearCache('/api/products');
+
+        const message = percentage === 0
+            ? `Discounts removed from ${updatedCount} product(s)`
+            : `${percentage}% discount applied to ${updatedCount} product(s)`;
+
+        res.json({ success: true, message, updatedCount });
+    } catch (error) {
+        console.error('[Product Controller] Error applying bulk discount:', error);
+        res.status(500).json({ success: false, message: 'Failed to apply bulk discount' });
+    }
+};
+
+/**
  * Reorder products by updating sortOrder for each
  * PUT /api/products/reorder
  * Body: { orderedIds: [id, id, ...] }
