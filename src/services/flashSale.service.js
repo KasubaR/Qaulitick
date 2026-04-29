@@ -137,7 +137,14 @@ class FlashSaleService {
     async endSaleIfAllOutOfStock(productId) {
         try {
             const Product = require('../models/Product.model');
-            const activeSales = await this.getActiveFlashSales();
+            const now = new Date();
+            const activeSales = await FlashSale.findAll({
+                where: {
+                    status: 'active',
+                    startDate: { [Op.lte]: now },
+                    endDate: { [Op.gte]: now }
+                }
+            });
 
             for (const sale of activeSales) {
                 const raw = sale.productIds;

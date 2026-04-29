@@ -231,6 +231,10 @@ exports.createFlashSale = async (req, res) => {
     try {
         const saleData = req.body;
 
+        if (saleData.startDate && saleData.endDate && new Date(saleData.endDate) <= new Date(saleData.startDate)) {
+            return res.status(400).json({ success: false, message: 'End date must be after the start date' });
+        }
+
         if (Array.isArray(saleData.productIds) && saleData.productIds.length > 0) {
             if (saleData.productIds.length > 4) {
                 return res.status(400).json({ success: false, message: 'A flash sale can include a maximum of 4 products' });
@@ -275,6 +279,10 @@ exports.updateFlashSale = async (req, res) => {
     try {
         const { id } = req.params;
         const saleData = req.body;
+
+        if (saleData.startDate && saleData.endDate && new Date(saleData.endDate) <= new Date(saleData.startDate)) {
+            return res.status(400).json({ success: false, message: 'End date must be after the start date' });
+        }
 
         if (Array.isArray(saleData.productIds) && saleData.productIds.length > 0) {
             if (saleData.productIds.length > 4) {

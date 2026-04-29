@@ -284,7 +284,12 @@
 
         modalTitle.textContent = 'Edit Flash Sale';
         flashSaleIdInput.value = sale._id || sale.id;
-        selectedProductIds = new Set(Array.isArray(sale.productIds) ? sale.productIds : []);
+        selectedProductIds = new Set(
+            (Array.isArray(sale.productIds) ? sale.productIds : []).map(id => String(id))
+        );
+        if (productList) {
+            productList.innerHTML = '';
+        }
 
         document.getElementById('saleName').value = sale.name || '';
         document.getElementById('startDate').value = formatDateForInput(sale.startDate);
@@ -308,11 +313,14 @@
 
         const id = flashSaleIdInput.value || null;
 
-        // Collect product IDs from selected checkboxes
-        selectedProductIds = new Set(
-            Array.from(document.querySelectorAll('#productList input[type="checkbox"]:checked'))
-                .map(input => input.value)
-        );
+        // Also sync any currently visible checked checkboxes (in case change events were missed)
+        document.querySelectorAll('#productList input[type="checkbox"]').forEach(input => {
+            if (input.checked) {
+                selectedProductIds.add(input.value);
+            } else {
+                selectedProductIds.delete(input.value);
+            }
+        });
 
         const saleData = {
             name: document.getElementById('saleName').value.trim(),
@@ -327,6 +335,16 @@
 
         if (!saleData.name || !saleData.startDate || !saleData.endDate || saleData.productIds.length === 0) {
             showNotification('Please fill in all required fields and select at least one product.', 'error');
+            return;
+        }
+
+        if (new Date(saleData.endDate) <= new Date(saleData.startDate)) {
+            showNotification('End date must be after the start date.', 'error');
+            return;
+        }
+
+        if (saleData.productIds.length > 4) {
+            showNotification('A flash sale can include a maximum of 4 products.', 'error');
             return;
         }
 
@@ -540,6 +558,14 @@
             checkbox.type = 'checkbox';
             checkbox.value = productId;
             checkbox.checked = selectedProductIds.has(String(productId));
+
+            checkbox.addEventListener('change', () => {
+                if (checkbox.checked) {
+                    selectedProductIds.add(String(productId));
+                } else {
+                    selectedProductIds.delete(String(productId));
+                }
+            });
 
             const info = document.createElement('span');
             info.className = 'product-list-label';
