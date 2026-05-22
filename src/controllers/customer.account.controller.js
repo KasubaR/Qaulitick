@@ -34,7 +34,7 @@ exports.renderDashboard = async (req, res) => {
                 where: { status: { [Op.in]: ['pending', 'overdue'] } },
                 order: [['dueAt', 'ASC']],
                 limit: 3,
-                attributes: ['id', 'sequence', 'status', 'dueAt', 'amount', 'currency', 'createdAt']
+                attributes: ['id', 'sequence', 'status', 'dueAt', 'amount', 'createdAt']
             })
         ]);
 
