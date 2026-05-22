@@ -1470,6 +1470,77 @@ async function sendLaybyInstallmentConfirmedEmail({ order, paidAmt, balanceRemai
     }
 }
 
+async function sendLaybyCancellationEmail({ order, reason }) {
+    const transporter = getTransporter();
+    if (!transporter) {
+        logger.warn('Cannot send layby cancellation email: transporter not configured');
+        return { success: false, error: 'Email service not configured' };
+    }
+
+    try {
+        const customerName = esc(order.customer?.name || 'Valued Customer');
+        const orderNumber  = esc(order.orderNumber || '');
+        const reasonText   = esc(reason || 'Your layby plan has been cancelled.');
+
+        const html = `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    body { margin: 0; padding: 0; background: #f4f4f4; font-family: Arial, sans-serif; color: #333; }
+                    .wrapper { max-width: 600px; margin: 30px auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+                    .header { background: #FFD700; padding: 36px 30px; text-align: center; }
+                    .header h1 { margin: 0; font-size: 26px; color: #222; letter-spacing: 0.5px; }
+                    .header p { margin: 6px 0 0; color: #555; font-size: 14px; }
+                    .body { padding: 32px 30px; }
+                    .section { background: #fafafa; border-left: 4px solid #e53935; border-radius: 4px; padding: 18px 20px; margin: 20px 0; }
+                    .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #999; text-align: center; line-height: 1.8; }
+                </style>
+            </head>
+            <body>
+                <div class="wrapper">
+                    <div class="header">
+                        <h1>Layby Plan Cancelled</h1>
+                        <p>Qualitick Collections — Layby Plan</p>
+                    </div>
+                    <div class="body">
+                        <p>Dear ${customerName},</p>
+                        <p>We're writing to let you know that your layby plan for order <strong>${orderNumber}</strong> has been cancelled.</p>
+
+                        <div class="section">
+                            <p style="margin:0;"><strong>Reason:</strong> ${reasonText}</p>
+                        </div>
+
+                        <p>If you believe this is an error or have any questions, please contact our support team.</p>
+
+                        <div class="footer">
+                            <p><strong>Qualitick Collections</strong> — Premium Luxury Watches</p>
+                            <p>Questions? Contact us at <a href="mailto:support@qualitickzm.com" style="color: #999;">support@qualitickzm.com</a></p>
+                            <p>This is an automated message. Please do not reply directly to this email.</p>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        const info = await transporter.sendMail({
+            from: MAIL_FROM,
+            to: order.customer.email,
+            subject: `Your layby plan has been cancelled — order ${orderNumber}`,
+            html
+        });
+
+        logger.info({ orderNumber: order.orderNumber, messageId: info.messageId }, 'Layby cancellation email sent');
+        return { success: true, messageId: info.messageId };
+    } catch (error) {
+        logger.error({ err: error, orderNumber: order.orderNumber }, 'Error sending layby cancellation email');
+        return { success: false, error: error.message };
+    }
+}
+
 module.exports = {
     sendContactNotificationToAdmin,
     sendContactConfirmationToUser,
@@ -1483,6 +1554,7 @@ module.exports = {
     sendDispatchEmail,
     sendNewsletterWelcomeEmail,
     sendLaybyInstallmentConfirmedEmail,
+    sendLaybyCancellationEmail,
     verifyTransporter
 };
 

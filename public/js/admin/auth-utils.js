@@ -38,18 +38,15 @@ async function checkAuthentication() {
 }
 
 /**
- * Redirect to login page
+ * Redirect to access denied page with session-expired message.
+ * The admin login page requires a secret URL token, so we cannot redirect
+ * there directly — instead send to the access-denied page which instructs
+ * the admin to use the correct secret URL.
  * @param {string} message - Optional message to display
  */
 function redirectToLogin(message = null) {
-    const currentUrl = window.location.pathname + window.location.search;
-    let loginUrl = '/admin/login?returnUrl=' + encodeURIComponent(currentUrl);
-    
-    if (message) {
-        loginUrl += '&error=' + encodeURIComponent(message);
-    }
-    
-    window.location.href = loginUrl;
+    const error = message || 'Your session has expired. Please log in again using the admin secret URL.';
+    window.location.href = '/admin/access-denied?error=' + encodeURIComponent(error);
 }
 
 /**

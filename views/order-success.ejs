@@ -15,6 +15,78 @@
     <section class="order-success-section" aria-labelledby="order-success-heading">
         <div class="order-success-container">
             <div class="success-content">
+
+                <% if (dpo === ‘pending’) { %>
+
+                <div class="success-icon success-icon--pending" aria-hidden="true">
+                    <i class="fas fa-clock"></i>
+                </div>
+
+                <p class="success-lead">Payment received</p>
+                <h1 class="success-title" id="order-success-heading">Awaiting payment confirmation</h1>
+
+                <p class="success-message">
+                    Your order has been placed and your payment is being confirmed by DPO. We’ll send you an email as soon as it clears — this usually takes just a few minutes.
+                </p>
+
+                <div class="order-details-card">
+                    <div class="order-number">
+                        <span class="label">Order number</span>
+                        <span class="value" id="orderNumber"><%= orderNumber %></span>
+                    </div>
+
+                    <div class="order-info">
+                        <p><i class="fas fa-envelope" aria-hidden="true"></i> <span>You’ll receive a confirmation email once your payment clears.</span></p>
+                        <p><i class="fas fa-clock" aria-hidden="true"></i> <span>Payment confirmation usually takes a few minutes. Please don’t pay again.</span></p>
+                        <p><i class="fas fa-headset" aria-hidden="true"></i> <span>If you don’t hear from us within an hour, please contact support with your order number.</span></p>
+                    </div>
+                </div>
+
+                <div class="success-actions">
+                    <a href="/shop" class="btn-primary">
+                        <i class="fas fa-shopping-bag" aria-hidden="true"></i> Continue shopping
+                    </a>
+                    <a href="/" class="btn-outline">
+                        <i class="fas fa-home" aria-hidden="true"></i> Back to home
+                    </a>
+                </div>
+
+                <% } else if (dpo === ‘error’) { %>
+
+                <div class="success-icon success-icon--error" aria-hidden="true">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+
+                <p class="success-lead">Payment issue</p>
+                <h1 class="success-title" id="order-success-heading">Payment could not be confirmed</h1>
+
+                <p class="success-message">
+                    Your order was received but we couldn’t confirm your payment. Please contact us with your order number and we’ll sort it out right away.
+                </p>
+
+                <div class="order-details-card">
+                    <div class="order-number">
+                        <span class="label">Order number</span>
+                        <span class="value" id="orderNumber"><%= orderNumber %></span>
+                    </div>
+
+                    <div class="order-info">
+                        <p><i class="fas fa-headset" aria-hidden="true"></i> <span>Please quote your order number when contacting support.</span></p>
+                        <p><i class="fas fa-redo" aria-hidden="true"></i> <span>You can retry your payment from your order page. Do not pay again from scratch.</span></p>
+                    </div>
+                </div>
+
+                <div class="success-actions">
+                    <a href="/shop" class="btn-primary">
+                        <i class="fas fa-shopping-bag" aria-hidden="true"></i> Continue shopping
+                    </a>
+                    <a href="/" class="btn-outline">
+                        <i class="fas fa-home" aria-hidden="true"></i> Back to home
+                    </a>
+                </div>
+
+                <% } else { %>
+
                 <div class="success-icon" aria-hidden="true">
                     <i class="fas fa-check-circle"></i>
                 </div>
@@ -65,6 +137,9 @@
                         <span>30-day returns</span>
                     </div>
                 </div>
+
+                <% } %>
+
             </div>
         </div>
     </section>

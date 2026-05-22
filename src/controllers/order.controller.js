@@ -10,6 +10,11 @@ const User = require('../models/User.model');
 const LaybyPlan = require('../models/LaybyPlan.model');
 const LaybyPayment = require('../models/LaybyPayment.model');
 const orderService = require('../services/order.service');
+const dpoService = require('../services/dpo.service');
+const {
+    compactDpoVerifyRaw,
+    applyDpoVerificationOutcome
+} = require('../services/dpoPaymentOutcome.service');
 const logger = require('../utils/logger').child({ module: 'OrderController' });
 const { getSellableUnitsForLine } = require('../utils/stock.utils');
 /** Admin order list filters — must match `Order` model ENUMs */
@@ -816,27 +821,49 @@ exports.verifyOrderPayment = async (req, res) => {
             });
         }
 
-        // If it's a Lenco payment, verify with Lenco API
+        // Gateway verification (Lenco mobile money or DPO bank_transfer)
         let verified = false;
         let verificationError = null;
-        
-        if (payment.lencoTransactionId || payment.transactionId || payment.lencoReference) {
+
+        const payMeta = payment.metadata || {};
+
+        if (payMeta.gateway === 'dpo' && payment.paymentMethod === 'bank_transfer') {
+            try {
+                const dpoResult = await dpoService.verifyToken(payment.transactionId);
+                const { outcome, raw } = dpoResult;
+
+                if (outcome.paid) {
+                    await applyDpoVerificationOutcome(payment, outcome, raw, 'order verify-payment');
+                } else if (!outcome.terminal) {
+                    await payment.update({ gatewayResponse: compactDpoVerifyRaw(raw) });
+                } else {
+                    await applyDpoVerificationOutcome(payment, outcome, raw, 'order verify-payment');
+                }
+
+                payment = await Payment.findByPk(payment.id);
+                verified = true;
+
+                logger.info({ orderNumber, paymentStatus: payment.status }, 'DPO payment verified');
+            } catch (error) {
+                logger.error({ err: error }, 'Error verifying payment with DPO');
+                verificationError = error.message;
+            }
+        } else if (payment.lencoTransactionId || payment.lencoReference) {
             try {
                 const lencoService = require('../services/lenco.service');
-                
+
                 const merchantReference =
                     (payment.transactionId && String(payment.transactionId).trim()) || null;
                 const verificationResult = await lencoService.verifyPayment(
                     payment.lencoTransactionId,
                     merchantReference
                 );
-                
-                // Update payment record with latest status
+
                 const previousPaymentStatus = payment.status;
                 payment.lencoStatus = verificationResult.status;
                 payment.status = payment.mapLencoStatusToPaymentStatus(verificationResult.status);
                 payment.lencoResponse = verificationResult.rawResponse || verificationResult;
-                
+
                 if (verificationResult.completedAt) {
                     payment.completedAt = new Date(verificationResult.completedAt);
                 }
@@ -844,10 +871,10 @@ exports.verifyOrderPayment = async (req, res) => {
                     payment.failedAt = new Date(verificationResult.failedAt);
                     payment.failureReason = verificationResult.failureReason;
                 }
-                
+
                 await payment.save();
                 verified = true;
-                
+
                 logger.info(
                     {
                         orderNumber,
@@ -856,14 +883,11 @@ exports.verifyOrderPayment = async (req, res) => {
                     },
                     'Payment verified'
                 );
-                
             } catch (error) {
                 logger.error({ err: error }, 'Error verifying payment with Lenco');
                 verificationError = error.message;
-                // Continue with database status if verification fails
             }
         } else {
-            // Non-Lenco payment, use database status
             verified = true;
         }
 

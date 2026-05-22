@@ -19,10 +19,10 @@ const {
 const { cookieName: sessionCookieName } = require('../config/session.constants');
 const logger = require('../utils/logger').child({ module: 'CustomerAuthController' });
 
-const REMEMBER_MAX_AGE_MS = parseInt(
-    process.env.SESSION_REMEMBER_MAX_AGE || String(30 * 24 * 60 * 60 * 1000),
-    10
-);
+const _rememberParsed = parseInt(process.env.SESSION_REMEMBER_MAX_AGE, 10);
+const REMEMBER_MAX_AGE_MS = Number.isFinite(_rememberParsed) && _rememberParsed > 0
+    ? _rememberParsed
+    : 30 * 24 * 60 * 60 * 1000;
 
 // Used to normalise bcrypt timing when no user is found, preventing email enumeration via response time.
 const DUMMY_HASH = '$2b$10$invalidhashfortimingnormalizationXXXXXXXXXXXXXXXXX';
@@ -30,6 +30,19 @@ const DUMMY_HASH = '$2b$10$invalidhashfortimingnormalizationXXXXXXXXXXXXXXXXX';
 function parseRememberMe(body) {
     const v = body.remember;
     return v === 'on' || v === true || v === 'true' || v === '1';
+}
+
+// Returns true only for same-origin relative paths.
+// Rejects protocol-relative (//) and backslash-relative (/\) bypasses by
+// parsing through the URL constructor and confirming the hostname stays local.
+function isSafeReturnUrl(url) {
+    if (typeof url !== 'string' || !url.startsWith('/') || url.startsWith('//')) return false;
+    try {
+        const parsed = new URL(url, 'http://localhost');
+        return parsed.hostname === 'localhost';
+    } catch {
+        return false;
+    }
 }
 
 exports.renderRegisterPage = (req, res) => {
@@ -137,7 +150,7 @@ exports.renderLoginPage = (req, res) => {
         accountSection: 'login',
         error: req.query.error ? sanitizeString(req.query.error) : null,
         message: req.query.message ? sanitizeString(req.query.message) : null,
-        returnUrl: typeof req.query.returnUrl === 'string' && req.query.returnUrl.startsWith('/') && !req.query.returnUrl.startsWith('//') ? req.query.returnUrl : '/account',
+        returnUrl: isSafeReturnUrl(req.query.returnUrl) ? req.query.returnUrl : '/account',
         csrfToken: res.locals.csrfToken || ''
     });
 };
@@ -149,6 +162,7 @@ exports.handleLogin = async (req, res) => {
         }
 
         const body = sanitizeObject(req.body);
+        const returnUrl = isSafeReturnUrl(body.returnUrl) ? body.returnUrl : '/account';
         const validation = validateLogin(body);
         if (!validation.valid) {
             return res.status(400).render('account/login', {
@@ -157,7 +171,7 @@ exports.handleLogin = async (req, res) => {
                 accountSection: 'login',
                 error: validation.errors.join(' '),
                 message: null,
-                returnUrl: body.returnUrl || '/account',
+                returnUrl,
                 csrfToken: res.locals.csrfToken || ''
             });
         }
@@ -173,7 +187,7 @@ exports.handleLogin = async (req, res) => {
                 accountSection: 'login',
                 error: 'Invalid email or password.',
                 message: null,
-                returnUrl: body.returnUrl || '/account',
+                returnUrl,
                 csrfToken: res.locals.csrfToken || ''
             });
         }
@@ -188,55 +202,26 @@ exports.handleLogin = async (req, res) => {
                 error: null,
                 message: null,
                 unverifiedEmail: userService.normalizeEmail(body.email),
-                returnUrl: body.returnUrl || '/account',
+                returnUrl,
                 csrfToken: res.locals.csrfToken || ''
             });
         }
 
         const remember = parseRememberMe(body);
-        const returnUrl = (() => {
-            try {
-                const decoded = decodeURIComponent(typeof body.returnUrl === 'string' ? body.returnUrl : '');
-                return decoded.startsWith('/') && !decoded.startsWith('//') ? decoded : '/account';
-            } catch {
-                return '/account';
-            }
-        })();
 
-        req.session.regenerate((regErr) => {
-            if (regErr) {
-                logger.error({ err: regErr }, 'session regenerate on login failed');
-                return res.status(500).render('account/login', {
-                    title: 'Sign in | Qualitick Collections',
-                    page: 'account',
-                    accountSection: 'login',
-                    error: 'Could not start session. Please try again.',
-                    message: null,
-                    returnUrl,
-                    csrfToken: res.locals.csrfToken || ''
-                });
-            }
+        await new Promise((resolve, reject) =>
+            req.session.regenerate((err) => (err ? reject(err) : resolve()))
+        );
 
-            req.session.userId = user.id;
-            req.session.csrfToken = crypto.randomBytes(32).toString('hex');
-            req.session.cookie.maxAge = remember ? REMEMBER_MAX_AGE_MS : null;
+        req.session.userId = user.id;
+        req.session.csrfToken = crypto.randomBytes(32).toString('hex');
+        req.session.cookie.maxAge = remember ? REMEMBER_MAX_AGE_MS : null;
 
-            req.session.save((saveErr) => {
-                if (saveErr) {
-                    logger.error({ err: saveErr }, 'session save on login failed');
-                    return res.status(500).render('account/login', {
-                        title: 'Sign in | Qualitick Collections',
-                        page: 'account',
-                        accountSection: 'login',
-                        error: 'Could not save session. Please try again.',
-                        message: null,
-                        returnUrl,
-                        csrfToken: res.locals.csrfToken || ''
-                    });
-                }
-                return res.redirect(returnUrl);
-            });
-        });
+        await new Promise((resolve, reject) =>
+            req.session.save((err) => (err ? reject(err) : resolve()))
+        );
+
+        return res.redirect(returnUrl);
     } catch (error) {
         logger.error({ err: error, op: 'handleLogin' }, 'handleLogin failed');
         res.status(500).render('account/login', {
@@ -515,30 +500,28 @@ exports.verifyEmail = async (req, res) => {
         }
 
         // Auto-login the user after successful verification
-        req.session.regenerate((regErr) => {
-            if (regErr) {
-                logger.error({ err: regErr }, 'session regenerate after email verify failed');
-                // Verification succeeded — redirect to login with a success message even if session fails
-                return res.redirect('/login?message=' + encodeURIComponent(
-                    'Email verified! You can now sign in.'
-                ));
-            }
+        try {
+            await new Promise((resolve, reject) =>
+                req.session.regenerate((err) => (err ? reject(err) : resolve()))
+            );
 
             req.session.userId = result.user.id;
             req.session.csrfToken = crypto.randomBytes(32).toString('hex');
 
-            req.session.save((saveErr) => {
-                if (saveErr) {
-                    logger.error({ err: saveErr }, 'session save after email verify failed');
-                    return res.redirect('/login?message=' + encodeURIComponent(
-                        'Email verified! You can now sign in.'
-                    ));
-                }
-                return res.redirect('/account?message=' + encodeURIComponent(
-                    'Your email is verified. Welcome to Qualitick Collections!'
-                ));
-            });
-        });
+            await new Promise((resolve, reject) =>
+                req.session.save((err) => (err ? reject(err) : resolve()))
+            );
+
+            return res.redirect('/account?message=' + encodeURIComponent(
+                'Your email is verified. Welcome to Qualitick Collections!'
+            ));
+        } catch (sessionErr) {
+            // Verification succeeded — redirect to login even if session setup fails
+            logger.error({ err: sessionErr }, 'session setup after email verify failed');
+            return res.redirect('/login?message=' + encodeURIComponent(
+                'Email verified! You can now sign in.'
+            ));
+        }
     } catch (error) {
         logger.error({ err: error, op: 'verifyEmail' }, 'verifyEmail failed');
         return res.status(500).render('account/verify-email-result', {

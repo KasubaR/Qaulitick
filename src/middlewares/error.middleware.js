@@ -1,5 +1,7 @@
 // Error Handling Middleware
 
+const logger = require('../utils/logger').child({ module: 'ErrorMiddleware' });
+
 /**
  * Custom Error Classes
  */
@@ -52,15 +54,23 @@ function errorHandler(err, req, res, next) {
         console.error(err.stack);
     }
 
+    // Only expose the raw message for operational errors (intentional AppError throws).
+    // Non-operational errors (Sequelize, third-party libs, uncaught exceptions) may
+    // contain table names, column names, internal URLs, or API keys — hide them in prod.
+    const isOperational = err.isOperational === true;
+    const safeMessage = (isOperational || process.env.NODE_ENV === 'development')
+        ? err.message
+        : 'An unexpected error occurred.';
+
     // Determine if it's an API request or page request
-    const isAPIRequest = req.path.startsWith('/api');
+    const isAPIRequest = req.path.startsWith('/api') || req.xhr || req.accepts(['json', 'html']) === 'json';
 
     if (isAPIRequest) {
         // API Error Response
         return res.status(err.statusCode).json({
             success: false,
             status: err.status,
-            message: err.message,
+            message: safeMessage,
             ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
         });
     } else {
@@ -69,7 +79,7 @@ function errorHandler(err, req, res, next) {
         return res.status(err.statusCode).render(errorPage, {
             title: `${err.statusCode} - ${getErrorTitle(err.statusCode)}`,
             page: 'error',
-            message: err.message,
+            message: safeMessage,
             statusCode: err.statusCode,
             errorType: getErrorType(err.statusCode)
         });
@@ -81,7 +91,7 @@ function errorHandler(err, req, res, next) {
  * Must be used after all routes
  */
 function notFoundHandler(req, res, next) {
-    const isAPIRequest = req.path.startsWith('/api');
+    const isAPIRequest = req.path.startsWith('/api') || req.xhr || req.accepts(['json', 'html']) === 'json';
     
     if (isAPIRequest) {
         return res.status(404).json({
@@ -102,7 +112,7 @@ function notFoundHandler(req, res, next) {
  * No Products Found Handler
  */
 function handleNoProducts(req, res, message = 'No products found matching your criteria') {
-    const isAPIRequest = req.path.startsWith('/api');
+    const isAPIRequest = req.path.startsWith('/api') || req.xhr || req.accepts(['json', 'html']) === 'json';
     
     if (isAPIRequest) {
         return res.status(404).json({
@@ -210,7 +220,7 @@ async function retryRequest(fn, maxRetries = 3, delay = 1000) {
             
             // Exponential backoff
             const waitTime = delay * Math.pow(2, attempt - 1);
-            console.log(`[Retry] Attempt ${attempt} failed, retrying in ${waitTime}ms...`);
+            logger.warn({ attempt, maxRetries, waitTime }, 'Retrying failed request');
             await new Promise(resolve => setTimeout(resolve, waitTime));
         }
     }

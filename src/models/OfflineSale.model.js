@@ -20,6 +20,11 @@ const OfflineSale = sequelize.define('OfflineSale', {
         unique: true,
         comment: 'Human-readable ref e.g. OFF-20260415-00001'
     },
+    saleType: {
+        type: DataTypes.ENUM('full', 'layby'),
+        allowNull: false,
+        defaultValue: 'full'
+    },
     soldAt: {
         type: DataTypes.DATE,
         allowNull: false,

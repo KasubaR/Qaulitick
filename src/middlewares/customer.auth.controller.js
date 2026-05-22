@@ -15,10 +15,10 @@ const {
 const { cookieName: sessionCookieName } = require('../config/session.constants');
 const logger = require('../utils/logger').child({ module: 'CustomerAuthController' });
 
-const REMEMBER_MAX_AGE_MS = parseInt(
-    process.env.SESSION_REMEMBER_MAX_AGE || String(30 * 24 * 60 * 60 * 1000),
-    10
-);
+const _rememberParsed = parseInt(process.env.SESSION_REMEMBER_MAX_AGE, 10);
+const REMEMBER_MAX_AGE_MS = Number.isFinite(_rememberParsed) && _rememberParsed > 0
+    ? _rememberParsed
+    : 30 * 24 * 60 * 60 * 1000;
 
 function parseRememberMe(body) {
     const v = body.remember;

@@ -197,7 +197,7 @@
                             <div class="payment-methods">
                                 <!-- Mobile Money Option -->
                                 <div class="payment-option">
-                                    <input type="radio" id="paymentMobile" name="paymentMethod" value="mobile" required>
+                                    <input type="radio" id="paymentMobile" name="paymentMethod" value="mobile" required checked>
                                     <label for="paymentMobile" class="payment-label">
                                         <div class="payment-icon" style="display:flex;align-items:center;gap:6px;width:auto;padding:0 8px;">
                                             <img src="/images/icons/Mtn-MoMo-Pay.svg" alt="MTN MoMo" style="height:28px;width:auto;">
@@ -210,8 +210,7 @@
                                     </label>
                                 </div>
 
-                                <!-- Bank Transfer Option - DISABLED FOR NOW (Will be enabled in future update) -->
-                                <!--
+                                <% if (typeof enableBankTransfer !== 'undefined' && enableBankTransfer) { %>
                                 <div class="payment-option">
                                     <input type="radio" id="paymentBank" name="paymentMethod" value="bank" required>
                                     <label for="paymentBank" class="payment-label">
@@ -219,12 +218,12 @@
                                             <i class="fas fa-university"></i>
                                         </div>
                                         <div class="payment-info">
-                                            <span class="payment-name">Bank Transfer</span>
-                                            <span class="payment-desc">Direct bank transfer</span>
+                                            <span class="payment-name">Card or bank (hosted)</span>
+                                            <span class="payment-desc">Secure payment page — bank, card, or mobile</span>
                                         </div>
                                     </label>
                                 </div>
-                                -->
+                                <% } %>
                             </div>
                             
                             <!-- Payment Method Specific Fields (dynamically added by JavaScript) -->
@@ -387,6 +386,9 @@
                 <i class="fas fa-exclamation-circle"></i>
                 <h3>Payment Failed</h3>
                 <p id="errorMessage">There was an error processing your payment. Please try again.</p>
+                <p id="rateLimitCountdown" style="display:none; color: #aaa; font-size: 14px; margin-top: 8px;">
+                    You can retry in <span id="rateLimitTimer"></span>.
+                </p>
                 <div class="modal-actions">
                     <button class="btn-primary" id="retryPaymentBtn">Retry Payment</button>
                     <button class="btn-outline" id="cancelPaymentBtn">Cancel</button>

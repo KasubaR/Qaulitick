@@ -18,6 +18,70 @@
     const listLimit = 15;
     let listTotalPages = 1;
 
+    let saleMode = 'full';
+
+    function getLaybyConfig() {
+        const modal = document.getElementById('addSaleModal');
+        const min = parseInt(modal?.dataset?.laybyMinPct, 10) || 30;
+        const max = parseInt(modal?.dataset?.laybyMaxPct, 10) || 100;
+        const planDays = parseInt(modal?.dataset?.laybyPlanDays, 10) || 90;
+        return { min, max, planDays };
+    }
+
+    function clampDepositPercent(pct) {
+        const { min, max } = getLaybyConfig();
+        return Math.min(max, Math.max(min, Math.round(pct)));
+    }
+
+    function getCurrentSubtotal() {
+        let sub = 0;
+        lineData.forEach((d) => { sub += round2(d.qty * d.unitPrice); });
+        return round2(sub);
+    }
+
+    function recalcLaybyDisplay() {
+        const sub = getCurrentSubtotal();
+        const pctInput = document.getElementById('laybyDepositPercentInput');
+        const pctRange = document.getElementById('laybyDepositPercentRange');
+        let pct = parseInt(pctInput?.value, 10);
+        if (Number.isNaN(pct)) pct = getLaybyConfig().min;
+        pct = clampDepositPercent(pct);
+        if (pctInput) pctInput.value = String(pct);
+        if (pctRange) pctRange.value = String(pct);
+
+        const deposit = round2(sub * (pct / 100));
+        const balance = round2(sub - deposit);
+        const depEl = document.getElementById('laybyDepositAmountDisplay');
+        const balEl = document.getElementById('laybyBalanceAmountDisplay');
+        if (depEl) depEl.textContent = formatZmw(deposit);
+        if (balEl) balEl.textContent = formatZmw(balance);
+    }
+
+    function setSaleMode(mode) {
+        saleMode = mode === 'layby' ? 'layby' : 'full';
+        const panel = document.getElementById('offlineLaybyPanel');
+        const fullBtn = document.getElementById('saleModeFullBtn');
+        const laybyBtn = document.getElementById('saleModeLaybyBtn');
+        const submitBtn = document.getElementById('submitOfflineSaleBtn');
+
+        if (panel) {
+            const isLayby = saleMode === 'layby';
+            panel.classList.toggle('is-hidden', !isLayby);
+            panel.setAttribute('aria-hidden', isLayby ? 'false' : 'true');
+        }
+        if (fullBtn) fullBtn.classList.toggle('is-active', saleMode === 'full');
+        if (laybyBtn) laybyBtn.classList.toggle('is-active', saleMode === 'layby');
+
+        if (submitBtn) {
+            submitBtn.innerHTML =
+                saleMode === 'layby'
+                    ? '<i class="fas fa-check"></i> Save layby sale'
+                    : '<i class="fas fa-check"></i> Save sale';
+        }
+
+        if (saleMode === 'layby') recalcLaybyDisplay();
+    }
+
     function csrfToken() {
         const m = document.querySelector('meta[name=”csrf-token”]');
         return m ? m.getAttribute('content') || '' : '';
@@ -62,12 +126,12 @@
     }
 
     function recalcGrandTotals() {
-        let sub = 0;
-        lineData.forEach((d) => { sub += round2(d.qty * d.unitPrice); });
+        const sub = getCurrentSubtotal();
         const subEl = document.getElementById('offlineSubtotalDisplay');
         const grandEl = document.getElementById('offlineGrandTotalDisplay');
         if (subEl) subEl.textContent = formatZmw(sub);
         if (grandEl) grandEl.textContent = formatZmw(sub);
+        if (saleMode === 'layby') recalcLaybyDisplay();
     }
 
     // ─── Read-only row rendering ──────────────────────────────────────────────
@@ -333,7 +397,7 @@
             if (!Number.isNaN(d.getTime())) soldAt = d.toISOString();
         }
 
-        return {
+        const base = {
             items,
             totals: { subtotal, total: subtotal },
             soldAt: soldAt || undefined,
@@ -342,6 +406,13 @@
             customerPhone: document.getElementById('customerPhoneInput')?.value?.trim() || undefined,
             notes: document.getElementById('notesInput')?.value?.trim() || undefined
         };
+
+        if (saleMode === 'layby') {
+            const pct = clampDepositPercent(parseInt(document.getElementById('laybyDepositPercentInput')?.value, 10));
+            base.depositPercent = pct;
+        }
+
+        return base;
     }
 
     async function submitSale() {
@@ -358,8 +429,11 @@
         const btn = document.getElementById('submitOfflineSaleBtn');
         if (btn) btn.disabled = true;
 
+        const isLayby = saleMode === 'layby';
+        const endpoint = isLayby ? '/api/admin/offline-sales/layby' : '/api/admin/offline-sales';
+
         try {
-            const res = await fetch('/api/admin/offline-sales', {
+            const res = await fetch(endpoint, {
                 method: 'POST',
                 credentials: 'include',
                 headers: {
@@ -371,9 +445,11 @@
             });
 
             const data = await res.json().catch(() => ({}));
-            if (!res.ok || !data.success) throw new Error(data.message || 'Failed to save sale');
+            if (!res.ok || !data.success) {
+                throw new Error(data.message || (isLayby ? 'Failed to save layby sale' : 'Failed to save sale'));
+            }
 
-            showToast('Sale recorded.', 'success');
+            showToast(isLayby ? 'Layby sale recorded.' : 'Sale recorded.', 'success');
             closeSaleModal();
 
             document.getElementById('customerNameInput').value = '';
@@ -413,7 +489,7 @@
             }
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success) {
-                tbody.innerHTML = `<tr><td colspan=”5” class=”empty-state”>${data.message || 'Could not load sales'}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${escapeHtml(data.message || 'Could not load sales')}</td></tr>`;
                 return;
             }
 
@@ -430,12 +506,20 @@
 
             const sales = data.sales || [];
             if (sales.length === 0) {
-                tbody.innerHTML = '<tr><td colspan=”5” class=”empty-state”>No offline sales yet</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No offline sales yet</td></tr>';
                 return;
             }
 
             tbody.innerHTML = sales.map((s) => {
                 const num = escapeHtml(s.saleNumber || '—');
+                const isLayby = s.saleType === 'layby';
+                const typeBadge = isLayby
+                    ? '<span class="offline-type-badge offline-type-badge--layby">Layby</span>'
+                    : '<span class="offline-type-badge offline-type-badge--full">Full</span>';
+                const planId = s.laybyPlan && s.laybyPlan.id;
+                const laybyLink = planId
+                    ? `<a class="offline-layby-plan-link" href="/admin/layby/${planId}">View plan</a>`
+                    : '';
                 const dt = s.soldAt ? escapeHtml(new Date(s.soldAt).toLocaleString()) : '—';
                 const tot = s.totals?.total != null ? formatZmw(s.totals.total) : '—';
                 const custParts = [s.customerName, s.customerEmail, s.customerPhone].filter(Boolean);
@@ -443,6 +527,7 @@
                 const by = escapeHtml(s.createdByAdmin?.email || s.createdByAdminEmail || '') || '—';
                 return `<tr>
                     <td><strong>${num}</strong></td>
+                    <td>${typeBadge}${laybyLink}</td>
                     <td>${dt}</td>
                     <td>${tot}</td>
                     <td>${cust}</td>
@@ -450,7 +535,7 @@
                 </tr>`;
             }).join('');
         } catch {
-            tbody.innerHTML = '<tr><td colspan=”5” class=”empty-state”>Failed to load sales</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Failed to load sales</td></tr>';
         }
     }
 
@@ -478,6 +563,12 @@
         const modal = document.getElementById('addSaleModal');
         if (!modal) return;
         initSoldAtDefault();
+        setSaleMode('full');
+        const { min } = getLaybyConfig();
+        const pctInput = document.getElementById('laybyDepositPercentInput');
+        const pctRange = document.getElementById('laybyDepositPercentRange');
+        if (pctInput) pctInput.value = String(min);
+        if (pctRange) pctRange.value = String(min);
         modal.classList.remove('is-hidden');
     }
 
@@ -503,6 +594,26 @@
         document.getElementById('addOfflineLineBtn')?.addEventListener('click', () => openLineModal(null));
         document.getElementById('submitOfflineSaleBtn')?.addEventListener('click', () => submitSale());
         document.getElementById('saveLineModalBtn')?.addEventListener('click', () => saveLineModal());
+
+        document.getElementById('saleModeFullBtn')?.addEventListener('click', () => setSaleMode('full'));
+        document.getElementById('saleModeLaybyBtn')?.addEventListener('click', () => setSaleMode('layby'));
+
+        const syncPctFromInput = () => {
+            const pct = clampDepositPercent(parseInt(document.getElementById('laybyDepositPercentInput')?.value, 10));
+            const range = document.getElementById('laybyDepositPercentRange');
+            if (range) range.value = String(pct);
+            recalcLaybyDisplay();
+        };
+        const syncPctFromRange = () => {
+            const pct = clampDepositPercent(parseInt(document.getElementById('laybyDepositPercentRange')?.value, 10));
+            const input = document.getElementById('laybyDepositPercentInput');
+            if (input) input.value = String(pct);
+            recalcLaybyDisplay();
+        };
+        document.getElementById('laybyDepositPercentInput')?.addEventListener('input', syncPctFromInput);
+        document.getElementById('laybyDepositPercentInput')?.addEventListener('change', syncPctFromInput);
+        document.getElementById('laybyDepositPercentRange')?.addEventListener('input', syncPctFromRange);
+        document.getElementById('laybyDepositPercentRange')?.addEventListener('change', syncPctFromRange);
 
         // Close line picker modal
         document.querySelectorAll('.offline-line-modal-close').forEach((btn) => {

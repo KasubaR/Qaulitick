@@ -67,8 +67,14 @@ function renderPlans(plans) {
 
     plans.forEach((p) => {
         const tr = document.createElement('tr');
-        const orderNum = p.order && p.order.orderNumber ? p.order.orderNumber : '—';
-        const email = p.user && p.user.email ? p.user.email : '—';
+        const orderNum =
+            (p.order && p.order.orderNumber) ||
+            (p.offlineSale && p.offlineSale.saleNumber) ||
+            '—';
+        const email =
+            (p.user && p.user.email) ||
+            (p.offlineSale && p.offlineSale.customerEmail) ||
+            '—';
 
         const cells = [
             String(p.id),

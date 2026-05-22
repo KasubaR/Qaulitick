@@ -120,6 +120,9 @@ LaybyPayment.belongsTo(Payment, { foreignKey: 'paymentId', as: 'payment' });
 Admin.hasMany(OfflineSale, { foreignKey: 'createdByAdminId', as: 'offlineSales' });
 OfflineSale.belongsTo(Admin, { foreignKey: 'createdByAdminId', as: 'createdByAdmin' });
 
+OfflineSale.hasOne(LaybyPlan, { foreignKey: 'offlineSaleId', as: 'laybyPlan' });
+LaybyPlan.belongsTo(OfflineSale, { foreignKey: 'offlineSaleId', as: 'offlineSale' });
+
 [Product, Order, Payment, FlashSale, FeaturedProduct, ContactSubmission, Settings, Admin, User, PasswordResetToken, LaybyPlan, LaybyPayment, NewsletterSubscriber, NewsletterSubscribeAttempt, OfflineSale].forEach(addMongooseCompat);
 
 module.exports = {

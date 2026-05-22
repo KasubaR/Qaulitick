@@ -48,13 +48,11 @@ app.use(compression({
 const {
     sanitizeInput,
     xssProtection,
-    limitRequestSize,
-    sqlInjectionProtection
+    limitRequestSize
 } = require('./middlewares/security.middleware');
 
 app.use(xssProtection);
 app.use(limitRequestSize('10mb'));
-app.use(sqlInjectionProtection);
 app.use(cookieParser());
 
 // Body parser — captures raw bytes for webhook signature verification

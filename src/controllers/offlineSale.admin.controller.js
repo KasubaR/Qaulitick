@@ -40,6 +40,32 @@ exports.createOfflineSale = async (req, res) => {
  * GET /api/admin/offline-sales?page=1&limit=20&from=&to=
  * Dates: ISO strings or YYYY-MM-DD
  */
+/**
+ * POST /api/admin/offline-sales/layby
+ * Body: { items, depositPercent, totals?, soldAt?, customerName?, customerEmail?, customerPhone?, notes?, planPeriodDays? }
+ */
+exports.createOfflineLaybySale = async (req, res) => {
+    try {
+        if (!req.admin) {
+            return res.status(401).json({ success: false, message: 'Admin authentication required' });
+        }
+
+        const sale = await offlineSaleService.createOfflineLaybySale(req.body || {}, req.admin);
+
+        res.status(201).json({
+            success: true,
+            sale: sale ? sale.toJSON() : null
+        });
+    } catch (err) {
+        logger.error({ err }, 'createOfflineLaybySale failed');
+        const status = httpStatusFromError(err);
+        res.status(status).json({
+            success: false,
+            message: err.message || 'Failed to create offline layby sale'
+        });
+    }
+};
+
 exports.listOfflineSales = async (req, res) => {
     try {
         const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -55,9 +81,6 @@ exports.listOfflineSales = async (req, res) => {
         });
     } catch (err) {
         logger.error({ err }, 'listOfflineSales failed');
-        res.status(500).json({
-            success: false,
-            message: err.message || 'Failed to list offline sales'
-        });
+        res.status(500).json({ success: false, message: 'Failed to list offline sales' });
     }
 };

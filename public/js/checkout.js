@@ -210,30 +210,17 @@ function updatePaymentMethodUI(method) {
         if (paymentPhone) paymentPhone.addEventListener('blur', validatePaymentPhone);
     }
 
-    // Bank Transfer - DISABLED FOR NOW (Will be enabled in future update)
-    /*
     if (method === 'bank' || method === 'bank_transfer') {
         const bankSection = document.createElement('div');
         bankSection.id = 'bankTransferSection';
-        bankSection.className = 'form-group';
+        bankSection.className = 'form-group checkout-hosted-pay-info';
         bankSection.innerHTML = `
-            <label for="bankName">Select Your Bank <span class="required">*</span></label>
-            <div class="bank-select-wrapper">
-                <select id="bankName" name="bankName" class="form-input" required disabled>
-                    <option value="">-- Loading Banks --</option>
-                </select>
-                <div id="bankLoadingSpinner" class="bank-loading-spinner">
-                    <i class="fas fa-spinner fa-spin"></i>
-                </div>
-            </div>
-            <span class="error-message" id="bankNameError"></span>
+            <p class="checkout-hosted-pay-note">
+                You will be redirected to our secure payment partner to complete your payment (bank transfer, card, or mobile money).
+            </p>
         `;
         paymentSection.appendChild(bankSection);
-        
-        // Load banks from API (lazy loading - only when needed)
-        loadBanks();
     }
-    */
 }
 
 // Load cart items from localStorage and validate prices server-side
@@ -471,26 +458,33 @@ function setupEventListeners() {
         });
     }
 
-    const closeErrorModal = document.getElementById('closeErrorModal');
-    if (closeErrorModal) {
-        closeErrorModal.addEventListener('click', () => {
-            document.getElementById('errorModal').style.display = 'none';
-        });
+    function closeErrorModal() {
+        document.getElementById('errorModal').style.display = 'none';
+        document.getElementById('rateLimitCountdown').style.display = 'none';
+        if (_rateLimitCountdownTimer) {
+            clearInterval(_rateLimitCountdownTimer);
+            _rateLimitCountdownTimer = null;
+        }
+        const retryBtn = document.getElementById('retryPaymentBtn');
+        if (retryBtn) retryBtn.disabled = false;
+    }
+
+    const closeErrorModalBtn = document.getElementById('closeErrorModal');
+    if (closeErrorModalBtn) {
+        closeErrorModalBtn.addEventListener('click', closeErrorModal);
     }
 
     const retryPaymentBtn = document.getElementById('retryPaymentBtn');
     if (retryPaymentBtn) {
         retryPaymentBtn.addEventListener('click', () => {
-            document.getElementById('errorModal').style.display = 'none';
+            closeErrorModal();
             document.getElementById('checkoutForm').requestSubmit();
         });
     }
 
     const cancelPaymentBtn = document.getElementById('cancelPaymentBtn');
     if (cancelPaymentBtn) {
-        cancelPaymentBtn.addEventListener('click', () => {
-            document.getElementById('errorModal').style.display = 'none';
-        });
+        cancelPaymentBtn.addEventListener('click', closeErrorModal);
     }
 
     // Payment instructions modal close buttons
@@ -586,12 +580,6 @@ function validateField(field) {
                 if (!validatePaymentPhone()) {
                     return false;
                 }
-            }
-            break;
-        case 'bankName':
-            if (!value) {
-                showFieldError(field, 'Please select a bank');
-                return false;
             }
             break;
     }
@@ -885,16 +873,6 @@ async function handleFormSubmit(e) {
             isValid = false;
         }
     }
-    // Bank Transfer validation - DISABLED FOR NOW (Will be enabled in future update)
-    /*
-    else if (paymentMethod === 'bank' || paymentMethod === 'bank_transfer') {
-        const bankName = document.getElementById('bankName');
-        if (!bankName || !bankName.value) {
-            isValid = false;
-            showFieldError(bankName, 'Please select a bank');
-        }
-    }
-    */
 
     // Validate required fields (paymentMethod is validated separately above)
     const requiredFields = ['fullName', 'phone', 'email', 'deliveryAddress', 'province', 'city', 'acceptTerms'];
@@ -1000,8 +978,13 @@ async function handleFormSubmit(e) {
             itemsCount: orderData.items ? orderData.items.length : 0
         });
 
-        // Process order with Lenco payment
-        const response = await processOrderWithLenco(orderData, formData);
+        // Process order and initiate payment
+        const response = await processOrder(orderData, formData);
+
+        if (response.success && response.redirectToPaymentUrl && response.paymentUrl) {
+            window.location.assign(response.paymentUrl);
+            return;
+        }
 
         // Hide processing modal
         document.getElementById('paymentModal').style.display = 'none';
@@ -1017,7 +1000,9 @@ async function handleFormSubmit(e) {
                 handlePaymentSuccess(response.orderNumber);
             } else {
                 // Payment failed
-                throw new Error(response.message || 'Payment processing failed');
+                const err = new Error(response.message || 'Payment processing failed');
+                if (response.retryAfter) err.retryAfter = response.retryAfter;
+                throw err;
             }
         } else {
             throw new Error(response.message || 'Order processing failed');
@@ -1033,7 +1018,7 @@ async function handleFormSubmit(e) {
 
         // Show error modal
         document.getElementById('errorMessage').textContent = error.message || 'There was an error processing your order. Please try again.';
-        document.getElementById('errorModal').style.display = 'flex';
+        showCheckoutErrorModal(error.retryAfter || null);
     } finally {
         isSubmitting = false;
         placeOrderBtn.disabled = false;
@@ -1041,8 +1026,55 @@ async function handleFormSubmit(e) {
     }
 }
 
+let _rateLimitCountdownTimer = null;
+
+function showCheckoutErrorModal(retryAfterSeconds) {
+    const modal = document.getElementById('errorModal');
+    const countdownEl = document.getElementById('rateLimitCountdown');
+    const timerEl = document.getElementById('rateLimitTimer');
+    const retryBtn = document.getElementById('retryPaymentBtn');
+
+    // Clear any previous countdown
+    if (_rateLimitCountdownTimer) {
+        clearInterval(_rateLimitCountdownTimer);
+        _rateLimitCountdownTimer = null;
+    }
+
+    if (retryAfterSeconds && retryAfterSeconds > 0) {
+        countdownEl.style.display = 'block';
+        if (retryBtn) retryBtn.disabled = true;
+
+        let remaining = retryAfterSeconds;
+        function updateTimer() {
+            const m = Math.floor(remaining / 60);
+            const s = remaining % 60;
+            timerEl.textContent = m > 0
+                ? `${m}m ${String(s).padStart(2, '0')}s`
+                : `${s}s`;
+        }
+        updateTimer();
+
+        _rateLimitCountdownTimer = setInterval(() => {
+            remaining--;
+            if (remaining <= 0) {
+                clearInterval(_rateLimitCountdownTimer);
+                _rateLimitCountdownTimer = null;
+                countdownEl.style.display = 'none';
+                if (retryBtn) retryBtn.disabled = false;
+            } else {
+                updateTimer();
+            }
+        }, 1000);
+    } else {
+        countdownEl.style.display = 'none';
+        if (retryBtn) retryBtn.disabled = false;
+    }
+
+    modal.style.display = 'flex';
+}
+
 // Process order with Lenco payment
-async function processOrderWithLenco(orderData, formData) {
+async function processOrder(orderData, formData) {
     try {
         const csrfToken = getCheckoutCsrfToken();
         if (!csrfToken) throw new Error(CHECKOUT_CSRF_MISSING_MSG);
@@ -1065,7 +1097,11 @@ async function processOrderWithLenco(orderData, formData) {
             if (orderResult.errors && Array.isArray(orderResult.errors) && orderResult.errors.length > 0) {
                 errorMessage += ': ' + orderResult.errors.join(', ');
             }
-            throw new Error(errorMessage);
+            const err = new Error(errorMessage);
+            if (orderResponse.status === 429 && orderResult.retryAfter) {
+                err.retryAfter = orderResult.retryAfter;
+            }
+            throw err;
         }
 
         const orderNumber = orderResult.orderNumber;
@@ -1102,22 +1138,6 @@ async function processOrderWithLenco(orderData, formData) {
             paymentData.provider = provider;
             paymentData.customerPhone = paymentPhone; // Use the payment phone number
         }
-        // Bank Transfer - DISABLED FOR NOW (Will be enabled in future update)
-        /*
-        else if (paymentMethod === 'bank_transfer') {
-            const bankName = formData.get('bankName');
-            
-            if (!bankName) {
-                throw new Error('Bank name is required');
-            }
-            
-            paymentData.bankDetails = {
-                bankName: bankName,
-                accountName: orderData.customer.name
-            };
-        }
-        */
-
         // Step 3: Initiate payment with Lenco
         const paymentResponse = await fetch('/api/payments/process', {
             method: 'POST',
@@ -1136,7 +1156,8 @@ async function processOrderWithLenco(orderData, formData) {
                 success: false,
                 orderNumber: orderNumber,
                 message: paymentResult.message || 'Payment processing failed',
-                retryable: paymentResult.retryable || false
+                retryable: paymentResult.retryable || false,
+                retryAfter: paymentResponse.status === 429 ? paymentResult.retryAfter : null
             };
         }
 
@@ -1152,6 +1173,7 @@ async function processOrderWithLenco(orderData, formData) {
             paymentUrl: paymentResult.paymentUrl,
             bankAccount: paymentResult.bankAccount,
             expiresAt: paymentResult.expiresAt,
+            redirectToPaymentUrl: !!paymentResult.redirectToPaymentUrl,
             message: paymentResult.message || 'Payment initiated successfully'
         };
     } catch (error) {
@@ -1669,7 +1691,7 @@ function showPaymentTimeoutError() {
 
     document.getElementById('errorMessage').textContent =
         'Payment timeout. Your order has been created but payment is still pending. Please contact support or try again.';
-    document.getElementById('errorModal').style.display = 'flex';
+    showCheckoutErrorModal(null);
 }
 
 // Show payment failed error
@@ -1679,7 +1701,7 @@ function showPaymentFailedError(reason) {
 
     document.getElementById('errorMessage').textContent =
         `Payment failed: ${reason || 'Please try again'}`;
-    document.getElementById('errorModal').style.display = 'flex';
+    showCheckoutErrorModal(null);
 }
 
 // Calculate subtotal
@@ -1758,86 +1780,4 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
-}
-
-// Load banks from API with fallback
-async function loadBanks() {
-    const bankSelect = document.getElementById('bankName');
-    const loadingSpinner = document.getElementById('bankLoadingSpinner');
-    if (!bankSelect) return;
-
-    // Show loading spinner
-    if (loadingSpinner) {
-        loadingSpinner.style.display = 'block';
-    }
-    bankSelect.disabled = true;
-
-    try {
-        const response = await fetch('/api/payments/banks');
-        const data = await response.json();
-
-        if (data.success && data.banks && data.banks.length > 0) {
-            // Clear loading option
-            bankSelect.innerHTML = '<option value="">-- Select Bank --</option>';
-
-            // Add banks from API
-            data.banks.forEach(bank => {
-                const option = document.createElement('option');
-                option.value = bank.name;  // Use bank name as value
-                option.textContent = bank.name;
-                option.dataset.code = bank.code; // Store code for reference
-                bankSelect.appendChild(option);
-            });
-
-            // Hide loading spinner and enable select
-            if (loadingSpinner) {
-                loadingSpinner.style.display = 'none';
-            }
-            bankSelect.disabled = false;
-
-            console.log(`✅ Loaded ${data.banks.length} banks${data.cached ? ' (cached)' : ''}`);
-        } else {
-            // Fallback to hardcoded list if API fails
-            loadFallbackBanks();
-        }
-    } catch (error) {
-        console.error('Error loading banks:', error);
-        // Fallback to hardcoded list if API fails
-        loadFallbackBanks();
-    }
-}
-
-// Fallback banks list (used if API fails)
-function loadFallbackBanks() {
-    const bankSelect = document.getElementById('bankName');
-    const loadingSpinner = document.getElementById('bankLoadingSpinner');
-    if (!bankSelect) return;
-
-    const fallbackBanks = [
-        'Zanaco',
-        'First National Bank (FNB)',
-        'Stanbic Bank',
-        'Standard Chartered',
-        'Atlas Mara',
-        'Absa',
-        'Indo Zambia Bank',
-        'Bank of China',
-        'Other'
-    ];
-
-    bankSelect.innerHTML = '<option value="">-- Select Bank --</option>';
-    fallbackBanks.forEach(bankName => {
-        const option = document.createElement('option');
-        option.value = bankName;
-        option.textContent = bankName;
-        bankSelect.appendChild(option);
-    });
-
-    // Hide loading spinner and enable select
-    if (loadingSpinner) {
-        loadingSpinner.style.display = 'none';
-    }
-    bankSelect.disabled = false;
-
-    console.warn('⚠️ Using fallback banks list (API unavailable)');
 }

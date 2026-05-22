@@ -277,12 +277,15 @@ router.get('/cart', async (req, res) => {
 
 router.get('/checkout', (req, res) => {
     const u = res.locals.currentUser;
+    const enableBankTransfer =
+        process.env.ENABLE_BANK_TRANSFER === 'true' || process.env.ENABLE_BANK_TRANSFER === '1';
     res.render('checkout', {
         title: 'Checkout | Qualitick Collections',
         page: 'checkout',
         loggedIn: !!u,
         laybyEligible: !!(u && u.emailVerifiedAt),
         laybyPlanDays: laybyConfig.PLAN_PERIOD_DAYS,
+        enableBankTransfer,
         prefill: u ? {
             name: u.name || '',
             email: u.email || '',
@@ -295,10 +298,12 @@ router.get('/checkout', (req, res) => {
 });
 
 router.get('/order-success/:orderNumber', (req, res) => {
+    const dpo = req.query.dpo || null;
     res.render('order-success', {
         title: 'Order Success | Qualitick Collections',
         page: 'order-success',
-        orderNumber: req.params.orderNumber
+        orderNumber: req.params.orderNumber,
+        dpo
     });
 });
 
@@ -319,12 +324,12 @@ router.get('/login',
     customerAuthController.renderLoginPage
 );
 router.post('/login',
-    rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }),
-    csrfTokenValidator(),
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 10, failClosed: true }),
+    csrfTokenValidator({ rotateToken: true }),
     customerAuthController.handleLogin
 );
 router.post('/logout',
-    csrfTokenValidator(),
+    csrfTokenValidator({ rotateToken: true }),
     customerAuthController.handleLogout
 );
 router.get('/verify-email',
@@ -342,7 +347,7 @@ router.get('/forgot-password',
     customerAuthController.renderForgotPasswordPage
 );
 router.post('/forgot-password',
-    rateLimit({ windowMs: 15 * 60 * 1000, max: 8 }),
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 8, failClosed: true }),
     csrfTokenValidator(),
     customerAuthController.handleForgotPassword
 );
@@ -351,8 +356,8 @@ router.get('/reset-password',
     customerAuthController.renderResetPasswordPage
 );
 router.post('/reset-password',
-    rateLimit({ windowMs: 15 * 60 * 1000, max: 8 }),
-    csrfTokenValidator(),
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 8, failClosed: true }),
+    csrfTokenValidator({ rotateToken: true }),
     customerAuthController.handleResetPassword
 );
 
@@ -362,13 +367,13 @@ router.post('/reset-password',
 router.get('/account', requireCustomerAuth, customerAccountController.renderDashboard);
 router.get('/account/profile', requireCustomerAuth, customerAccountController.renderProfile);
 router.post('/account/profile', requireCustomerAuth, csrfTokenValidator(), customerAccountController.updateProfile);
-router.post('/account/password', requireCustomerAuth, csrfTokenValidator(), customerAccountController.updatePassword);
+router.post('/account/password', requireCustomerAuth, csrfTokenValidator({ rotateToken: true }), customerAccountController.updatePassword);
 router.get('/account/address', requireCustomerAuth, customerAccountController.renderAddress);
 router.post('/account/address', requireCustomerAuth, csrfTokenValidator(), customerAccountController.updateAddress);
 router.get('/account/orders', requireCustomerAuth, customerAccountController.renderOrders);
 router.get('/account/layby', requireCustomerAuth, customerAccountController.renderLayby);
 router.post('/account/layby/:id/pay', requireCustomerAuth, csrfTokenValidator(), customerAccountController.startLaybyPayment);
-router.post('/account/logout-all-devices', requireCustomerAuth, csrfTokenValidator(), customerAccountController.logoutAllDevices);
+router.post('/account/logout-all-devices', requireCustomerAuth, csrfTokenValidator({ rotateToken: true }), customerAccountController.logoutAllDevices);
 
 // ============================================
 // Product & Marketing page routes

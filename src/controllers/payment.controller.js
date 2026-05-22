@@ -4,19 +4,36 @@ const { sequelize } = require('../config/mysql');
 const Payment = require('../models/Payment.model');
 const Order = require('../models/Order.model');
 const lencoService = require('../services/lenco.service');
+const dpoService = require('../services/dpo.service');
 const orderService = require('../services/order.service');
 const laybyService = require('../services/layby.service');
 const {
     applyPaymentStatusSideEffects,
     sendAdminPaymentNotificationOnce
 } = require('../services/paymentCompletion.service');
+const {
+    compactDpoVerifyRaw,
+    applyDpoVerificationOutcome
+} = require('../services/dpoPaymentOutcome.service');
 const LaybyPayment = require('../models/LaybyPayment.model');
 const LaybyPlan = require('../models/LaybyPlan.model');
-const { getAuthenticatedAdmin } = require('../middlewares/auth.middleware');
 const logger = require('../utils/logger').child({ module: 'PaymentController' });
 
 function roundMoney2(x) {
     return Math.round(Number(x) * 100) / 100;
+}
+
+function getPublicBaseUrl() {
+    const base = process.env.APP_PUBLIC_URL || '';
+    return String(base).replace(/\/$/, '');
+}
+
+function splitCustomerName(name) {
+    const n = (name && String(name).trim()) || '';
+    if (!n) return { first: '', last: '' };
+    const space = n.indexOf(' ');
+    if (space === -1) return { first: n, last: '' };
+    return { first: n.slice(0, space).trim(), last: n.slice(space + 1).trim() };
 }
 
 /**
@@ -27,7 +44,7 @@ async function assertLaybyPaymentVerifyAuthorized(req, payment) {
     if (!payment.laybyPaymentId) {
         return null;
     }
-    const admin = await getAuthenticatedAdmin(req);
+    const admin = req.admin;
     if (admin) {
         return null;
     }
@@ -236,7 +253,7 @@ exports.processPayment = async (req, res) => {
                 if (existing) {
                     const err = new Error('ALREADY_PENDING');
                     err.statusCode = 409;
-                    err.transactionId = existing.lencoTransactionId;
+                    err.transactionId = existing.lencoTransactionId || existing.transactionId;
                     throw err;
                 }
 
@@ -335,6 +352,23 @@ exports.processPayment = async (req, res) => {
                     }
                 }
 
+                return res.json({
+                    success: true,
+                    transactionId: lencoResponse.transactionId,
+                    reference: lencoResponse.reference,
+                    orderNumber,
+                    paymentMethod,
+                    amount: authoritativeAmount,
+                    status: 'pending',
+                    laybyPaymentId: laybyIdValid ? laybyPaymentId : undefined,
+                    paymentInstructions: lencoResponse.paymentInstructions,
+                    qrCode: lencoResponse.qrCode,
+                    paymentUrl: lencoResponse.paymentUrl,
+                    bankAccount: lencoResponse.bankAccount,
+                    expiresAt: lencoResponse.expiresAt,
+                    message:
+                        'Payment initiated successfully. Please complete the payment using the instructions provided.'
+                });
             } catch (error) {
                 logger.error({ err: error }, 'Error initiating mobile money payment');
 
@@ -360,116 +394,109 @@ exports.processPayment = async (req, res) => {
                 });
             }
         }
-        // Bank Transfer Payment - DISABLED FOR NOW (Will be enabled in future update)
-        /*
-        else if (paymentMethod === 'bank_transfer') {
-            // Validate bank transfer requirements
-            if (!bankDetails || !bankDetails.bankName) {
-                return res.status(400).json({
+
+        if (paymentMethod === 'bank_transfer') {
+            const publicBase = getPublicBaseUrl();
+            if (!publicBase) {
+                await paymentRecord
+                    .update({
+                        status: 'failed',
+                        failureReason: 'APP_PUBLIC_URL not configured',
+                        failedAt: new Date()
+                    })
+                    .catch(() => {});
+                return res.status(500).json({
                     success: false,
-                    message: 'Bank transfer payment requires bank details (bankName)'
+                    message: 'Payment redirect URL is not configured. Please contact support.'
                 });
             }
 
+            const companyRef = `QC-PAY-${paymentRecord.id}`;
+            const { first: customerFirst, last: customerLast } = splitCustomerName(customerInfo.name);
+            const redirectUrl = `${publicBase}/api/payments/dpo/success`;
+            const backUrl = `${publicBase}/api/payments/dpo/cancel`;
+            const amtStr = roundMoney2(authoritativeAmount).toFixed(2);
+            const serviceDesc = `Order ${orderNumber}`;
+
             try {
-                // Initiate bank transfer with Lenco
-                lencoResponse = await lencoService.initiateBankTransfer(
-                    orderData,
-                    bankDetails
-                );
-
-                // Create payment record with Lenco collection data
-                // Map Lenco status to payment status
-                const tempPayment = new Payment();
-                const mappedStatus = tempPayment.mapLencoStatusToPaymentStatus(lencoResponse.status || 'pending');
-                
-                paymentRecord = await Payment.create({
-                    orderNumber,
-                    paymentMethod: 'bank_transfer',
-                    amount: lencoResponse.amount || amount,
-                    currency: lencoResponse.currency || 'ZMW',
-                    status: mappedStatus, // Mapped from lencoStatus
-                    customerInfo,
-                    
-                    // Lenco-specific fields
-                    lencoTransactionId: lencoResponse.transactionId,      // Collection ID (col_xxx)
-                    lencoReference: lencoResponse.lencoReference,        // Lenco's reference (LNC-xxx)
-                    lencoStatus: lencoResponse.status,                   // 'pay-offline', 'pending', etc.
-                    lencoResponse: lencoResponse.rawResponse || lencoResponse,
-                    
-                    // Your reference (QC-ORD-xxx)
-                    transactionId: lencoResponse.reference,
-                    
-                    // Payment instructions for customer
-                    paymentInstructions: lencoResponse.paymentInstructions,
-                    
-                    // Bank transfer details
-                    bankDetails: {
-                        bankName: bankDetails.bankName,
-                        accountNumber: bankDetails.accountNumber || null,
-                        accountName: bankDetails.accountName || customerInfo.name
-                    },
-                    expiresAt: lencoResponse.expiresAt ? new Date(lencoResponse.expiresAt) : null,
-                    metadata: {
-                        bankName: bankDetails.bankName,
-                        initiatedAt: lencoResponse.initiatedAt,
-                        bankAccountDetails: lencoResponse.bankAccountDetails
-                    }
-                });
-
-                logger.debug({ orderNumber, bankName: bankDetails.bankName }, 'Bank transfer payment initiated');
-
-            } catch (error) {
-                console.error('[Payment Controller] Error initiating bank transfer:', error);
-                
-                // Create failed payment record
-                paymentRecord = await Payment.create({
-                    orderNumber,
-                    paymentMethod: 'bank_transfer',
-                    amount: authoritativeAmount, // Use authoritative amount from database order
+                const dpoResult = await dpoService.createToken({
+                    amount: amtStr,
                     currency: 'ZMW',
-                    status: 'failed',
-                    customerInfo,
-                    bankDetails: {
-                        bankName: bankDetails.bankName,
-                        accountNumber: bankDetails.accountNumber || null,
-                        accountName: bankDetails.accountName || customerInfo.name
-                    },
-                    failureReason: error.message,
-                    failedAt: new Date(),
+                    companyRef,
+                    redirectUrl,
+                    backUrl,
+                    serviceDesc,
+                    customerEmail: customerInfo.email || '',
+                    customerFirst,
+                    customerLast
+                });
+
+                await paymentRecord.update({
+                    transactionId: dpoResult.token,
+                    paymentUrl: dpoResult.paymentUrl,
                     metadata: {
-                        bankName: bankDetails.bankName
+                        gateway: 'dpo',
+                        companyRef,
+                        transRef: dpoResult.transRef,
+                        ptl: dpoResult.ptl,
+                        ptlType: dpoResult.ptlType,
+                        laybyPaymentId: laybyIdValid ? laybyPaymentId : undefined
                     }
                 });
+
+                logger.debug({ orderNumber, companyRef }, 'DPO payment initiated');
+
+                if (laybyIdValid) {
+                    try {
+                        await orderService.updateOrderStatusFromPayment(
+                            orderNumber,
+                            'pending',
+                            companyRef,
+                            'Layby installment payment initiated (DPO)'
+                        );
+                    } catch (ordErr) {
+                        logger.warn({ err: ordErr }, 'Order status update after DPO payment start');
+                    }
+                }
+
+                return res.json({
+                    success: true,
+                    redirectToPaymentUrl: true,
+                    transactionId: dpoResult.token,
+                    reference: companyRef,
+                    orderNumber,
+                    paymentMethod: 'bank_transfer',
+                    amount: authoritativeAmount,
+                    status: 'pending',
+                    paymentUrl: dpoResult.paymentUrl,
+                    laybyPaymentId: laybyIdValid ? laybyPaymentId : undefined,
+                    message: 'Redirect to secure payment page to complete your payment.'
+                });
+            } catch (error) {
+                logger.error({ err: error }, 'Error initiating DPO payment');
+                await paymentRecord
+                    .update({
+                        status: 'failed',
+                        failureReason: error.message,
+                        failedAt: new Date(),
+                        metadata: { gateway: 'dpo', failed: true }
+                    })
+                    .catch(() => {});
 
                 return res.status(500).json({
                     success: false,
-                    message: error.message || 'Failed to initiate bank transfer',
+                    message: error.message || 'Failed to initiate payment',
                     orderNumber,
                     paymentMethod,
-                    amount,
+                    amount: authoritativeAmount,
                     status: 'failed'
                 });
             }
         }
-        */
 
-        // Return payment instructions to frontend
-        res.json({
-            success: true,
-            transactionId: lencoResponse.transactionId,
-            reference: lencoResponse.reference,
-            orderNumber,
-            paymentMethod,
-            amount: authoritativeAmount, // Use authoritative amount from database order
-            status: 'pending',
-            laybyPaymentId: laybyIdValid ? laybyPaymentId : undefined,
-            paymentInstructions: lencoResponse.paymentInstructions,
-            qrCode: lencoResponse.qrCode,
-            paymentUrl: lencoResponse.paymentUrl,
-            bankAccount: lencoResponse.bankAccount,
-            expiresAt: lencoResponse.expiresAt,
-            message: 'Payment initiated successfully. Please complete the payment using the instructions provided.'
+        return res.status(500).json({
+            success: false,
+            message: 'Payment processing reached an unexpected state.'
         });
 
     } catch (error) {
@@ -479,6 +506,105 @@ exports.processPayment = async (req, res) => {
             message: error.message || 'Payment processing error. Please try again.'
         });
     }
+};
+
+/**
+ * DPO redirect after payment — GET /api/payments/dpo/success
+ */
+exports.handleDpoSuccess = async (req, res) => {
+    try {
+        const tokenRaw = req.query.TransactionToken || req.query.transactionToken;
+        const token = tokenRaw != null ? String(tokenRaw).trim() : '';
+        if (!token) {
+            return res.status(400).send('Missing transaction token.');
+        }
+
+        const base = getPublicBaseUrl();
+        if (!base) {
+            return res.status(500).send('Server configuration error.');
+        }
+
+        const payment = await Payment.findOne({
+            where: {
+                transactionId: token,
+                paymentMethod: 'bank_transfer',
+                status: { [Op.in]: ['pending', 'processing'] }
+            }
+        });
+
+        const meta = payment ? payment.metadata || {} : {};
+        if (!payment || meta.gateway !== 'dpo') {
+            return res.status(404).send('Payment session not found.');
+        }
+
+        if (payment.status === 'completed') {
+            return res.redirect(
+                `${base}/order-success/${encodeURIComponent(payment.orderNumber)}?dpo=already`
+            );
+        }
+
+        const dpoResult = await dpoService.verifyToken(token);
+        const { outcome, raw } = dpoResult;
+
+        if (outcome.paid) {
+            await applyDpoVerificationOutcome(payment, outcome, raw, 'DPO RedirectURL');
+            return res.redirect(
+                `${base}/order-success/${encodeURIComponent(payment.orderNumber)}?dpo=verified`
+            );
+        }
+
+        if (!outcome.terminal) {
+            await payment.update({ gatewayResponse: compactDpoVerifyRaw(raw) });
+            return res.redirect(
+                `${base}/order-success/${encodeURIComponent(payment.orderNumber)}?dpo=pending`
+            );
+        }
+
+        await applyDpoVerificationOutcome(payment, outcome, raw, 'DPO RedirectURL terminal');
+        return res.redirect(
+            `${base}/order-success/${encodeURIComponent(payment.orderNumber)}?dpo=error`
+        );
+    } catch (err) {
+        logger.error({ err }, 'handleDpoSuccess failed');
+        return res.status(500).send('Payment verification failed. Please contact support.');
+    }
+};
+
+/**
+ * DPO BackURL — customer cancelled on hosted page
+ */
+exports.handleDpoCancel = async (req, res) => {
+    const base = getPublicBaseUrl();
+    if (!base) {
+        return res.status(500).send('Server configuration error.');
+    }
+
+    try {
+        const tokenRaw = req.query.TransactionToken || req.query.transactionToken;
+        const token = tokenRaw != null ? String(tokenRaw).trim() : '';
+        if (token) {
+            const payment = await Payment.findOne({
+                where: {
+                    transactionId: token,
+                    paymentMethod: 'bank_transfer',
+                    status: { [Op.in]: ['pending', 'processing'] }
+                }
+            });
+            if (payment && (payment.metadata || {}).gateway === 'dpo') {
+                await payment.update({
+                    status: 'cancelled',
+                    cancelledAt: new Date(),
+                    failureReason: 'Cancelled by customer on DPO payment page'
+                });
+                logger.debug({ token, orderNumber: payment.orderNumber }, 'DPO payment cancelled by customer');
+            }
+        }
+    } catch (err) {
+        // Non-fatal — log and still redirect the customer
+        logger.warn({ err }, 'handleDpoCancel: failed to mark payment cancelled');
+    }
+
+    res.redirect(`${base}/checkout?dpo=cancelled`);
 };
 
 /**
@@ -520,7 +646,7 @@ exports.verifyPayment = async (req, res) => {
         if (authError) return res.status(authError.status).json(authError.body);
 
         if (!payment.laybyPaymentId) {
-            const admin = await getAuthenticatedAdmin(req);
+            const admin = req.admin;
             if (!admin) {
                 const order = await Order.findByOrderNumber(payment.orderNumber);
                 const uid = req.session?.userId != null ? parseInt(String(req.session.userId), 10) : null;
@@ -539,9 +665,11 @@ exports.verifyPayment = async (req, res) => {
             },
             'Found payment in database'
         );
-        
-        // If payment is already completed or failed, return current status
-        if (payment.status === 'completed' || payment.status === 'failed') {
+
+        const meta = payment.metadata || {};
+
+        // Terminal statuses — no gateway refresh
+        if (['completed', 'failed', 'cancelled', 'refunded'].includes(payment.status)) {
             logger.debug({ status: payment.status }, 'Payment already finalized');
             return res.json({
                 success: true,
@@ -555,7 +683,69 @@ exports.verifyPayment = async (req, res) => {
                 orderNumber: payment.orderNumber
             });
         }
-        
+
+        // DPO (bank_transfer hosted checkout)
+        if (
+            meta.gateway === 'dpo' &&
+            payment.paymentMethod === 'bank_transfer' &&
+            ['pending', 'processing'].includes(payment.status)
+        ) {
+            try {
+                const dpoResult = await dpoService.verifyToken(payment.transactionId);
+                const { outcome, raw } = dpoResult;
+
+                if (outcome.paid) {
+                    await applyDpoVerificationOutcome(payment, outcome, raw, 'payment verify API');
+                    payment = await Payment.findByPk(payment.id);
+                    return res.json({
+                        success: true,
+                        transactionId: payment.transactionId,
+                        status: payment.status,
+                        verified: true,
+                        message: 'Payment completed',
+                        orderNumber: payment.orderNumber
+                    });
+                }
+
+                if (!outcome.terminal) {
+                    await payment.update({
+                        gatewayResponse: compactDpoVerifyRaw(raw)
+                    });
+                    payment = await Payment.findByPk(payment.id);
+                    return res.json({
+                        success: true,
+                        transactionId: payment.transactionId,
+                        status: payment.status,
+                        verified: false,
+                        message: 'Payment is still processing at the gateway.',
+                        orderNumber: payment.orderNumber,
+                        processing: true
+                    });
+                }
+
+                await applyDpoVerificationOutcome(payment, outcome, raw, 'payment verify API');
+                payment = await Payment.findByPk(payment.id);
+                return res.json({
+                    success: true,
+                    transactionId: payment.transactionId,
+                    status: payment.status,
+                    verified: outcome.paid,
+                    message: outcome.explanation || 'Gateway verification result',
+                    orderNumber: payment.orderNumber
+                });
+            } catch (dpoErr) {
+                logger.error({ err: dpoErr }, 'DPO verify failed');
+                return res.json({
+                    success: true,
+                    transactionId: payment.transactionId,
+                    status: payment.status,
+                    verified: false,
+                    message: 'Could not refresh status from gateway.',
+                    orderNumber: payment.orderNumber
+                });
+            }
+        }
+
         // For pending payments, verify with Lenco
         if (payment.isLencoPayment) {
             try {
@@ -947,22 +1137,14 @@ exports.getPaymentMethods = async (req, res) => {
                 providerName: 'MTN'
             },
             // Zamtel disabled
-            // Bank Transfer (feature flag controlled)
+            // Bank Transfer — hosted checkout via DPO (card / bank / mobile on gateway page)
             {
                 id: 'lenco-bank-transfer',
-                name: 'Bank Transfer',
-                description: 'Direct bank transfer',
+                name: 'Bank & card (hosted)',
+                description: 'Pay securely on our payment partner page (bank, card, or mobile money)',
                 icon: 'fas fa-university',
-                enabled: ENABLE_BANK_TRANSFER, // Controlled by ENABLE_BANK_TRANSFER feature flag
-                type: 'bank_transfer',
-                supportedBanks: [
-                    { id: 'zanaco', name: 'Zanaco' },
-                    { id: 'stanbic', name: 'Stanbic Bank' },
-                    { id: 'fnb', name: 'First National Bank' },
-                    { id: 'barclays', name: 'Barclays Bank' },
-                    { id: 'standard-chartered', name: 'Standard Chartered' },
-                    { id: 'other', name: 'Other' }
-                ]
+                enabled: ENABLE_BANK_TRANSFER,
+                type: 'bank_transfer'
             }
         ];
 
@@ -1028,7 +1210,7 @@ exports.cancelPayment = async (req, res) => {
         if (authError) return res.status(authError.status).json(authError.body);
 
         if (!payment.laybyPaymentId) {
-            const admin = await getAuthenticatedAdmin(req);
+            const admin = req.admin;
             if (!admin) {
                 const order = await Order.findByOrderNumber(payment.orderNumber);
                 const uid = req.session?.userId != null ? parseInt(String(req.session.userId), 10) : null;
@@ -1116,7 +1298,7 @@ exports.retryPayment = async (req, res) => {
             });
         }
 
-        const admin = await getAuthenticatedAdmin(req);
+        const admin = req.admin;
         const customerUserId =
             req.session && req.session.userId != null ? parseInt(String(req.session.userId), 10) : null;
         if (!admin && order.userId != null) {
@@ -1246,58 +1428,108 @@ exports.retryPayment = async (req, res) => {
                 });
 
             } else if (existingPayment.paymentMethod === 'bank_transfer') {
-                // Get bank details from existing payment or order
-                const bankDetails = existingPayment.bankDetails || {
-                    bankName: 'Standard Chartered Bank', // Default if not specified
-                    accountName: customerInfo.name
-                };
+                const publicBase = getPublicBaseUrl();
+                if (!publicBase) {
+                    return res.status(500).json({
+                        success: false,
+                        message: 'Payment redirect URL is not configured. Please contact support.'
+                    });
+                }
 
-                // Initiate new bank transfer payment with Lenco
-                lencoResponse = await lencoService.initiateBankTransfer(
-                    orderData,
-                    bankDetails
-                );
+                const { first: customerFirst, last: customerLast } = splitCustomerName(customerInfo.name);
+                const redirectUrl = `${publicBase}/api/payments/dpo/success`;
+                const backUrl = `${publicBase}/api/payments/dpo/cancel`;
+                const amtStr = roundMoney2(dbAmount).toFixed(2);
+                const serviceDesc = `Order ${orderNumber}`;
 
-                // Create new payment record
-                const tempPayment = new Payment();
-                const mappedStatus = tempPayment.mapLencoStatusToPaymentStatus(lencoResponse.status || 'pending');
-                
+                // Create the payment record first so we have its ID for companyRef
                 newPaymentRecord = await Payment.create({
                     orderNumber,
                     paymentMethod: 'bank_transfer',
                     amount: dbAmount,
-                    currency: lencoResponse.currency || existingPayment.currency || 'ZMW',
-                    status: mappedStatus,
+                    currency: existingPayment.currency || 'ZMW',
+                    status: 'pending',
                     customerInfo,
-                    bankDetails: {
-                        bankName: bankDetails.bankName,
-                        accountNumber: bankDetails.accountNumber || null,
-                        accountName: bankDetails.accountName || customerInfo.name
-                    },
-                    
-                    // Lenco-specific fields
-                    lencoTransactionId: lencoResponse.transactionId,
-                    lencoReference: lencoResponse.lencoReference,
-                    lencoStatus: lencoResponse.status,
-                    lencoResponse: lencoResponse.rawResponse || lencoResponse,
-                    
-                    // Payment instructions
-                    paymentInstructions: lencoResponse.paymentInstructions,
-                    paymentUrl: lencoResponse.paymentUrl,
-                    bankAccount: lencoResponse.bankAccount,
-                    expiresAt: lencoResponse.expiresAt ? new Date(lencoResponse.expiresAt) : null,
-                    
-                    // Link to original payment
                     retryOf: existingPayment.id,
                     retryCount: priorFailedCount,
-
-                    // Metadata
                     metadata: {
+                        gateway: 'dpo',
                         isRetry: true,
-                        originalPaymentId: String(existingPayment.id),
-                        originalTransactionId: existingPayment.lencoTransactionId
+                        originalPaymentId: String(existingPayment.id)
                     }
                 });
+
+                const companyRef = `QC-PAY-${newPaymentRecord.id}`;
+
+                try {
+                    const dpoResult = await dpoService.createToken({
+                        amount: amtStr,
+                        currency: 'ZMW',
+                        companyRef,
+                        redirectUrl,
+                        backUrl,
+                        serviceDesc,
+                        customerEmail: customerInfo.email || '',
+                        customerFirst,
+                        customerLast
+                    });
+
+                    await newPaymentRecord.update({
+                        transactionId: dpoResult.token,
+                        paymentUrl: dpoResult.paymentUrl,
+                        metadata: {
+                            gateway: 'dpo',
+                            companyRef,
+                            transRef: dpoResult.transRef,
+                            ptl: dpoResult.ptl,
+                            ptlType: dpoResult.ptlType,
+                            isRetry: true,
+                            originalPaymentId: String(existingPayment.id)
+                        }
+                    });
+
+                    try {
+                        await orderService.updateOrderStatusFromPayment(
+                            orderNumber,
+                            'pending',
+                            companyRef,
+                            'Payment retry initiated (DPO)'
+                        );
+                    } catch (orderError) {
+                        console.error('[Payment Controller] Error updating order status after DPO retry:', orderError);
+                    }
+
+                    return res.json({
+                        success: true,
+                        redirectToPaymentUrl: true,
+                        transactionId: dpoResult.token,
+                        reference: companyRef,
+                        orderNumber,
+                        paymentMethod: 'bank_transfer',
+                        amount: dbAmount,
+                        status: 'pending',
+                        paymentUrl: dpoResult.paymentUrl,
+                        message: 'Redirect to secure payment page to complete your payment.'
+                    });
+                } catch (dpoError) {
+                    logger.error({ err: dpoError }, 'Error initiating DPO payment retry');
+                    await newPaymentRecord.update({
+                        status: 'failed',
+                        failureReason: dpoError.message,
+                        failedAt: new Date(),
+                        metadata: {
+                            gateway: 'dpo',
+                            isRetry: true,
+                            originalPaymentId: String(existingPayment.id),
+                            failed: true
+                        }
+                    }).catch(() => {});
+
+                    return res.status(500).json({
+                        success: false,
+                        message: dpoError.message || 'Failed to initiate payment retry'
+                    });
+                }
             } else {
                 return res.status(400).json({
                     success: false,

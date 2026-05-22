@@ -95,6 +95,18 @@
     }
 }
 
+.success-icon--pending {
+    background: linear-gradient(145deg, rgba(184, 134, 11, 0.12), rgba(184, 134, 11, 0.06));
+    border-color: rgba(184, 134, 11, 0.25);
+    color: #92680a;
+}
+
+.success-icon--error {
+    background: linear-gradient(145deg, rgba(192, 57, 43, 0.12), rgba(192, 57, 43, 0.06));
+    border-color: rgba(192, 57, 43, 0.25);
+    color: #c0392b;
+}
+
 .success-title {
     font-size: clamp(1.65rem, 4vw, 2rem);
     font-weight: 700;

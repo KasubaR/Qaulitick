@@ -3,27 +3,31 @@
     <section class="error-section" style="min-height: 70vh; display: flex; align-items: center; justify-content: center; padding: 40px 5%;">
         <div class="error-container" style="text-align: center; max-width: 600px;">
             <div class="error-icon" style="font-size: 120px; color: #ff4444; margin-bottom: 20px;">
-                <i class="fas fa-server"></i>
+                <i class="fas <%= typeof errorType !== 'undefined' && errorType === 'rate-limit' ? 'fa-clock' : 'fa-server' %>"></i>
             </div>
             <h1 class="error-title" style="font-size: 48px; font-weight: 700; margin-bottom: 20px; background: var(--gold-gradient-horizontal); -webkit-background-clip: text; background-clip: text; color: transparent;">
-                500
+                <%= typeof errorType !== 'undefined' && errorType === 'rate-limit' ? '429' : '500' %>
             </h1>
-            <h2 class="error-subtitle" style="font-size: 24px; margin-bottom: 15px; color: #fff;">
+            <h2 class="error-subtitle" style="font-size: 24px; margin-bottom: 15px; color: #333;">
                 <%= typeof message !== 'undefined' ? message : 'Server Error' %>
             </h2>
-            <p class="error-message" style="color: #aaa; margin-bottom: 30px; font-size: 16px; line-height: 1.6;">
-                <%= typeof errorType !== 'undefined' && errorType === 'network-error'
-                    ? 'We\'re experiencing network issues. Please check your connection and try again.'
-                    : 'Something went wrong on our end. Our team has been notified and is working to fix the issue.' %>
+            <p class="error-message" style="color: #666; margin-bottom: 30px; font-size: 16px; line-height: 1.6;">
+                <% if (typeof errorType !== 'undefined' && errorType === 'rate-limit') { %>
+                    <%= typeof rateLimitMessage !== 'undefined' ? rateLimitMessage : 'You have made too many requests. Please wait before trying again.' %>
+                <% } else if (typeof errorType !== 'undefined' && errorType === 'network-error') { %>
+                    We're experiencing network issues. Please check your connection and try again.
+                <% } else { %>
+                    Something went wrong on our end. Our team has been notified and is working to fix the issue.
+                <% } %>
             </p>
             <div class="error-actions" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
                 <button onclick="window.location.reload()" class="btn-primary" style="padding: 12px 25px; background: var(--gold-gradient-horizontal); color: #000; border: none; border-radius: 5px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block;">
                     <i class="fas fa-redo"></i> Retry
                 </button>
-                <a href="/" class="btn-outline" style="padding: 12px 25px; background: transparent; color: #fff; border: 1px solid rgba(255, 238, 193, 0.3); border-radius: 5px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+                <a href="/" class="btn-outline" style="padding: 12px 25px; background: transparent; color: #333; border: 1px solid #ccc; border-radius: 5px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
                     <i class="fas fa-home"></i> Go Home
                 </a>
-                <a href="/shop" class="btn-outline" style="padding: 12px 25px; background: transparent; color: #fff; border: 1px solid rgba(255, 238, 193, 0.3); border-radius: 5px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+                <a href="/shop" class="btn-outline" style="padding: 12px 25px; background: transparent; color: #333; border: 1px solid #ccc; border-radius: 5px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
                     <i class="fas fa-shopping-bag"></i> Browse Shop
                 </a>
             </div>

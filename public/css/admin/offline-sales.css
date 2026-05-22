@@ -14,6 +14,128 @@
     gap: 28px;
 }
 
+.offline-sale-type-toggle {
+    display: flex;
+    gap: 0;
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color, #333);
+    border-radius: 6px;
+    overflow: hidden;
+    width: fit-content;
+}
+
+.offline-sale-type-btn {
+    padding: 10px 20px;
+    border: none;
+    background: var(--bg-secondary, #1a1a1a);
+    color: var(--text-muted, #aaa);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.offline-sale-type-btn:hover {
+    color: var(--text-primary, #fff);
+}
+
+.offline-sale-type-btn.is-active {
+    background: var(--admin-gold, #af9044);
+    color: #111;
+}
+
+.offline-layby-panel {
+    margin-bottom: 20px;
+    padding: 16px 18px;
+    border: 1px solid rgba(175, 144, 68, 0.35);
+    border-radius: 8px;
+    background: rgba(175, 144, 68, 0.06);
+}
+
+.offline-layby-panel.is-hidden {
+    display: none;
+}
+
+.offline-layby-deposit-row label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.offline-layby-deposit-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.offline-layby-range {
+    flex: 1;
+    min-width: 140px;
+    max-width: 280px;
+}
+
+.offline-layby-pct-input {
+    width: 4.5rem;
+    text-align: center;
+}
+
+.offline-layby-pct-suffix {
+    color: var(--text-muted, #888);
+}
+
+.offline-layby-summary {
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.offline-layby-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.95rem;
+}
+
+.offline-layby-summary-row--muted {
+    font-size: 0.85rem;
+    color: var(--text-muted, #888);
+}
+
+.offline-type-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.offline-type-badge--full {
+    background: rgba(100, 100, 100, 0.25);
+    color: var(--text-muted, #bbb);
+}
+
+.offline-type-badge--layby {
+    background: rgba(175, 144, 68, 0.25);
+    color: var(--admin-gold, #d4b06a);
+}
+
+.offline-layby-plan-link {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.8rem;
+    color: var(--admin-gold, #af9044);
+    text-decoration: none;
+}
+
+.offline-layby-plan-link:hover {
+    text-decoration: underline;
+}
+
 .offline-section-title {
     margin: 0;
     font-size: 1.1rem;

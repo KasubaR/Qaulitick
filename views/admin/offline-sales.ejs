@@ -40,6 +40,7 @@
                             <thead>
                                 <tr>
                                     <th>Sale #</th>
+                                    <th>Type</th>
                                     <th>Date</th>
                                     <th>Total</th>
                                     <th>Customer</th>
@@ -48,7 +49,7 @@
                             </thead>
                             <tbody id="offlineSalesHistoryBody">
                                 <tr>
-                                    <td colspan="5" class="empty-state">Loading…</td>
+                                    <td colspan="6" class="empty-state">Loading…</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -70,13 +71,46 @@
     <div id="offlinePageNotification" class="offline-page-notification" role="alert" aria-live="polite"></div>
 
     <!-- Add offline sale modal -->
-    <div id="addSaleModal" class="offline-modal-overlay is-hidden" role="dialog" aria-modal="true" aria-labelledby="addSaleModalTitle">
+    <div id="addSaleModal" class="offline-modal-overlay is-hidden" role="dialog" aria-modal="true" aria-labelledby="addSaleModalTitle"
+         data-layby-min-pct="<%= typeof laybyMinPct !== 'undefined' ? laybyMinPct : 30 %>"
+         data-layby-max-pct="<%= typeof laybyMaxPct !== 'undefined' ? laybyMaxPct : 100 %>"
+         data-layby-plan-days="<%= typeof laybyPlanPeriodDays !== 'undefined' ? laybyPlanPeriodDays : 90 %>">
         <div class="offline-modal offline-modal--large">
             <div class="offline-modal-header">
                 <h3 id="addSaleModalTitle">Add offline sale</h3>
                 <button type="button" class="btn-icon" id="closeSaleModalBtn" aria-label="Close"><i class="fas fa-times"></i></button>
             </div>
             <div class="offline-modal-body">
+                <div class="offline-sale-type-toggle" role="group" aria-label="Sale type">
+                    <button type="button" class="offline-sale-type-btn is-active" data-sale-mode="full" id="saleModeFullBtn">Full payment</button>
+                    <button type="button" class="offline-sale-type-btn" data-sale-mode="layby" id="saleModeLaybyBtn">Layby</button>
+                </div>
+
+                <div id="offlineLaybyPanel" class="offline-layby-panel is-hidden" aria-hidden="true">
+                    <div class="offline-layby-deposit-row">
+                        <label for="laybyDepositPercentInput">Deposit %</label>
+                        <div class="offline-layby-deposit-controls">
+                            <input type="range" id="laybyDepositPercentRange" class="offline-layby-range" min="<%= typeof laybyMinPct !== 'undefined' ? laybyMinPct : 30 %>" max="<%= typeof laybyMaxPct !== 'undefined' ? laybyMaxPct : 100 %>" step="1" value="<%= typeof laybyMinPct !== 'undefined' ? laybyMinPct : 30 %>">
+                            <input type="number" id="laybyDepositPercentInput" class="form-input offline-layby-pct-input" min="<%= typeof laybyMinPct !== 'undefined' ? laybyMinPct : 30 %>" max="<%= typeof laybyMaxPct !== 'undefined' ? laybyMaxPct : 100 %>" step="1" value="<%= typeof laybyMinPct !== 'undefined' ? laybyMinPct : 30 %>">
+                            <span class="offline-layby-pct-suffix">%</span>
+                        </div>
+                    </div>
+                    <div class="offline-layby-summary">
+                        <div class="offline-layby-summary-row">
+                            <span>Deposit due now</span>
+                            <strong id="laybyDepositAmountDisplay">K0.00</strong>
+                        </div>
+                        <div class="offline-layby-summary-row">
+                            <span>Balance remaining</span>
+                            <strong id="laybyBalanceAmountDisplay">K0.00</strong>
+                        </div>
+                        <div class="offline-layby-summary-row offline-layby-summary-row--muted">
+                            <span>Plan period</span>
+                            <span id="laybyPlanPeriodLabel"><%= typeof laybyPlanPeriodDays !== 'undefined' ? laybyPlanPeriodDays : 90 %> days</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="offline-meta-grid">
                     <div class="form-group">
                         <label for="soldAtInput">Sale date &amp; time</label>

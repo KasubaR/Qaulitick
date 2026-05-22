@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
 
@@ -9,7 +10,6 @@ const { clearRateLimit, cleanExpiredRateLimits, getAllRateLimitEntries } = requi
 
 const authController = require('../controllers/auth.controller');
 const productController = require('../controllers/product.controller');
-const productService = require('../services/product.service');
 const analyticsController = require('../controllers/analytics.controller');
 const dashboardController = require('../controllers/dashboard.controller');
 const customerController = require('../controllers/customer.controller');
@@ -18,6 +18,8 @@ const contactController = require('../controllers/contact.controller');
 const adminLaybyController = require('../controllers/admin.layby.controller');
 const reviewAdminController = require('../controllers/review.admin.controller');
 const offlineSaleAdminController = require('../controllers/offlineSale.admin.controller');
+const { MIN_PCT, MAX_PCT, PLAN_PERIOD_DAYS } = require('../config/layby');
+const logger = require('../utils/logger').child({ module: 'AdminRoutes' });
 
 const adminOrderRoutes = require('./admin.order.routes');
 
@@ -29,11 +31,10 @@ router.get('/admin/login',
     authController.renderLoginPage
 );
 router.post('/admin/login',
-    rateLimit({ windowMs: 15 * 60 * 1000, max: 5 }),
-    csrfTokenValidator({ excludedPaths: ['/admin/login'] }),
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 5, failClosed: true }),
     authController.handleLogin
 );
-router.post('/admin/logout', csrfTokenValidator(), authController.handleLogout);
+router.post('/admin/logout', csrfTokenValidator({ rotateToken: true }), authController.handleLogout);
 
 router.get('/admin/access-denied', (req, res) => {
     res.render('admin/access-denied', {
@@ -53,24 +54,7 @@ router.get('/admin/dashboard', requireAdminAuth, (req, res) => {
 
 router.get('/admin/analytics', requireAdminAuth, analyticsController.renderAnalyticsPage);
 
-router.get('/admin/products', requireAdminAuth, async (req, res) => {
-    try {
-        const products = await productService.getAllProducts({}, { sort: [['sortOrder', 'ASC'], ['createdAt', 'DESC']] });
-        res.render('admin/products', {
-            title: 'Product Management | Admin Panel',
-            page: 'admin',
-            activePage: 'products',
-            products: products.map(p => p.toJSON())
-        });
-    } catch (error) {
-        res.render('admin/products', {
-            title: 'Product Management | Admin Panel',
-            page: 'admin',
-            activePage: 'products',
-            products: []
-        });
-    }
-});
+router.get('/admin/products', requireAdminAuth, productController.renderProductsPage);
 
 router.get('/admin/orders', requireAdminAuth, (req, res) => {
     res.render('admin/orders', { title: 'Orders Management | Admin Panel', page: 'admin' });
@@ -97,7 +81,10 @@ router.get('/admin/offline-sales/add', requireAdminAuth, (req, res) => {
         page: 'admin',
         activePage: 'offline-sales',
         viewMode: 'add',
-        csrfToken: res.locals.csrfToken || ''
+        csrfToken: res.locals.csrfToken || '',
+        laybyMinPct: MIN_PCT,
+        laybyMaxPct: MAX_PCT,
+        laybyPlanPeriodDays: PLAN_PERIOD_DAYS
     });
 });
 
@@ -107,7 +94,10 @@ router.get('/admin/offline-sales', requireAdminAuth, (req, res) => {
         page: 'admin',
         activePage: 'offline-sales',
         viewMode: 'history',
-        csrfToken: res.locals.csrfToken || ''
+        csrfToken: res.locals.csrfToken || '',
+        laybyMinPct: MIN_PCT,
+        laybyMaxPct: MAX_PCT,
+        laybyPlanPeriodDays: PLAN_PERIOD_DAYS
     });
 });
 
@@ -132,12 +122,6 @@ router.get('/admin/reviews', requireAdminAuth, (req, res) => {
 // ============================================
 // Admin Product API
 // ============================================
-
-// Must be declared before /:id to prevent "search" being treated as an ID
-router.get('/api/products/search',
-    rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
-    productController.searchProducts
-);
 
 router.get('/api/products/export',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }),
@@ -231,7 +215,6 @@ router.delete('/api/products/:id(\\d+)/images/:imageId',
 router.use('/api/admin/orders',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 200 }),
     authenticateAdmin,
-    csrfTokenValidator(),
     adminOrderRoutes
 );
 
@@ -328,13 +311,13 @@ router.get('/api/admin/registered-users',
 );
 router.post('/api/admin/users/:id/suspend',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 30 }),
-    requireAdminAuth,
+    authenticateAdmin,
     csrfTokenValidator(),
     customerController.suspendUser
 );
 router.post('/api/admin/users/:id/activate',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 30 }),
-    requireAdminAuth,
+    authenticateAdmin,
     csrfTokenValidator(),
     customerController.activateUser
 );
@@ -382,6 +365,12 @@ router.post('/api/admin/offline-sales',
     authenticateAdmin,
     csrfTokenValidator(),
     offlineSaleAdminController.createOfflineSale
+);
+router.post('/api/admin/offline-sales/layby',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60 }),
+    authenticateAdmin,
+    csrfTokenValidator(),
+    offlineSaleAdminController.createOfflineLaybySale
 );
 
 // ============================================
@@ -476,7 +465,13 @@ router.delete('/api/admin/reviews/:productId/:reviewId/feature',
 // ============================================
 router.post('/api/admin/cron/poll-payments', async (req, res) => {
     const token = req.query.token || req.headers['x-cron-secret'];
-    if (!token || !process.env.CRON_SECRET || token !== process.env.CRON_SECRET) {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!token || !cronSecret) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+    const a = Buffer.from(cronSecret, 'utf8');
+    const b = Buffer.from(String(token), 'utf8');
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
     try {
@@ -484,7 +479,8 @@ router.post('/api/admin/cron/poll-payments', async (req, res) => {
         const result = await schedulerService.pollPendingPayments();
         return res.json({ success: true, result });
     } catch (error) {
-        return res.status(500).json({ success: false, message: error.message });
+        logger.error({ error }, 'cron pollPendingPayments failed');
+        return res.status(500).json({ success: false, message: 'Internal error during payment polling' });
     }
 });
 
@@ -492,15 +488,18 @@ router.post('/api/admin/cron/poll-payments', async (req, res) => {
 // Debug (development only)
 // ============================================
 if (process.env.NODE_ENV !== 'production') {
-    router.post('/api/debug/rate-limit/clear', (req, res) => {
+    router.post('/api/debug/rate-limit/clear', async (req, res) => {
         const { key } = req.body;
-        const cleared = clearRateLimit(key);
-        const cleaned = cleanExpiredRateLimits();
+        const [cleared, cleaned, allEntries] = await Promise.all([
+            clearRateLimit(key),
+            cleanExpiredRateLimits(),
+            getAllRateLimitEntries()
+        ]);
         res.json({
             success: true,
             message: cleared ? `Cleared rate limit for: ${key || 'all'}` : 'No matching rate limit found',
             expiredCleaned: cleaned,
-            allEntries: getAllRateLimitEntries()
+            allEntries
         });
     });
 }

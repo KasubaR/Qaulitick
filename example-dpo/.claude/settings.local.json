@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X POST https://secure.3gdirectpay.com/API/v6/ -H \"Content-Type: application/xml\" --data '<?xml version=\"\"1.0\"\"?><API3G><Request>ping</Request></API3G>')"
+    ]
+  }
+}

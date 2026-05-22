@@ -12,6 +12,11 @@ const Product = require('../models/Product.model');
 const { LaybyPlan, LaybyPayment } = require('../models');
 const laybyService = require('./layby.service');
 const lencoService = require('./lenco.service');
+const dpoService = require('./dpo.service');
+const {
+    compactDpoVerifyRaw,
+    applyDpoVerificationOutcome
+} = require('./dpoPaymentOutcome.service');
 const {
     applyPaymentStatusSideEffects,
     sendAdminPaymentNotificationOnce
@@ -33,6 +38,13 @@ const PAYMENT_POLL_EXPIRY_GRACE_MS = parsePositiveInt(process.env.PAYMENT_POLL_E
 const PAYMENT_POLL_BATCH_LIMIT = Math.min(
     100,
     parsePositiveInt(process.env.PAYMENT_POLL_BATCH_LIMIT, 50)
+);
+
+const DPO_POLL_MIN_AGE_MS = parsePositiveInt(process.env.DPO_POLL_MIN_AGE_MS, 15 * 1000);
+const DPO_POLL_MAX_AGE_MS = parsePositiveInt(process.env.DPO_POLL_MAX_AGE_MS, 35 * 60 * 1000);
+const DPO_POLL_BATCH_LIMIT = Math.min(
+    50,
+    parsePositiveInt(process.env.DPO_POLL_BATCH_LIMIT, 25)
 );
 
 /**
@@ -182,6 +194,7 @@ async function pollPendingLencoPayments() {
 
     const payments = await Payment.findAll({
         where: {
+            paymentMethod: 'mobile_money',
             status: { [Op.in]: ['pending', 'processing'] },
             createdAt: { [Op.lt]: cutoff },
             [Op.and]: [
@@ -289,6 +302,66 @@ async function pollPendingLencoPayments() {
     return stats;
 }
 
+async function pollPendingDpoPayments() {
+    const now = Date.now();
+    const minCreated = new Date(now - DPO_POLL_MAX_AGE_MS);
+    const maxCreated = new Date(now - DPO_POLL_MIN_AGE_MS);
+
+    const payments = await Payment.findAll({
+        where: {
+            paymentMethod: 'bank_transfer',
+            status: { [Op.in]: ['pending', 'processing'] },
+            transactionId: { [Op.ne]: null },
+            createdAt: { [Op.gt]: minCreated, [Op.lt]: maxCreated }
+        },
+        order: [['createdAt', 'ASC']],
+        limit: DPO_POLL_BATCH_LIMIT
+    });
+
+    const dpoRows = payments.filter((p) => (p.metadata && p.metadata.gateway) === 'dpo');
+    if (dpoRows.length === 0) return { checked: 0, updated: 0, terminal: 0, errors: 0 };
+
+    console.log(`[Scheduler] Polling ${dpoRows.length} pending DPO payment(s)...`);
+
+    const stats = { checked: dpoRows.length, updated: 0, terminal: 0, errors: 0 };
+
+    for (const payment of dpoRows) {
+        try {
+            const { outcome, raw } = await dpoService.verifyToken(payment.transactionId);
+
+            if (outcome.paid) {
+                await applyDpoVerificationOutcome(payment, outcome, raw, 'DPO scheduler poll');
+                stats.updated++;
+                stats.terminal++;
+                continue;
+            }
+
+            if (!outcome.terminal) {
+                await payment.update({
+                    gatewayResponse: compactDpoVerifyRaw(raw)
+                });
+                stats.updated++;
+                continue;
+            }
+
+            await applyDpoVerificationOutcome(payment, outcome, raw, 'DPO scheduler poll');
+            stats.updated++;
+            stats.terminal++;
+        } catch (error) {
+            stats.errors++;
+            console.warn(`[Scheduler] DPO poll failed for payment ${payment.id}:`, error.message);
+        }
+    }
+
+    if (stats.updated > 0 || stats.errors > 0) {
+        console.log(
+            `[Scheduler] DPO poll complete: checked=${stats.checked}, updated=${stats.updated}, terminal=${stats.terminal}, errors=${stats.errors}`
+        );
+    }
+
+    return stats;
+}
+
 class SchedulerService {
     constructor() {
         this.intervals = [];
@@ -304,7 +377,9 @@ class SchedulerService {
 
         this.paymentPollRunning = true;
         try {
-            return await pollPendingLencoPayments();
+            const lenco = await pollPendingLencoPayments();
+            const dpo = await pollPendingDpoPayments();
+            return { lenco, dpo };
         } finally {
             this.paymentPollRunning = false;
         }

@@ -1381,4 +1381,15 @@ exports.reorderProducts = async (req, res) => {
     }
 };
 
+exports.renderProductsPage = async (req, res) => {
+    const base = { title: 'Product Management | Admin Panel', page: 'admin', activePage: 'products' };
+    try {
+        const products = await productService.getAllProducts({}, { sort: [['sortOrder', 'ASC'], ['createdAt', 'DESC']] });
+        res.render('admin/products', { ...base, products: products.map((p) => p.toJSON()) });
+    } catch (error) {
+        console.error('[Product Controller] Error loading products page:', error);
+        res.render('admin/products', { ...base, products: [] });
+    }
+};
+
 module.exports = exports;

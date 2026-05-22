@@ -9,17 +9,24 @@ const LaybyPlan = sequelize.define('LaybyPlan', {
     },
     orderId: {
         type: DataTypes.INTEGER,
-        allowNull: false,
+        allowNull: true,
         references: { model: 'orders', key: 'id' },
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE'
     },
     userId: {
         type: DataTypes.INTEGER,
-        allowNull: false,
+        allowNull: true,
         references: { model: 'users', key: 'id' },
         onUpdate: 'CASCADE',
         onDelete: 'RESTRICT'
+    },
+    offlineSaleId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: { model: 'offline_sales', key: 'id' },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL'
     },
     currency: {
         type: DataTypes.STRING(10),
@@ -67,6 +74,7 @@ const LaybyPlan = sequelize.define('LaybyPlan', {
     indexes: [
         { fields: ['orderId'] },
         { fields: ['userId'] },
+        { fields: ['offlineSaleId'] },
         { fields: ['status'] }
     ]
 });

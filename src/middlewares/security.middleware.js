@@ -19,13 +19,55 @@ sequelize.query(`
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 `).catch(err => console.error('[Rate Limit] Failed to create rate_limits table:', err.message));
 
+// In-memory fallback store used by fail-closed limiters when DB is unavailable.
+// Structure: Map<key, { count: number, resetTime: number }>
+// Intentionally module-level so it persists for the process lifetime.
+const _memFallback = new Map();
+const _MAX_MEM_ENTRIES = 50_000;
+
+function _memIncrement(key, windowMs, now) {
+    const entry = _memFallback.get(key);
+    if (!entry || entry.resetTime + windowMs <= now) {
+        // Don't grow unboundedly under a DDoS with unique IPs. If the map is full
+        // and this is a new key, return a count of 1 without storing — fail open
+        // so legitimate traffic isn't blocked, but memory is protected.
+        if (!_memFallback.has(key) && _memFallback.size >= _MAX_MEM_ENTRIES) {
+            return { count: 1, resetTime: now };
+        }
+        const next = { count: 1, resetTime: now };
+        _memFallback.set(key, next);
+        return next;
+    }
+    entry.count += 1;
+    return entry;
+}
+
+// Periodically evict expired in-memory entries to prevent unbounded growth.
+setInterval(() => {
+    const now = Date.now();
+    for (const [k, v] of _memFallback) {
+        // Use a generous 2× window before evicting so late DB recovery doesn't reset counters prematurely
+        if (v.resetTime + 30 * 60 * 1000 <= now) _memFallback.delete(k);
+    }
+}, 5 * 60 * 1000).unref();
+
+// Periodically delete expired DB rate-limit rows (max window across all limiters is 1 hour).
+setInterval(() => {
+    const now = Date.now();
+    sequelize.query(
+        'DELETE FROM rate_limits WHERE reset_time + 3600000 <= :now',
+        { replacements: { now } }
+    ).catch(() => {});
+}, 5 * 60 * 1000).unref();
+
 /**
  * Rate Limiting Middleware
  * Backed by MySQL — survives restarts and works correctly under multi-process deployments.
  * @param {object} options
- * @param {number} options.windowMs  - Time window in milliseconds
- * @param {number} options.max       - Maximum requests per window
- * @param {string} options.message   - Response message when limit exceeded
+ * @param {number}   options.windowMs     - Time window in milliseconds
+ * @param {number}   options.max          - Maximum requests per window
+ * @param {string}   options.message      - Response message when limit exceeded
+ * @param {boolean}  options.failClosed   - If true, enforce limits via in-memory fallback when DB is down (default false)
  * @param {Function} options.keyGenerator - Optional custom key function(req) → string
  */
 function rateLimit(options = {}) {
@@ -33,61 +75,71 @@ function rateLimit(options = {}) {
         windowMs = 15 * 60 * 1000,
         max = 100,
         message = 'Too many requests, please try again later.',
+        failClosed = false,
         keyGenerator = null
     } = options;
 
     return async (req, res, next) => {
-        try {
-            const ip = req.ip ||
-                       req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-                       req.connection?.remoteAddress ||
-                       'unknown';
+        const ip = req.ip ||
+                   req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+                   req.connection?.remoteAddress ||
+                   'unknown';
+        const routePath = req.path || req.route?.path || 'unknown';
+        const key = keyGenerator ? keyGenerator(req) : `${ip}:${routePath}`;
 
-            const routePath = req.path || req.route?.path || 'unknown';
-            const key = keyGenerator ? keyGenerator(req) : `${ip}:${routePath}`;
+        // Helper shared by the happy path and the fail-closed fallback
+        const sendLimited = (count, resetTime, now) => {
+            const retryAfter = Math.ceil((windowMs - (now - resetTime)) / 1000);
+            res.set({
+                'Retry-After': retryAfter,
+                'X-RateLimit-Limit': max,
+                'X-RateLimit-Remaining': 0,
+                'X-RateLimit-Reset': new Date(resetTime + windowMs).toISOString()
+            });
+            const isApiRequest = req.originalUrl.startsWith('/api/') || req.xhr;
+            if (!isApiRequest) {
+                const mins = Math.floor(retryAfter / 60);
+                const secs = retryAfter % 60;
+                const timeStr = mins > 0
+                    ? `${mins} minute${mins !== 1 ? 's' : ''} and ${secs} second${secs !== 1 ? 's' : ''}`
+                    : `${secs} second${secs !== 1 ? 's' : ''}`;
+                return res.status(429).render('500', {
+                    title: '429 - Too Many Requests',
+                    message: 'Too Many Requests',
+                    errorType: 'rate-limit',
+                    rateLimitMessage: `${message} Please wait ${timeStr} before trying again.`
+                });
+            }
+            return res.status(429).json({ success: false, message, retryAfter });
+        };
+
+        try {
             const now = Date.now();
 
-            // Atomic upsert: insert a fresh counter, or increment the existing one.
-            // If the window has expired (reset_time + windowMs <= now), reset the counter.
-            await sequelize.query(
-                `INSERT INTO rate_limits (rl_key, count, reset_time)
-                 VALUES (:key, 1, :now)
-                 ON DUPLICATE KEY UPDATE
-                     count      = IF(reset_time + :windowMs <= :now, 1,     count + 1),
-                     reset_time = IF(reset_time + :windowMs <= :now, :now,   reset_time)`,
-                { replacements: { key, now, windowMs } }
-            );
+            // Lock the row (or gap for new keys) then write — eliminates the read/write race.
+            // SELECT FOR UPDATE in InnoDB holds an exclusive lock until commit, so no other
+            // connection can increment or delete the key between our read and our write.
+            const { count, resetTime } = await sequelize.transaction(async (t) => {
+                const [[row]] = await sequelize.query(
+                    'SELECT count, reset_time FROM rate_limits WHERE rl_key = :key FOR UPDATE',
+                    { replacements: { key }, transaction: t }
+                );
 
-            const [[row]] = await sequelize.query(
-                'SELECT count, reset_time FROM rate_limits WHERE rl_key = :key',
-                { replacements: { key } }
-            );
+                const expired      = !row || row.reset_time + windowMs <= now;
+                const newCount     = expired ? 1 : row.count + 1;
+                const newResetTime = expired ? now : row.reset_time;
 
-            const count     = row ? row.count      : 1;
-            const resetTime = row ? row.reset_time : now;
+                await sequelize.query(
+                    `INSERT INTO rate_limits (rl_key, count, reset_time)
+                     VALUES (:key, :count, :resetTime)
+                     ON DUPLICATE KEY UPDATE count = :count, reset_time = :resetTime`,
+                    { replacements: { key, count: newCount, resetTime: newResetTime }, transaction: t }
+                );
 
-            // Probabilistic cleanup of expired rows (~5 % of requests)
-            if (Math.random() < 0.05) {
-                sequelize.query(
-                    'DELETE FROM rate_limits WHERE reset_time + :windowMs <= :now',
-                    { replacements: { windowMs, now } }
-                ).catch(() => {});
-            }
+                return { count: newCount, resetTime: newResetTime };
+            });
 
-            if (count > max) {
-                const retryAfter = Math.ceil((windowMs - (now - resetTime)) / 1000);
-                res.set({
-                    'Retry-After': retryAfter,
-                    'X-RateLimit-Limit': max,
-                    'X-RateLimit-Remaining': 0,
-                    'X-RateLimit-Reset': new Date(resetTime + windowMs).toISOString()
-                });
-                return res.status(429).json({
-                    success: false,
-                    message,
-                    retryAfter
-                });
-            }
+            if (count > max) return sendLimited(count, resetTime, now);
 
             res.set({
                 'X-RateLimit-Limit': max,
@@ -97,8 +149,17 @@ function rateLimit(options = {}) {
 
             next();
         } catch (error) {
-            // Fail open: if the DB is unavailable, do not block requests
-            console.error('[Rate Limit] DB error — failing open:', error.message);
+            console.error('[Rate Limit] DB error:', error.message);
+
+            if (failClosed) {
+                // Enforce limits via in-memory store so brute-force protection survives DB outages
+                const now = Date.now();
+                const entry = _memIncrement(key, windowMs, now);
+                if (entry.count > max) return sendLimited(entry.count, entry.resetTime, now);
+                return next();
+            }
+
+            // Non-sensitive routes: fail open (original behaviour)
             next();
         }
     };
@@ -157,6 +218,11 @@ function xssProtection(req, res, next) {
 /**
  * Request Size Limiting Middleware
  */
+// Fast pre-reject based on the Content-Length header. This is client-supplied and can be
+// spoofed (missing or understated), so it is NOT the authoritative size enforcement.
+// Actual body size is enforced by express.json({ limit }) and express.urlencoded({ limit })
+// in app.js, which measure the streamed bytes. This check exists only to reject honest
+// clients early and avoid unnecessary body parsing overhead.
 function limitRequestSize(maxSize = '10mb') {
     return (req, res, next) => {
         const contentLength = req.get('content-length');
@@ -178,25 +244,6 @@ function parseSize(size) {
     const units = { kb: 1024, mb: 1024 * 1024, gb: 1024 * 1024 * 1024 };
     const match = size.toLowerCase().match(/^(\d+)(kb|mb|gb)$/);
     return match ? parseInt(match[1]) * units[match[2]] : 10 * 1024 * 1024;
-}
-
-/**
- * SQL Injection Protection
- */
-function sqlInjectionProtection(req, res, next) {
-    const sqlPatterns = [
-        /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE)\b)/gi,
-        /('|(\\')|(;)|(\\)|(\/\*)|(\*\/)|(\-\-)|(\+)|(\%27)|(\%22))/gi
-    ];
-    const checkValue = (value) => {
-        if (typeof value === 'string') return sqlPatterns.some(p => p.test(value));
-        if (typeof value === 'object' && value !== null) return Object.values(value).some(checkValue);
-        return false;
-    };
-    if (checkValue({ ...req.query, ...req.body, ...req.params })) {
-        return res.status(400).json({ success: false, message: 'Invalid input detected' });
-    }
-    next();
 }
 
 // ── Debug helpers (development only) ─────────────────────────────────────────
@@ -247,7 +294,6 @@ module.exports = {
     validateQueryParams,
     xssProtection,
     limitRequestSize,
-    sqlInjectionProtection,
     clearRateLimit,
     cleanExpiredRateLimits,
     getAllRateLimitEntries

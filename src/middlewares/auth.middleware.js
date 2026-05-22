@@ -3,6 +3,7 @@
 
 const crypto = require('crypto');
 const adminService = require('../services/admin.service');
+const logger = require('../utils/logger').child({ module: 'AdminAuthMiddleware' });
 
 /**
  * Validate secret token against environment variable
@@ -55,8 +56,9 @@ async function getAuthenticatedAdmin(req) {
         // DB error (timeout, connection failure, etc.) — do NOT clear the session.
         // Treating a transient DB blip the same as a deleted admin would log the
         // admin out under load, and the session data is still valid.
-        console.error('[Auth Middleware] DB error fetching admin:', error);
-        return null;
+        // Re-throw so callers can distinguish DB failure from "not found".
+        logger.error({ err: error }, 'DB error fetching admin');
+        throw error;
     }
 }
 
@@ -84,11 +86,11 @@ async function authenticateAdmin(req, res, next) {
         req.admin = admin;
         next();
     } catch (error) {
-        console.error('[Auth Middleware] Error in authenticateAdmin:', error);
-        return res.status(500).json({
+        logger.error({ err: error }, 'Error in authenticateAdmin');
+        return res.status(503).json({
             success: false,
-            message: 'Authentication error occurred',
-            error: 'INTERNAL_ERROR'
+            message: 'Service temporarily unavailable. Please try again shortly.',
+            error: 'SERVICE_UNAVAILABLE'
         });
     }
 }
@@ -106,10 +108,11 @@ async function requireAdminAuth(req, res, next) {
         const admin = await getAuthenticatedAdmin(req);
         
         if (!admin) {
-            // Not authenticated - redirect to login
-            // Store intended destination for redirect after login
-            const returnUrl = req.path; // path only — strips query strings that may contain sensitive params
-            return res.redirect(`/admin/login?returnUrl=${encodeURIComponent(returnUrl)}`);
+            // Not authenticated — redirect to access-denied.
+            // The admin login page requires a secret URL token that cannot be
+            // reconstructed here, so redirect to the access-denied page which
+            // instructs the admin to use the correct secret URL.
+            return res.redirect('/admin/access-denied?error=' + encodeURIComponent('Your session has expired. Please log in again using the admin secret URL.'));
         }
         
         // Attach admin to request object for use in route handlers
@@ -124,9 +127,10 @@ async function requireAdminAuth(req, res, next) {
         
         next();
     } catch (error) {
-        console.error('[Auth Middleware] Error in requireAdminAuth:', error);
-        // Redirect to login on error
-        return res.redirect('/admin/login?error=authentication_error');
+        logger.error({ err: error }, 'Error in requireAdminAuth');
+        // DB failure — don't treat as unauthenticated or redirect to access-denied,
+        // which could itself require auth and cause a loop. Return 503 instead.
+        return res.status(503).render('500', { message: 'Service temporarily unavailable. Please try again shortly.' });
     }
 }
 
@@ -146,7 +150,7 @@ async function optionalAdminAuth(req, res, next) {
         next();
     } catch (error) {
         // Don't block on error, just continue
-        console.error('[Auth Middleware] Error in optionalAdminAuth:', error);
+        logger.error({ err: error }, 'Error in optionalAdminAuth');
         next();
     }
 }
@@ -155,7 +159,6 @@ module.exports = {
     validateSecretToken,
     authenticateAdmin,
     requireAdminAuth,
-    optionalAdminAuth,
-    getAuthenticatedAdmin
+    optionalAdminAuth
 };
 

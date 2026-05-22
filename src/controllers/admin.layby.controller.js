@@ -6,7 +6,7 @@
  */
 
 const { Op } = require('sequelize');
-const { LaybyPlan, LaybyPayment, Order, User, Payment } = require('../models');
+const { LaybyPlan, LaybyPayment, Order, User, Payment, OfflineSale } = require('../models');
 const laybyService = require('../services/layby.service');
 const { enrichLaybyPlan } = require('../utils/laybyStatusPresenter');
 const logger = require('../utils/logger').child({ module: 'AdminLaybyController' });
@@ -55,6 +55,29 @@ function sanitizeLaybyPlanDetailForAdmin(plan) {
             email: j.user.email
         };
     }
+    if (j.offlineSale) {
+        const s = j.offlineSale;
+        const totals = s.totals && typeof s.totals === 'object' ? s.totals : {};
+        const items = Array.isArray(s.items) ? s.items : [];
+        j.offlineSale = {
+            id: s.id,
+            saleNumber: s.saleNumber,
+            saleType: s.saleType,
+            soldAt: s.soldAt,
+            customerName: s.customerName,
+            customerEmail: s.customerEmail,
+            customerPhone: s.customerPhone,
+            totals: {
+                subtotal: totals.subtotal,
+                total: totals.total
+            },
+            items: items.map((it) => ({
+                name: it.name,
+                quantity: it.quantity,
+                price: it.unitPrice != null ? it.unitPrice : it.price
+            }))
+        };
+    }
     return enrichLaybyPlan(j);
 }
 
@@ -95,20 +118,41 @@ exports.listPlans = async (req, res) => {
             where.status = status;
         }
 
-        const orderInclude = {
-            model: Order,
-            as: 'order',
-            attributes: ['id', 'orderNumber', 'status', 'paymentStatus', 'checkoutMode'],
-            required: true
-        };
         if (search) {
-            orderInclude.where = { orderNumber: { [Op.like]: `%${search}%` } };
+            const like = `%${search}%`;
+            where[Op.or] = [
+                { '$order.orderNumber$': { [Op.like]: like } },
+                { '$offlineSale.saleNumber$': { [Op.like]: like } },
+                { '$offlineSale.customerName$': { [Op.like]: like } }
+            ];
         }
 
-        const { count, rows } = await LaybyPlan.findAndCountAll({
+        const count = await LaybyPlan.count({
             where,
             include: [
-                orderInclude,
+                { model: Order, as: 'order', attributes: [], required: false },
+                { model: OfflineSale, as: 'offlineSale', attributes: [], required: false },
+                { model: User, as: 'user', attributes: [], required: false }
+            ],
+            distinct: true,
+            col: 'LaybyPlan.id'
+        });
+
+        const rows = await LaybyPlan.findAll({
+            where,
+            include: [
+                {
+                    model: Order,
+                    as: 'order',
+                    attributes: ['id', 'orderNumber', 'status', 'paymentStatus', 'checkoutMode'],
+                    required: false
+                },
+                {
+                    model: OfflineSale,
+                    as: 'offlineSale',
+                    attributes: ['id', 'saleNumber', 'saleType', 'customerName', 'customerEmail', 'soldAt'],
+                    required: false
+                },
                 { model: User, as: 'user', attributes: ['id', 'email', 'name'], required: false },
                 {
                     model: LaybyPayment,
@@ -128,7 +172,6 @@ exports.listPlans = async (req, res) => {
             order: [['createdAt', 'DESC']],
             limit,
             offset,
-            distinct: true,
             subQuery: false
         });
 
@@ -153,56 +196,88 @@ exports.getPlan = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid plan id' });
         }
 
-        const plan = await LaybyPlan.findByPk(id, {
-            include: [
-                {
-                    model: Order,
-                    as: 'order',
-                    attributes: [
-                        'id',
-                        'orderNumber',
-                        'status',
-                        'paymentStatus',
-                        'checkoutMode',
-                        'items',
-                        'totals',
-                        'createdAt'
-                    ]
-                },
-                { model: User, as: 'user', attributes: ['id', 'email', 'name'], required: false },
-                {
-                    model: LaybyPayment,
-                    as: 'laybyPayments',
-                    separate: true,
-                    order: [['sequence', 'ASC']],
+        // Both queries share a transaction so the plan snapshot and payment history
+        // are read-consistent. Note: `separate: true` sub-queries (laybyPayments)
+        // do not inherit the transaction — accepted limitation since LaybyPayment
+        // rows are structural and rarely change mid-request.
+        const { plan, paymentHistory } = await LaybyPlan.sequelize.transaction(
+            { isolationLevel: LaybyPlan.sequelize.Transaction.ISOLATION_LEVELS.REPEATABLE_READ },
+            async (t) => {
+                const fetchedPlan = await LaybyPlan.findByPk(id, {
+                    transaction: t,
                     include: [
                         {
-                            model: Payment,
-                            as: 'payment',
-                            required: false,
-                            attributes: ['id', 'status', 'paymentMethod', 'metadata', 'lencoReference', 'transactionId', 'createdAt', 'amount', 'completedAt']
+                            model: Order,
+                            as: 'order',
+                            attributes: [
+                                'id',
+                                'orderNumber',
+                                'status',
+                                'paymentStatus',
+                                'checkoutMode',
+                                'items',
+                                'totals',
+                                'createdAt'
+                            ],
+                            required: false
+                        },
+                        {
+                            model: OfflineSale,
+                            as: 'offlineSale',
+                            attributes: [
+                                'id',
+                                'saleNumber',
+                                'saleType',
+                                'soldAt',
+                                'items',
+                                'totals',
+                                'customerName',
+                                'customerEmail',
+                                'customerPhone'
+                            ],
+                            required: false
+                        },
+                        { model: User, as: 'user', attributes: ['id', 'email', 'name'], required: false },
+                        {
+                            model: LaybyPayment,
+                            as: 'laybyPayments',
+                            separate: true,
+                            order: [['sequence', 'ASC']],
+                            include: [
+                                {
+                                    model: Payment,
+                                    as: 'payment',
+                                    required: false,
+                                    attributes: ['id', 'status', 'paymentMethod', 'metadata', 'lencoReference', 'transactionId', 'createdAt', 'amount', 'completedAt']
+                                }
+                            ]
                         }
                     ]
-                }
-            ]
-        });
+                });
+
+                if (!fetchedPlan) return { plan: null };
+
+                const installmentIds = (fetchedPlan.laybyPayments || []).map((lp) => lp.id).filter(Boolean);
+                const history = installmentIds.length
+                    ? await Payment.findAll({
+                          where: { laybyPaymentId: { [Op.in]: installmentIds } },
+                          attributes: [
+                              'id', 'amount', 'currency', 'status', 'paymentMethod',
+                              'lencoProvider', 'lencoReference', 'transactionId',
+                              'completedAt', 'createdAt', 'laybyPaymentId', 'metadata'
+                          ],
+                          order: [['createdAt', 'DESC']],
+                          transaction: t
+                      })
+                    : [];
+
+                return { plan: fetchedPlan, paymentHistory: history };
+            }
+        );
 
         if (!plan) {
             return res.status(404).json({ success: false, message: 'Plan not found' });
         }
-
-        const installmentIds = (plan.laybyPayments || []).map((lp) => lp.id).filter(Boolean);
-        const paymentHistory = installmentIds.length
-            ? await Payment.findAll({
-                  where: { laybyPaymentId: { [Op.in]: installmentIds } },
-                  attributes: [
-                      'id', 'amount', 'currency', 'status', 'paymentMethod',
-                      'lencoProvider', 'lencoReference', 'transactionId',
-                      'completedAt', 'createdAt', 'laybyPaymentId', 'metadata'
-                  ],
-                  order: [['createdAt', 'DESC']]
-              })
-            : [];
 
         res.json({
             success: true,
@@ -228,6 +303,14 @@ exports.updatePlanStatus = async (req, res) => {
         }
 
         if (status === 'cancelled') {
+            const preCheck = await LaybyPlan.findByPk(id, { attributes: ['id', 'status'] });
+            if (!preCheck) {
+                return res.status(404).json({ success: false, message: 'Plan not found' });
+            }
+            if (!LAYBY_PLAN_STATUS_TRANSITIONS[preCheck.status]?.includes('cancelled')) {
+                return res.status(400).json({ success: false, message: `Cannot transition from ${preCheck.status} to cancelled` });
+            }
+
             const actor = req.admin?.email || (req.admin?.id ? `admin:${req.admin.id}` : 'admin');
             const cancelled = await laybyService.cancelLaybyPlan(id, {
                 actor,
@@ -310,6 +393,9 @@ exports.confirmInstallmentOffline = async (req, res) => {
         if (out.error === 'ORDER_NOT_FOUND') {
             return res.status(400).json({ success: false, message: 'Order missing for this plan' });
         }
+        if (out.error === 'OFFLINE_SALE_NOT_FOUND') {
+            return res.status(400).json({ success: false, message: 'Offline sale missing for this plan' });
+        }
         if (out.error === 'TRANSACTION_FAILED') {
             return res.status(500).json({ success: false, message: 'Could not confirm installment' });
         }
@@ -322,7 +408,11 @@ exports.confirmInstallmentOffline = async (req, res) => {
             success: true,
             fullyPaid: out.fullyPaid,
             plan: out.plan ? out.plan.toJSON() : null,
-            orderNumber: out.order ? out.order.orderNumber : null
+            orderNumber: out.order
+                ? out.order.orderNumber
+                : out.offlineSale
+                  ? out.offlineSale.saleNumber
+                  : null
         });
     } catch (err) {
         logger.error({ err }, 'confirmInstallmentOffline failed');

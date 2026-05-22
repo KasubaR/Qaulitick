@@ -159,7 +159,7 @@ function renderOrderSummary(order) {
     items.forEach((it) => {
         const name = it.name || 'Item';
         const qty = it.quantity || 1;
-        const price = Number(it.price) || 0;
+        const price = Number(it.price != null ? it.price : it.unitPrice) || 0;
         const line = price * qty;
         linesHtml +=
             '<li class="layby-order-summary__line">' +
@@ -376,12 +376,28 @@ function setText(id, value) {
 
 function fillSummary(plan) {
     const order = plan.order || {};
+    const offlineSale = plan.offlineSale || {};
     const user = plan.user || {};
     setText('detailPlanIdLabel', String(plan.id));
-    setText('summaryOrderNumber', order.orderNumber || '—');
-    setText('summaryCheckout', order.checkoutMode || '—');
-    const cust = [user.name, user.email].filter(Boolean).join(' · ');
-    setText('summaryCustomer', cust || '—');
+
+    if (offlineSale.saleNumber) {
+        setText('summaryOrderNumber', offlineSale.saleNumber);
+        setText('summaryCheckout', 'Offline layby');
+        const custParts = [
+            offlineSale.customerName,
+            offlineSale.customerEmail,
+            offlineSale.customerPhone
+        ].filter(Boolean);
+        setText('summaryCustomer', custParts.length ? custParts.join(' · ') : '—');
+        renderOrderSummary(offlineSale);
+    } else {
+        setText('summaryOrderNumber', order.orderNumber || '—');
+        setText('summaryCheckout', order.checkoutMode || '—');
+        const cust = [user.name, user.email].filter(Boolean).join(' · ');
+        setText('summaryCustomer', cust || '—');
+        renderOrderSummary(order);
+    }
+
     setText('summaryPlanStatus', plan.laybyDisplayStatus || plan.status || '—');
     setText('summaryArrangement', plan.paymentArrangementLabel || deriveArrangementLabel(plan));
     const cur = plan.currency || 'ZMW';
@@ -392,8 +408,6 @@ function fillSummary(plan) {
     setText('summaryAmountPaid', `${formatZmw(amountPaid)} ${cur}`);
     setText('summaryNextAction', plan.nextActionLabel || deriveNextAction(plan));
     setText('summaryNextDue', plan.nextDueLabel || formatDate(plan.nextDueAt));
-
-    renderOrderSummary(order);
 
     const sel = document.getElementById('planStatusSelect');
     if (sel && plan.status) {

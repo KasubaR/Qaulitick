@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const paymentController = require('../controllers/payment.controller');
 const { rateLimit } = require('../middlewares/security.middleware');
-const { authenticateAdmin } = require('../middlewares/auth.middleware');
+const { authenticateAdmin, optionalAdminAuth } = require('../middlewares/auth.middleware');
 
 /**
  * Payment Routes
@@ -14,17 +14,22 @@ const { authenticateAdmin } = require('../middlewares/auth.middleware');
  * Regular Payment Routes:
  */
 
+// DPO return URLs (GET — no CSRF)
+router.get('/dpo/success', paymentController.handleDpoSuccess);
+router.get('/dpo/cancel', paymentController.handleDpoCancel);
+
 // Process payment
 router.post('/process', paymentController.processPayment);
 
 // Verify payment status - MUST come before /:id to avoid route conflict
 // More permissive rate limit (designed for polling): 60 requests per 15 minutes
-router.get('/verify/:transactionId', 
-    rateLimit({ 
-        windowMs: 15 * 60 * 1000, 
+router.get('/verify/:transactionId',
+    rateLimit({
+        windowMs: 15 * 60 * 1000,
         max: 60,
         message: 'Too many verification requests. Please wait before checking again.'
-    }), 
+    }),
+    optionalAdminAuth,
     paymentController.verifyPayment
 );
 
@@ -41,10 +46,10 @@ router.get('/', authenticateAdmin, paymentController.getAllPayments);
 router.get('/export', authenticateAdmin, paymentController.exportPayments);
 
 // Retry failed payment (must come before /:id to avoid route conflict)
-router.post('/retry/:orderNumber', paymentController.retryPayment);
+router.post('/retry/:orderNumber', optionalAdminAuth, paymentController.retryPayment);
 
 // Cancel a pending payment by transaction ID (must come before /:id to avoid route conflict)
-router.patch('/cancel/:transactionId', paymentController.cancelPayment);
+router.patch('/cancel/:transactionId', optionalAdminAuth, paymentController.cancelPayment);
 
 // Delete payment record (admin)
 router.delete('/:id', authenticateAdmin, paymentController.deletePayment);
