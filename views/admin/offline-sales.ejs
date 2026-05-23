@@ -87,6 +87,15 @@
                 </div>
 
                 <div id="offlineLaybyPanel" class="offline-layby-panel is-hidden" aria-hidden="true">
+                    <div class="form-group offline-layby-user-group">
+                        <label for="laybyUserSearch">Customer account <span class="offline-layby-required">*</span></label>
+                        <div class="offline-product-search">
+                            <input type="text" id="laybyUserSearch" class="form-input" placeholder="Search by name or email…" autocomplete="off">
+                            <div id="laybyUserSearchResults" class="offline-search-results is-hidden" role="listbox"></div>
+                        </div>
+                        <input type="hidden" id="laybyUserId">
+                        <p id="laybyUserLabel" class="offline-modal-product-label">No account selected</p>
+                    </div>
                     <div class="offline-layby-deposit-row">
                         <label for="laybyDepositPercentInput">Deposit %</label>
                         <div class="offline-layby-deposit-controls">

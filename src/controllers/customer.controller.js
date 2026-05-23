@@ -155,6 +155,25 @@ exports.getRegisteredUsers = async (req, res) => {
     }
 };
 
+exports.searchUsers = async (req, res) => {
+    try {
+        const q = (req.query.q || '').trim().slice(0, 100);
+        if (q.length < 2) return res.json({ success: true, users: [] });
+        const result = await customerService.getRegisteredUsers({ search: q }, { page: 1, limit: 10 });
+        res.json({
+            success: true,
+            users: (result.users || []).map((u) => ({
+                id: u.id,
+                name: u.name,
+                email: u.email,
+                phone: u.phone || ''
+            }))
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Search failed' });
+    }
+};
+
 exports.suspendUser = async (req, res) => {
     try {
         const userId = parseInt(req.params.id, 10);

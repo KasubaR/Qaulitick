@@ -309,6 +309,11 @@ router.get('/api/admin/registered-users',
     authenticateAdmin,
     customerController.getRegisteredUsers
 );
+router.get('/api/admin/users/search',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
+    authenticateAdmin,
+    customerController.searchUsers
+);
 router.post('/api/admin/users/:id/suspend',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 30 }),
     authenticateAdmin,

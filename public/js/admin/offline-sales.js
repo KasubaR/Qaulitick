@@ -13,6 +13,8 @@
     let modalLineId = null; // null = adding new, number = editing existing
 
     let searchTimer = null;
+    let userSearchTimer = null;
+    let selectedLaybyUser = null;
 
     let listPage = 1;
     const listLimit = 15;
@@ -57,8 +59,84 @@
         if (balEl) balEl.textContent = formatZmw(balance);
     }
 
+    // ─── Layby user search ────────────────────────────────────────────────────
+
+    function closeLaybyUserDropdown() {
+        const d = document.getElementById('laybyUserSearchResults');
+        if (d) { d.classList.add('is-hidden'); d.innerHTML = ''; }
+    }
+
+    function clearLaybyUser() {
+        selectedLaybyUser = null;
+        const idEl = document.getElementById('laybyUserId');
+        const labelEl = document.getElementById('laybyUserLabel');
+        const searchEl = document.getElementById('laybyUserSearch');
+        if (idEl) idEl.value = '';
+        if (labelEl) { labelEl.textContent = 'No account selected'; labelEl.classList.remove('is-selected'); }
+        if (searchEl) searchEl.value = '';
+        closeLaybyUserDropdown();
+    }
+
+    function applyLaybyUser(user) {
+        selectedLaybyUser = user;
+        const idEl = document.getElementById('laybyUserId');
+        const labelEl = document.getElementById('laybyUserLabel');
+        const searchEl = document.getElementById('laybyUserSearch');
+        if (idEl) idEl.value = String(user.id);
+        if (labelEl) { labelEl.textContent = `${user.name} (${user.email})`; labelEl.classList.add('is-selected'); }
+        if (searchEl) searchEl.value = '';
+        closeLaybyUserDropdown();
+
+        // Pre-fill customer fields
+        const nameEl = document.getElementById('customerNameInput');
+        const emailEl = document.getElementById('customerEmailInput');
+        const phoneEl = document.getElementById('customerPhoneInput');
+        if (nameEl && !nameEl.value) nameEl.value = user.name || '';
+        if (emailEl && !emailEl.value) emailEl.value = user.email || '';
+        if (phoneEl && !phoneEl.value) phoneEl.value = user.phone || '';
+    }
+
+    function renderLaybyUserResults(users) {
+        const wrap = document.getElementById('laybyUserSearchResults');
+        if (!wrap) return;
+        if (!users || users.length === 0) {
+            wrap.innerHTML = '<ul><li class="offline-search-empty">No accounts found</li></ul>';
+            wrap.classList.remove('is-hidden');
+            return;
+        }
+        const ul = document.createElement('ul');
+        users.forEach((u) => {
+            const li = document.createElement('li');
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'offline-search-result-btn';
+            btn.textContent = `${u.name} — ${u.email}`;
+            btn.addEventListener('click', () => {
+                applyLaybyUser(u);
+            });
+            li.appendChild(btn);
+            ul.appendChild(li);
+        });
+        wrap.innerHTML = '';
+        wrap.appendChild(ul);
+        wrap.classList.remove('is-hidden');
+    }
+
+    async function runLaybyUserSearch(q) {
+        const query = (q || '').trim();
+        if (query.length < 2) { closeLaybyUserDropdown(); return; }
+        try {
+            const res = await fetch(`/api/admin/users/search?q=${encodeURIComponent(query)}`, { credentials: 'include' });
+            const data = await res.json().catch(() => ({}));
+            renderLaybyUserResults(res.ok && data.success ? (data.users || []) : []);
+        } catch {
+            renderLaybyUserResults([]);
+        }
+    }
+
     function setSaleMode(mode) {
         saleMode = mode === 'layby' ? 'layby' : 'full';
+        if (saleMode === 'full') clearLaybyUser();
         const panel = document.getElementById('offlineLaybyPanel');
         const fullBtn = document.getElementById('saleModeFullBtn');
         const laybyBtn = document.getElementById('saleModeLaybyBtn');
@@ -410,6 +488,11 @@
         if (saleMode === 'layby') {
             const pct = clampDepositPercent(parseInt(document.getElementById('laybyDepositPercentInput')?.value, 10));
             base.depositPercent = pct;
+            const userId = parseInt(document.getElementById('laybyUserId')?.value, 10);
+            if (!selectedLaybyUser || Number.isNaN(userId) || userId < 1) {
+                throw new Error('Select a registered customer account for layby sales');
+            }
+            base.userId = userId;
         }
 
         return base;
@@ -452,6 +535,7 @@
             showToast(isLayby ? 'Layby sale recorded.' : 'Sale recorded.', 'success');
             closeSaleModal();
 
+            clearLaybyUser();
             document.getElementById('customerNameInput').value = '';
             document.getElementById('customerEmailInput').value = '';
             document.getElementById('customerPhoneInput').value = '';
@@ -563,6 +647,7 @@
         const modal = document.getElementById('addSaleModal');
         if (!modal) return;
         initSoldAtDefault();
+        clearLaybyUser();
         setSaleMode('full');
         const { min } = getLaybyConfig();
         const pctInput = document.getElementById('laybyDepositPercentInput');
@@ -635,10 +720,25 @@
             });
         }
 
-        // Close search dropdown when clicking outside
+        // Layby user search
+        const laybyUserSearch = document.getElementById('laybyUserSearch');
+        if (laybyUserSearch) {
+            laybyUserSearch.addEventListener('input', () => {
+                clearTimeout(userSearchTimer);
+                userSearchTimer = setTimeout(() => runLaybyUserSearch(laybyUserSearch.value), 350);
+            });
+            laybyUserSearch.addEventListener('focus', () => {
+                if (laybyUserSearch.value.trim().length >= 2) runLaybyUserSearch(laybyUserSearch.value);
+            });
+        }
+
+        // Close search dropdowns when clicking outside
         document.addEventListener('click', (e) => {
             if (!e.target.closest('#offlineLineModal .offline-product-search')) {
                 closeModalSearchDropdown();
+            }
+            if (!e.target.closest('#laybyUserSearch, #laybyUserSearchResults')) {
+                closeLaybyUserDropdown();
             }
         }, true);
 

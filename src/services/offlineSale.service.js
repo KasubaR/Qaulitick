@@ -9,6 +9,7 @@ const { sequelize } = require('../config/mysql');
 const OfflineSale = require('../models/OfflineSale.model');
 const Product = require('../models/Product.model');
 const Admin = require('../models/Admin.model');
+const User = require('../models/User.model');
 const LaybyPlan = require('../models/LaybyPlan.model');
 const LaybyPayment = require('../models/LaybyPayment.model');
 const laybyService = require('./layby.service');
@@ -286,6 +287,18 @@ async function createOfflineLaybySale(payload, admin) {
         throw err;
     }
 
+    if (payload.userId == null || payload.userId === '') {
+        const err = new Error('A registered customer account is required for layby sales');
+        err.statusCode = 400;
+        throw err;
+    }
+    const userId = parseInt(String(payload.userId), 10);
+    if (Number.isNaN(userId) || userId < 1) {
+        const err = new Error('Invalid customer account');
+        err.statusCode = 400;
+        throw err;
+    }
+
     const soldAt = payload.soldAt ? new Date(payload.soldAt) : new Date();
     if (Number.isNaN(soldAt.getTime())) {
         const err = new Error('Invalid soldAt date');
@@ -307,6 +320,13 @@ async function createOfflineLaybySale(payload, admin) {
     };
 
     return sequelize.transaction(async (t) => {
+        const user = await User.findByPk(userId, { transaction: t, attributes: ['id', 'name', 'email', 'phone'] });
+        if (!user) {
+            const err = new Error('Customer account not found');
+            err.statusCode = 404;
+            throw err;
+        }
+
         const { lines: normalizedLines, productMap } = await validateAndNormalizeOfflineItems(itemsIn, t);
 
         const subtotal = roundMoney2(
@@ -333,9 +353,9 @@ async function createOfflineLaybySale(payload, admin) {
                 soldAt,
                 items: mapLinesToSaleItems(normalizedLines),
                 totals: { subtotal, total },
-                customerName: payload.customerName?.trim() || null,
-                customerEmail: payload.customerEmail?.trim() || null,
-                customerPhone: payload.customerPhone?.trim() || null,
+                customerName: payload.customerName?.trim() || user.name || null,
+                customerEmail: payload.customerEmail?.trim() || user.email || null,
+                customerPhone: payload.customerPhone?.trim() || user.phone || null,
                 notes: payload.notes?.trim() || null,
                 createdByAdminId: Number.isNaN(adminId) ? null : adminId,
                 createdByAdminEmail: adminEmail
@@ -348,6 +368,7 @@ async function createOfflineLaybySale(payload, admin) {
 
         const { plan, depositInstallment } = await laybyService.createFlexibleLaybyPlanAndPayments({
             offlineSaleId: sale.id,
+            userId,
             orderTotal: total,
             depositPercentInput: payload.depositPercent,
             planPeriodDays,
