@@ -201,7 +201,7 @@ exports.getPlan = async (req, res) => {
         // do not inherit the transaction — accepted limitation since LaybyPayment
         // rows are structural and rarely change mid-request.
         const { plan, paymentHistory } = await LaybyPlan.sequelize.transaction(
-            { isolationLevel: LaybyPlan.sequelize.Transaction.ISOLATION_LEVELS.REPEATABLE_READ },
+            { isolationLevel: 'REPEATABLE READ' },
             async (t) => {
                 const fetchedPlan = await LaybyPlan.findByPk(id, {
                     transaction: t,
