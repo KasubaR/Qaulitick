@@ -18,7 +18,7 @@
     display: flex;
     gap: 0;
     margin-bottom: 20px;
-    border: 1px solid var(--border-color, #333);
+    border: 1px solid var(--border, rgba(0, 0, 0, 0.15));
     border-radius: 6px;
     overflow: hidden;
     width: fit-content;
@@ -27,8 +27,8 @@
 .offline-sale-type-btn {
     padding: 10px 20px;
     border: none;
-    background: var(--bg-secondary, #1a1a1a);
-    color: var(--text-muted, #aaa);
+    background: var(--surface-2, #f3f3f1);
+    color: var(--text-muted, #888);
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
@@ -36,7 +36,7 @@
 }
 
 .offline-sale-type-btn:hover {
-    color: var(--text-primary, #fff);
+    color: var(--text, #070707);
 }
 
 .offline-sale-type-btn.is-active {
