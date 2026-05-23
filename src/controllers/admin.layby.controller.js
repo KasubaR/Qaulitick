@@ -135,7 +135,7 @@ exports.listPlans = async (req, res) => {
                 { model: User, as: 'user', attributes: [], required: false }
             ],
             distinct: true,
-            col: 'LaybyPlan.id'
+            col: 'id'
         });
 
         const rows = await LaybyPlan.findAll({
