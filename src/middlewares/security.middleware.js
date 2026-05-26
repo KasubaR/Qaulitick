@@ -116,28 +116,26 @@ function rateLimit(options = {}) {
         try {
             const now = Date.now();
 
-            // Lock the row (or gap for new keys) then write — eliminates the read/write race.
-            // SELECT FOR UPDATE in InnoDB holds an exclusive lock until commit, so no other
-            // connection can increment or delete the key between our read and our write.
-            const { count, resetTime } = await sequelize.transaction(async (t) => {
-                const [[row]] = await sequelize.query(
-                    'SELECT count, reset_time FROM rate_limits WHERE rl_key = :key FOR UPDATE',
-                    { replacements: { key }, transaction: t }
-                );
+            // Single atomic upsert — no transaction or SELECT FOR UPDATE needed.
+            // SELECT FOR UPDATE on new keys acquires an InnoDB gap lock; two concurrent
+            // requests on the same new key each hold that gap lock and then deadlock on
+            // INSERT. Replacing it with a pure UPSERT eliminates the gap-lock entirely.
+            await sequelize.query(
+                `INSERT INTO rate_limits (rl_key, count, reset_time)
+                 VALUES (:key, 1, :now)
+                 ON DUPLICATE KEY UPDATE
+                   count      = IF(reset_time + :windowMs <= :now, 1, count + 1),
+                   reset_time = IF(reset_time + :windowMs <= :now, :now, reset_time)`,
+                { replacements: { key, now, windowMs } }
+            );
 
-                const expired      = !row || row.reset_time + windowMs <= now;
-                const newCount     = expired ? 1 : row.count + 1;
-                const newResetTime = expired ? now : row.reset_time;
+            const [[row]] = await sequelize.query(
+                'SELECT count, reset_time FROM rate_limits WHERE rl_key = :key',
+                { replacements: { key } }
+            );
 
-                await sequelize.query(
-                    `INSERT INTO rate_limits (rl_key, count, reset_time)
-                     VALUES (:key, :count, :resetTime)
-                     ON DUPLICATE KEY UPDATE count = :count, reset_time = :resetTime`,
-                    { replacements: { key, count: newCount, resetTime: newResetTime }, transaction: t }
-                );
-
-                return { count: newCount, resetTime: newResetTime };
-            });
+            const count     = row?.count      ?? 1;
+            const resetTime = row?.reset_time ?? now;
 
             if (count > max) return sendLimited(count, resetTime, now);
 

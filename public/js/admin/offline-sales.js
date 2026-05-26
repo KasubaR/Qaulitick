@@ -157,6 +157,10 @@
                     : '<i class="fas fa-check"></i> Save sale';
         }
 
+        document.querySelectorAll('.offline-customer-field').forEach((el) => {
+            el.style.display = saleMode === 'layby' ? 'none' : '';
+        });
+
         if (saleMode === 'layby') recalcLaybyDisplay();
     }
 

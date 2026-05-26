@@ -423,6 +423,16 @@ async function initiateMobileMoneyPayment(orderData, customerPhone, provider, am
 
     const paymentReference = generatePaymentReference(orderData.orderNumber);
 
+    // Normalize phone to +260XXXXXXXXX (Lenco requires international format)
+    const normalizedPhone = (() => {
+        const stripped = customerPhone.replace(/\s+/g, '');
+        if (/^\+260\d{9}$/.test(stripped)) return stripped;          // already correct
+        if (/^260\d{9}$/.test(stripped))   return `+${stripped}`;    // missing leading +
+        if (/^0\d{9}$/.test(stripped))     return `+260${stripped.slice(1)}`; // local 0XXXXXXXXX
+        if (/^\d{9}$/.test(stripped))      return `+260${stripped}`;  // bare 9-digit
+        return stripped; // unrecognised — pass through and let Lenco reject it
+    })();
+
     const rawAmount = amountOverride != null && !Number.isNaN(Number(amountOverride))
         ? Number(amountOverride)
         : Number(orderData.totals?.total);
@@ -460,13 +470,13 @@ async function initiateMobileMoneyPayment(orderData, customerPhone, provider, am
         provider: provider.toLowerCase(),
         amount: chargeAmount,
         reference: paymentReference,
-        customerPhone: customerPhone.replace(/(\d{3})(\d{3})(\d{3})/, '***-***-$3') // Mask phone for privacy
+        customerPhone: normalizedPhone.replace(/(\+\d{3})(\d{3})(\d{3})(\d{3})/, '$1-***-***-$4') // Mask phone for privacy
     });
 
     try {
         // Prepare payment request payload (Lenco's required format)
         const paymentPayload = {
-            phone: customerPhone,              // Required: Customer's phone number
+            phone: normalizedPhone,            // Required: Customer's phone number (+260XXXXXXXXX)
             operator: provider.toLowerCase(),  // Required: airtel or mtn
             amount: chargeAmount,   // Required: Amount to collect
             currency: 'ZMW',                  // Required: Currency code

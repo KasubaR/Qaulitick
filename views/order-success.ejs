@@ -145,7 +145,7 @@
     </section>
 
     <script>
-        const orderNumber = <%- JSON.stringify(orderNumber) %>;
+        const orderNumber = <%- JSON.stringify(orderNumber ?? null) %>;
         if (typeof localStorage !== 'undefined') {
             localStorage.removeItem('cart');
         }
