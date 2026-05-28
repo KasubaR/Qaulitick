@@ -384,9 +384,15 @@ exports.processPayment = async (req, res) => {
                 }).catch(() => {});
 
                 const statusCode = error.name === 'validation_error' ? 400 : 500;
+                // Map known Lenco error codes to user-friendly messages
+                let userMessage = error.message || 'Failed to initiate mobile money payment';
+                if (error.errorCode === '10') {
+                    const providerName = (provider || 'mobile money').toLowerCase() === 'airtel' ? 'Airtel Money' : 'MTN Mobile Money';
+                    userMessage = `This phone number is not registered with ${providerName}. Please check your number and try again.`;
+                }
                 return res.status(statusCode).json({
                     success: false,
-                    message: error.message || 'Failed to initiate mobile money payment',
+                    message: userMessage,
                     orderNumber,
                     paymentMethod,
                     amount: authoritativeAmount,
@@ -1591,9 +1597,15 @@ exports.retryPayment = async (req, res) => {
             }
 
             logger.error({ err: error }, 'retryPayment inner handler failed');
-            return res.status(500).json({
+            let retryUserMessage = 'Failed to retry payment';
+            if (error.errorCode === '10') {
+                const providerName = (existingPayment.lencoProvider || '').toLowerCase() === 'airtel' ? 'Airtel Money' : 'MTN Mobile Money';
+                retryUserMessage = `This phone number is not registered with ${providerName}. Please check your number and try again.`;
+            }
+            const retryStatusCode = error.name === 'validation_error' ? 400 : 500;
+            return res.status(retryStatusCode).json({
                 success: false,
-                message: 'Failed to retry payment'
+                message: retryUserMessage
             });
         }
     } catch (error) {

@@ -213,7 +213,8 @@ async function makeApiRequest(config, retryCount = 0) {
         enhancedError.code = errorData.code;
         enhancedError.retryable = errorData.retryable;
         enhancedError.details = errorData.details;
-        
+        enhancedError.errorCode = errorData.errorCode;
+
         throw enhancedError;
     }
 }

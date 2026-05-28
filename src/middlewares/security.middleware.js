@@ -113,52 +113,62 @@ function rateLimit(options = {}) {
             return res.status(429).json({ success: false, message, retryAfter });
         };
 
-        try {
-            const now = Date.now();
-
-            // Single atomic upsert — no transaction or SELECT FOR UPDATE needed.
-            // SELECT FOR UPDATE on new keys acquires an InnoDB gap lock; two concurrent
-            // requests on the same new key each hold that gap lock and then deadlock on
-            // INSERT. Replacing it with a pure UPSERT eliminates the gap-lock entirely.
-            await sequelize.query(
-                `INSERT INTO rate_limits (rl_key, count, reset_time)
-                 VALUES (:key, 1, :now)
-                 ON DUPLICATE KEY UPDATE
-                   count      = IF(reset_time + :windowMs <= :now, 1, count + 1),
-                   reset_time = IF(reset_time + :windowMs <= :now, :now, reset_time)`,
-                { replacements: { key, now, windowMs } }
-            );
-
-            const [[row]] = await sequelize.query(
-                'SELECT count, reset_time FROM rate_limits WHERE rl_key = :key',
-                { replacements: { key } }
-            );
-
-            const count     = row?.count      ?? 1;
-            const resetTime = row?.reset_time ?? now;
-
-            if (count > max) return sendLimited(count, resetTime, now);
-
-            res.set({
-                'X-RateLimit-Limit': max,
-                'X-RateLimit-Remaining': Math.max(0, max - count),
-                'X-RateLimit-Reset': new Date(resetTime + windowMs).toISOString()
-            });
-
-            next();
-        } catch (error) {
-            console.error('[Rate Limit] DB error:', error.message);
-
-            if (failClosed) {
-                // Enforce limits via in-memory store so brute-force protection survives DB outages
+        // INSERT ... ON DUPLICATE KEY UPDATE can still deadlock in InnoDB when two
+        // concurrent requests race to insert the same new key (both acquire a shared
+        // gap lock then try to upgrade). Retry up to 2 times on ER_LOCK_DEADLOCK (1213).
+        let attempts = 0;
+        while (true) {
+            try {
                 const now = Date.now();
-                const entry = _memIncrement(key, windowMs, now);
-                if (entry.count > max) return sendLimited(entry.count, entry.resetTime, now);
+
+                await sequelize.query(
+                    `INSERT INTO rate_limits (rl_key, count, reset_time)
+                     VALUES (:key, 1, :now)
+                     ON DUPLICATE KEY UPDATE
+                       count      = IF(reset_time + :windowMs <= :now, 1, count + 1),
+                       reset_time = IF(reset_time + :windowMs <= :now, :now, reset_time)`,
+                    { replacements: { key, now, windowMs } }
+                );
+
+                const [[row]] = await sequelize.query(
+                    'SELECT count, reset_time FROM rate_limits WHERE rl_key = :key',
+                    { replacements: { key } }
+                );
+
+                const count     = row ? row.count      : 1;
+                const resetTime = row ? row.reset_time : now;
+
+                if (count > max) return sendLimited(count, resetTime, now);
+
+                res.set({
+                    'X-RateLimit-Limit': max,
+                    'X-RateLimit-Remaining': Math.max(0, max - count),
+                    'X-RateLimit-Reset': new Date(resetTime + windowMs).toISOString()
+                });
+
+                return next();
+            } catch (error) {
+                const isDeadlock = (error.original || error.parent || error).errno === 1213
+                    || error.message.includes('Deadlock');
+
+                if (isDeadlock && attempts < 2) {
+                    attempts++;
+                    await new Promise(r => setTimeout(r, 5 * attempts));
+                    continue;
+                }
+
+                console.error('[Rate Limit] DB error:', error.message);
+
+                if (failClosed) {
+                    const now = Date.now();
+                    const entry = _memIncrement(key, windowMs, now);
+                    if (entry.count > max) return sendLimited(entry.count, entry.resetTime, now);
+                    return next();
+                }
+
+                // Non-sensitive routes: fail open (original behaviour)
                 return next();
             }
-
-            // Non-sensitive routes: fail open (original behaviour)
-            next();
         }
     };
 }
