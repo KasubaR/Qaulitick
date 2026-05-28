@@ -32,7 +32,7 @@
                 <div class="order-details-card">
                     <div class="order-number">
                         <span class="label">Order number</span>
-                        <span class="value" id="orderNumber"><%= orderNumber %></span>
+                        <span class="value js-order-number"><%= orderNumber %></span>
                     </div>
 
                     <div class="order-info">
@@ -67,7 +67,7 @@
                 <div class="order-details-card">
                     <div class="order-number">
                         <span class="label">Order number</span>
-                        <span class="value" id="orderNumber"><%= orderNumber %></span>
+                        <span class="value js-order-number"><%= orderNumber %></span>
                     </div>
 
                     <div class="order-info">
@@ -101,7 +101,7 @@
                 <div class="order-details-card">
                     <div class="order-number">
                         <span class="label">Order number</span>
-                        <span class="value" id="orderNumber"><%= orderNumber %></span>
+                        <span class="value js-order-number"><%= orderNumber %></span>
                     </div>
 
                     <div class="order-info">
@@ -118,9 +118,9 @@
                     <a href="/" class="btn-outline">
                         <i class="fas fa-home" aria-hidden="true"></i> Back to home
                     </a>
-                    <button type="button" class="btn-outline is-hidden" id="viewOrderBtn">
+                    <a href="/account/orders" class="btn-outline">
                         <i class="fas fa-receipt" aria-hidden="true"></i> View order details
-                    </button>
+                    </a>
                 </div>
 
                 <div class="trust-badges-success">
@@ -144,8 +144,8 @@
         </div>
     </section>
 
+    <div id="order-data" data-order-number="<%= orderNumber != null ? orderNumber : '' %>" hidden></div>
     <script>
-        const orderNumber = <%- JSON.stringify(orderNumber != null ? orderNumber : null) %>;
         if (typeof localStorage !== 'undefined') {
             localStorage.removeItem('cart');
         }

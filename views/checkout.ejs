@@ -72,7 +72,7 @@
                                 </div>
                             </div>
 
-                            <% if (!loggedIn) { %>
+                            <% if (typeof loggedIn === 'undefined' || !loggedIn) { %>
                             <div class="login-prompt">
                                 <p><a href="/login?returnUrl=/checkout">Sign in</a> or <a href="/register?returnUrl=/checkout">create an account</a> for faster checkout next time.</p>
                             </div>
@@ -212,7 +212,7 @@
 
                                 <% if (typeof enableBankTransfer !== 'undefined' && enableBankTransfer) { %>
                                 <div class="payment-option">
-                                    <input type="radio" id="paymentBank" name="paymentMethod" value="bank" required>
+                                    <input type="radio" id="paymentBank" name="paymentMethod" value="bank">
                                     <label for="paymentBank" class="payment-label">
                                         <div class="payment-icon">
                                             <i class="fas fa-university"></i>
@@ -258,8 +258,8 @@
 
                         <!-- Place Order Button -->
                         <div class="form-actions">
-                            <button type="submit" class="btn-place-order" id="placeOrderBtn">
-                                <i class="fas fa-lock"></i> Place Order
+                            <button type="submit" class="btn-place-order" id="placeOrderBtn" disabled aria-disabled="true">
+                                <i class="fas fa-spinner fa-spin"></i> Loading cart...
                             </button>
                             <a href="/cart" class="btn-back-to-cart">
                                 <i class="fas fa-arrow-left"></i> Back to Cart
@@ -279,7 +279,9 @@
 
                         <!-- Cart Items List -->
                         <div class="summary-items" id="summaryItems">
-                            <!-- Cart items will be dynamically inserted here -->
+                            <p class="summary-loading" id="summaryLoading" style="color:#94a3b8;font-size:14px;text-align:center;padding:12px 0;">
+                                <i class="fas fa-spinner fa-spin"></i> Loading your cart&hellip;
+                            </p>
                         </div>
 
                         <!-- Summary Totals -->
@@ -400,7 +402,7 @@
     <!-- Payment Instructions Modal -->
     <div class="modal" id="paymentInstructionsModal" style="display: none;">
         <div class="modal-content payment-instructions-modal" style="max-width: 600px;">
-            <button class="modal-close" id="closePaymentInstructionsBtn">&times;</button>
+            <button class="modal-close js-close-payment-instructions">&times;</button>
             <div class="payment-instructions-content">
                 <h3 style="margin-bottom: 20px; color: #1e293b;">
                     <i class="fas fa-info-circle" style="color: #3b82f6;"></i> Payment Instructions
@@ -476,7 +478,7 @@
                 </div>
                 
                 <div class="payment-modal-actions">
-                    <button type="button" class="payment-modal-cancel-btn" id="closePaymentInstructionsBtn2">
+                    <button type="button" class="payment-modal-cancel-btn js-close-payment-instructions">
                         Cancel and close
                     </button>
                     <p class="payment-modal-cancel-hint">Only use this if you want to abandon this payment attempt. Your order may stay pending until payment completes or expires.</p>

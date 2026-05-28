@@ -5,7 +5,7 @@
     url: '/account/layby'
 }) %>
 
-<script type="application/json" id="account-layby-customer"><%- JSON.stringify(typeof payCustomerInfo !== 'undefined' ? payCustomerInfo : {}) %></script>
+<script type="application/json" id="account-layby-customer"><%- JSON.stringify(typeof payCustomerInfo !== 'undefined' ? payCustomerInfo : {}).replace(/</g, '\\u003c') %></script>
 
 <div class="account-page-wrap">
     <div class="account-hero">

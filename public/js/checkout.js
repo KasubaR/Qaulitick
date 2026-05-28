@@ -115,6 +115,17 @@ function setupLaybyCheckoutSection() {
 
 document.addEventListener('DOMContentLoaded', async () => {
     await loadCartItems();
+
+    // Enable submit button only after cart has loaded successfully
+    const placeOrderBtn = document.getElementById('placeOrderBtn');
+    if (placeOrderBtn) {
+        placeOrderBtn.disabled = false;
+        placeOrderBtn.removeAttribute('aria-disabled');
+        placeOrderBtn.innerHTML = '<i class="fas fa-lock"></i> Place Order';
+    }
+    const summaryLoading = document.getElementById('summaryLoading');
+    if (summaryLoading) summaryLoading.remove();
+
     setupEventListeners();
     calculateDeliveryFee();
     updateOrderSummary();
@@ -487,20 +498,12 @@ function setupEventListeners() {
         cancelPaymentBtn.addEventListener('click', closeErrorModal);
     }
 
-    // Payment instructions modal close buttons
-    const closePaymentInstructionsBtn = document.getElementById('closePaymentInstructionsBtn');
-    if (closePaymentInstructionsBtn) {
-        closePaymentInstructionsBtn.addEventListener('click', () => {
+    // Payment instructions modal close buttons (both use the shared class)
+    document.querySelectorAll('.js-close-payment-instructions').forEach(btn => {
+        btn.addEventListener('click', () => {
             closePaymentInstructionsModal();
         });
-    }
-
-    const closePaymentInstructionsBtn2 = document.getElementById('closePaymentInstructionsBtn2');
-    if (closePaymentInstructionsBtn2) {
-        closePaymentInstructionsBtn2.addEventListener('click', () => {
-            closePaymentInstructionsModal();
-        });
-    }
+    });
 
     // Real-time validation
     setupFormValidation();
@@ -880,7 +883,7 @@ async function handleFormSubmit(e) {
 
     requiredFields.forEach(fieldName => {
         const field = document.getElementById(fieldName);
-        if (field) {
+        if (field && !field.disabled) {
             if (field.type === 'checkbox') {
                 if (!field.checked) {
                     isValid = false;

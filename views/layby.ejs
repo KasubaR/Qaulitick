@@ -71,7 +71,7 @@
                     <i class="fas fa-hand-holding-usd"></i>
                 </div>
                 <h3>Pay Your Deposit</h3>
-                <p>Secure your item with a 30% deposit of the total price. Your watch is immediately reserved under your name and taken off the shelf for up to 90 days.</p>
+                <p>Secure your item with a minimum 30% deposit of the total price. Your watch is immediately reserved under your name and taken off the shelf for up to 90 days.</p>
             </div>
             <div class="layby-step-card">
                 <div class="layby-step-number">04</div>
@@ -79,7 +79,7 @@
                     <i class="fas fa-calendar-check"></i>
                 </div>
                 <h3>Pay the Balance</h3>
-                <p>Clear the remaining 70% in up to 3 monthly installments. You choose your own payment schedule — weekly or monthly — as long as it's settled within 90 days.</p>
+                <p>Pay off the remaining balance in as many payments as you like within 90 days. There is no fixed schedule — pay what you can, when you can, as long as the full balance is cleared before your deadline.</p>
             </div>
             <div class="layby-step-card">
                 <div class="layby-step-number">05</div>
@@ -111,8 +111,8 @@
             <div class="layby-policy-card">
                 <i class="fas fa-percentage"></i>
                 <div>
-                    <h4>30% Deposit</h4>
-                    <p>A non-refundable deposit of 30% of the total purchase price is required to reserve your item. This deposit confirms your commitment and holds the item exclusively for you.</p>
+                    <h4>Minimum 30% Deposit</h4>
+                    <p>A non-refundable deposit of at least 30% of the total purchase price is required to reserve your item. You may pay more upfront — the more you deposit, the less remains to pay later.</p>
                 </div>
             </div>
             <div class="layby-policy-card">
@@ -133,7 +133,7 @@
                 <i class="fas fa-exclamation-triangle"></i>
                 <div>
                     <h4>Late Payments</h4>
-                    <p>Missed a payment? You have a 7-day grace period per installment. After 7 days we will reach out — if no arrangement is made within a further 7 days, the layby is cancelled under our cancellation policy.</p>
+                    <p>Falling behind? As long as your full balance is paid within your 90-day period, there are no penalties. If you are approaching your deadline without clearing the balance, contact us — extensions may be granted at our discretion.</p>
                 </div>
             </div>
             <div class="layby-policy-card">
@@ -246,18 +246,18 @@
 </section>
 
 <script>
-    // Simple accordion for FAQ
+    // Simple accordion for FAQ — .open class is the source of truth; aria-expanded mirrors it
     document.querySelectorAll('.layby-faq-q').forEach(btn => {
         btn.addEventListener('click', () => {
             const item = btn.closest('.layby-faq-item');
-            const isOpen = btn.getAttribute('aria-expanded') === 'true';
+            const isOpen = item.classList.contains('open');
             document.querySelectorAll('.layby-faq-item').forEach(i => {
-                i.querySelector('.layby-faq-q').setAttribute('aria-expanded', 'false');
                 i.classList.remove('open');
+                i.querySelector('.layby-faq-q').setAttribute('aria-expanded', 'false');
             });
             if (!isOpen) {
-                btn.setAttribute('aria-expanded', 'true');
                 item.classList.add('open');
+                btn.setAttribute('aria-expanded', 'true');
             }
         });
     });
