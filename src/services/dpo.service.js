@@ -39,10 +39,15 @@ function getCompanyToken() {
     return String(t).trim();
 }
 
+const FALLBACK_DEV_SERVICE_TYPE = '54841'; // DPO test service type — replace with your own if different
+
 function getDefaultServiceType() {
     const s = process.env.DPO_SERVICE_TYPE;
     if (s && String(s).trim()) return String(s).trim();
-    if (process.env.NODE_ENV !== 'production') return '54841';
+    if (process.env.NODE_ENV !== 'production') {
+        console.warn(`[DPO] DPO_SERVICE_TYPE not set, using fallback "${FALLBACK_DEV_SERVICE_TYPE}" — do not use in production`);
+        return FALLBACK_DEV_SERVICE_TYPE;
+    }
     throw new Error('DPO_SERVICE_TYPE is not configured');
 }
 
@@ -60,6 +65,14 @@ function getPtlAndType() {
     return { ptl: safePtl, ptlType: type };
 }
 
+function assertSafeUrl(value, name) {
+    let parsed;
+    try { parsed = new URL(value); } catch { throw new Error(`${name} is not a valid URL`); }
+    if (!['https:', 'http:'].includes(parsed.protocol)) {
+        throw new Error(`${name} must be http or https`);
+    }
+}
+
 function postToApi(xmlBody) {
     return new Promise((resolve, reject) => {
         const base = getApiBaseUrl();
@@ -70,6 +83,7 @@ function postToApi(xmlBody) {
             hostname: url.hostname,
             path: url.pathname,
             method: 'POST',
+            timeout: 15000,
             headers: {
                 'Content-Type': 'application/xml',
                 'Content-Length': postData.length,
@@ -79,8 +93,15 @@ function postToApi(xmlBody) {
 
         const req = https.request(options, (res) => {
             let raw = '';
+            let bytesReceived = 0;
+            const MAX_BYTES = 512 * 1024; // 512 KB
             res.setEncoding('utf8');
             res.on('data', (chunk) => {
+                bytesReceived += Buffer.byteLength(chunk, 'utf8');
+                if (bytesReceived > MAX_BYTES) {
+                    req.destroy(new Error('DPO response exceeded size limit'));
+                    return;
+                }
                 raw += chunk;
             });
             res.on('end', async () => {
@@ -96,10 +117,33 @@ function postToApi(xmlBody) {
             });
         });
 
+        req.setTimeout(15000, () => {
+            req.destroy(new Error('DPO API request timed out after 15s'));
+        });
         req.on('error', reject);
         req.write(postData);
         req.end();
     });
+}
+
+/**
+ * Retry postToApi on network errors with exponential backoff.
+ * Safe for both createToken (CompanyRefUnique=1) and verifyToken (idempotent read).
+ */
+async function postToApiWithRetry(xmlBody, maxAttempts = 3) {
+    let lastErr;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            return await postToApi(xmlBody);
+        } catch (err) {
+            lastErr = err;
+            if (attempt < maxAttempts) {
+                const delayMs = 500 * Math.pow(2, attempt - 1); // 500ms, 1000ms
+                await new Promise((res) => setTimeout(res, delayMs));
+            }
+        }
+    }
+    throw lastErr;
 }
 
 /**
@@ -204,6 +248,15 @@ async function createToken(params) {
         throw new Error('createToken: amount, companyRef, redirectUrl and backUrl are required.');
     }
 
+    assertSafeUrl(redirectUrl, 'redirectUrl');
+    assertSafeUrl(backUrl, 'backUrl');
+
+    const numericAmount = parseFloat(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+        throw new Error('createToken: amount must be a positive number');
+    }
+    const safeAmount = numericAmount.toFixed(2);
+
     const companyToken = getCompanyToken();
     const { ptl, ptlType } = getPtlAndType();
     const companyRefUnique = getCompanyRefUnique();
@@ -217,7 +270,7 @@ async function createToken(params) {
   <CompanyToken>${escapeXml(companyToken)}</CompanyToken>
   <Request>createToken</Request>
   <Transaction>
-    <PaymentAmount>${escapeXml(amount)}</PaymentAmount>
+    <PaymentAmount>${escapeXml(safeAmount)}</PaymentAmount>
     <PaymentCurrency>${escapeXml(currency)}</PaymentCurrency>
     <CompanyRef>${escapeXml(companyRef)}</CompanyRef>
     <RedirectURL>${escapeXml(redirectUrl)}</RedirectURL>
@@ -238,9 +291,9 @@ async function createToken(params) {
   </Services>
 </API3G>`;
 
-    const response = await postToApi(xml);
+    const response = await postToApiWithRetry(xml);
 
-    if (response.Result !== '000') {
+    if (String(response.Result || '').trim() !== '000') {
         throw new Error(
             `createToken failed [${response.Result}]: ${response.ResultExplanation || 'unknown'}`
         );
@@ -254,6 +307,9 @@ async function createToken(params) {
     const paymentPageBase = getPaymentPageBase();
     const paymentUrl = `${paymentPageBase}?ID=${encodeURIComponent(token)}`;
 
+    const ptlMs = ptl * (ptlType === 'minutes' ? 60 : 3600) * 1000;
+    const expiresAt = new Date(Date.now() + ptlMs);
+
     return {
         token,
         transRef: response.TransRef || null,
@@ -261,7 +317,8 @@ async function createToken(params) {
         companyRef,
         ptl,
         ptlType,
-        serviceDate
+        serviceDate,
+        expiresAt
     };
 }
 
@@ -271,7 +328,7 @@ async function createToken(params) {
  */
 async function verifyToken(transactionToken) {
     if (!transactionToken) {
-        throw new Error('verifyToken: transactionToken is required.');
+        throw new Error('verifyToken: transactionToken is required');
     }
 
     const companyToken = getCompanyToken();
@@ -283,7 +340,7 @@ async function verifyToken(transactionToken) {
   <TransactionToken>${escapeXml(transactionToken)}</TransactionToken>
 </API3G>`;
 
-    const response = await postToApi(xml);
+    const response = await postToApiWithRetry(xml);
     const result = response.Result != null ? String(response.Result).trim() : '';
     const explanation = response.ResultExplanation != null ? String(response.ResultExplanation) : '';
 
