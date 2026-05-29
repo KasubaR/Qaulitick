@@ -1,3 +1,25 @@
-# Disable directory listing - prevent folder contents from being shown
-# when no index file exists (shows 403 Forbidden instead)
+# Disable directory listing
 Options -Indexes
+
+# Block access to sensitive files
+<FilesMatch "(^\.env|^\.env\..+|package\.json|package-lock\.json|server\.js|CLAUDE\.md)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Block direct access to source and config directories
+    RewriteRule ^(src|node_modules|scripts|example-dpo|views|controllers|docs|materials)(/|$) - [F,L]
+
+    # Proxy all requests to Node.js
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^(.*)$ http://127.0.0.1:3000/$1 [P,L]
+</IfModule>
+
+# Show maintenance page when Node.js is down or on server errors
+ErrorDocument 500 /maintenance.html
+ErrorDocument 502 /maintenance.html
+ErrorDocument 503 /maintenance.html
+ErrorDocument 504 /maintenance.html
