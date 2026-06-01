@@ -1,3 +1,7 @@
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+# (cPanel will auto-inject Passenger config here when the Node.js app is set up)
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+
 # Disable directory listing
 Options -Indexes
 
@@ -12,13 +16,9 @@ Options -Indexes
 
     # Block direct access to source and config directories
     RewriteRule ^(src|node_modules|scripts|example-dpo|views|controllers|docs|materials)(/|$) - [F,L]
-
-    # Proxy all requests to Node.js
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteRule ^(.*)$ http://127.0.0.1:3000/$1 [P,L]
 </IfModule>
 
-# Show maintenance page when Node.js is down or on server errors
+# Show maintenance page when Node.js/Passenger is down or on server errors
 ErrorDocument 500 /maintenance.html
 ErrorDocument 502 /maintenance.html
 ErrorDocument 503 /maintenance.html
