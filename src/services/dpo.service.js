@@ -41,6 +41,25 @@ function getCompanyToken() {
 
 const FALLBACK_DEV_SERVICE_TYPE = '54841'; // DPO test service type — replace with your own if different
 
+// Maps product gender/category to live DPO service type IDs
+const SERVICE_TYPE_MAP = {
+    'Accessories': '111574',
+    'Men':         '111981',
+    'Women':       '112141',
+    'Unisex':      '112142',
+    'Gift Picks':  '112143',
+    'Jewelry':     '112144',
+};
+
+/**
+ * Resolve a DPO service type ID from a product gender/category string.
+ * Falls back to the configured default if the category is not recognised.
+ */
+function getDpoServiceType(gender) {
+    if (gender && SERVICE_TYPE_MAP[gender]) return SERVICE_TYPE_MAP[gender];
+    return getDefaultServiceType();
+}
+
 function getDefaultServiceType() {
     const s = process.env.DPO_SERVICE_TYPE;
     if (s && String(s).trim()) return String(s).trim();
@@ -239,6 +258,7 @@ async function createToken(params) {
         backUrl,
         serviceType = getDefaultServiceType(),
         serviceDesc = 'Qualitick Collections Payment',
+        services,        // optional array of { serviceType, serviceDesc } — overrides serviceType/serviceDesc
         customerEmail = '',
         customerFirst = '',
         customerLast = ''
@@ -265,6 +285,17 @@ async function createToken(params) {
     const pad = (n) => String(n).padStart(2, '0');
     const serviceDate = `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
+    // Build <Service> blocks — use the services array if provided, otherwise fall back to single service
+    const serviceList = Array.isArray(services) && services.length > 0
+        ? services
+        : [{ serviceType, serviceDesc }];
+
+    const servicesXml = serviceList.map(s => `    <Service>
+      <ServiceType>${escapeXml(s.serviceType)}</ServiceType>
+      <ServiceDescription>${escapeXml(s.serviceDesc || serviceDesc)}</ServiceDescription>
+      <ServiceDate>${escapeXml(serviceDate)}</ServiceDate>
+    </Service>`).join('\n');
+
     const xml = `<?xml version="1.0" encoding="utf-8"?>
 <API3G>
   <CompanyToken>${escapeXml(companyToken)}</CompanyToken>
@@ -283,11 +314,7 @@ async function createToken(params) {
     ${customerLast ? `<customerLastName>${escapeXml(customerLast)}</customerLastName>` : ''}
   </Transaction>
   <Services>
-    <Service>
-      <ServiceType>${escapeXml(serviceType)}</ServiceType>
-      <ServiceDescription>${escapeXml(serviceDesc)}</ServiceDescription>
-      <ServiceDate>${escapeXml(serviceDate)}</ServiceDate>
-    </Service>
+${servicesXml}
   </Services>
 </API3G>`;
 
@@ -360,5 +387,7 @@ module.exports = {
     escapeXml,
     getApiBaseUrl,
     getPaymentPageBase,
-    getPtlAndType
+    getPtlAndType,
+    getDpoServiceType,
+    SERVICE_TYPE_MAP
 };

@@ -191,6 +191,7 @@ exports.createOrder = async (req, res) => {
                     productId: String(productObj.id),
                     sku: productObj.sku || null,
                     stock: productObj.stock,
+                    gender: productObj.gender || '',
                     selectedColor: item.variant?.color || item.color || null,
                     variant: item.variant || null
                 };

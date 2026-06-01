@@ -28,6 +28,23 @@ function getPublicBaseUrl() {
     return String(base).replace(/\/$/, '');
 }
 
+/**
+ * Build a deduplicated DPO services array from order items.
+ * One <Service> entry per distinct category in the order.
+ */
+function buildDpoServices(items, serviceDesc) {
+    const seen = new Set();
+    const services = [];
+    for (const item of (items || [])) {
+        const type = dpoService.getDpoServiceType(item.gender);
+        if (!seen.has(type)) {
+            seen.add(type);
+            services.push({ serviceType: type, serviceDesc });
+        }
+    }
+    return services.length > 0 ? services : null;
+}
+
 function splitCustomerName(name) {
     const n = (name && String(name).trim()) || '';
     if (!n) return { first: '', last: '' };
@@ -432,6 +449,7 @@ exports.processPayment = async (req, res) => {
                     redirectUrl,
                     backUrl,
                     serviceDesc,
+                    services: buildDpoServices(order.items, serviceDesc),
                     customerEmail: customerInfo.email || '',
                     customerFirst,
                     customerLast
@@ -1475,6 +1493,7 @@ exports.retryPayment = async (req, res) => {
                         redirectUrl,
                         backUrl,
                         serviceDesc,
+                        services: buildDpoServices(order.items, serviceDesc),
                         customerEmail: customerInfo.email || '',
                         customerFirst,
                         customerLast
