@@ -207,6 +207,22 @@
     color: #070707;
 }
 
+.account-stat-value--success {
+    color: #27ae60;
+}
+
+.account-stat-value--warning {
+    color: #c0392b;
+}
+
+.account-stat-value--orange {
+    color: #e67e22;
+}
+
+.account-stat-value--yellow {
+    color: #d4ac0d;
+}
+
 .account-stat-link {
     color: #333;
     font-size: 13px;

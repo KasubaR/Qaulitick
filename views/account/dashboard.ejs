@@ -38,12 +38,13 @@
         </section>
         <section class="account-card account-stat-card">
             <p class="account-stat-label">Address status</p>
-            <p class="account-stat-value"><%= dashboardStats && dashboardStats.addressCompleted ? 'Complete' : 'Needs update' %></p>
+            <p class="account-stat-value<%= dashboardStats && dashboardStats.addressCompleted ? ' account-stat-value--success' : ' account-stat-value--warning' %>"><%= dashboardStats && dashboardStats.addressCompleted ? 'Complete' : 'Needs update' %></p>
             <a href="/account/address" class="account-stat-link">Update address</a>
         </section>
         <section class="account-card account-stat-card">
             <p class="account-stat-label">Profile completion</p>
-            <p class="account-stat-value"><%= dashboardStats && dashboardStats.profileCompletionPercent != null ? dashboardStats.profileCompletionPercent : 0 %>%</p>
+            <% var profilePct = dashboardStats && dashboardStats.profileCompletionPercent != null ? dashboardStats.profileCompletionPercent : 0; %>
+            <p class="account-stat-value <%= profilePct >= 76 ? 'account-stat-value--success' : profilePct >= 51 ? 'account-stat-value--yellow' : profilePct >= 26 ? 'account-stat-value--orange' : 'account-stat-value--warning' %>"><%= profilePct %>%</p>
             <a href="/account/profile" class="account-stat-link">Complete profile</a>
         </section>
     </div>
