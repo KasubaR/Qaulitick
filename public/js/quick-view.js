@@ -240,6 +240,27 @@
                 if (!Array.isArray(imgs)) imgs = [];
                 qvImage.src = imgs[0] || '/images/placeholder.jpg';
             }
+
+            // Update stock availability and button state for selected color
+            if (currentProduct) {
+                const baseStock = Math.max(0, Number(currentProduct.stock) || 0);
+                let effectiveStock = baseStock;
+                if (colorName && Array.isArray(currentProduct.colors)) {
+                    const colorEntry = currentProduct.colors.find(function (c) {
+                        return (typeof c === 'string' ? c : (c && c.name)) === colorName;
+                    });
+                    if (colorEntry && typeof colorEntry === 'object' && colorEntry.stock != null) {
+                        effectiveStock = Math.min(baseStock, Math.max(0, Number(colorEntry.stock) || 0));
+                    }
+                }
+                const oos = effectiveStock <= 0;
+                qvQtyInput.max = oos ? 1 : effectiveStock;
+                if (parseInt(qvQtyInput.value, 10) > effectiveStock) qvQtyInput.value = 1;
+                qvQtyDec.disabled = parseInt(qvQtyInput.value, 10) <= 1;
+                qvQtyInc.disabled = oos || effectiveStock <= 1;
+                qvAddToCart.disabled = oos;
+                qvAddToCart.setAttribute('aria-disabled', oos ? 'true' : 'false');
+            }
         });
     }
 

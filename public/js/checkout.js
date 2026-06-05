@@ -1021,6 +1021,18 @@ async function handleFormSubmit(e) {
 
         // Show error modal
         document.getElementById('errorMessage').textContent = error.message || 'There was an error processing your order. Please try again.';
+
+        // For stock errors, show "Go to Cart" instead of "Retry Payment"
+        const goToCartBtn = document.getElementById('goToCartBtn');
+        const retryPaymentBtn = document.getElementById('retryPaymentBtn');
+        if (error.isStockError) {
+            if (goToCartBtn) goToCartBtn.style.display = '';
+            if (retryPaymentBtn) retryPaymentBtn.style.display = 'none';
+        } else {
+            if (goToCartBtn) goToCartBtn.style.display = 'none';
+            if (retryPaymentBtn) retryPaymentBtn.style.display = '';
+        }
+
         showCheckoutErrorModal(error.retryAfter || null);
     } finally {
         isSubmitting = false;
@@ -1101,6 +1113,10 @@ async function processOrder(orderData, formData) {
                 errorMessage += ': ' + orderResult.errors.join(', ');
             }
             const err = new Error(errorMessage);
+            if (orderResponse.status === 409) {
+                err.isStockError = true;
+                err.message = (orderResult.message || 'An item in your cart is out of stock.') + ' Please remove it from your cart and try again.';
+            }
             if (orderResponse.status === 429 && orderResult.retryAfter) {
                 err.retryAfter = orderResult.retryAfter;
             }

@@ -131,6 +131,7 @@ function postToApi(xmlBody) {
                     });
                     resolve(parsed.API3G);
                 } catch (err) {
+                    console.error('[DPO] Failed to parse API response. HTTP status:', res.statusCode, '— Raw (first 500 chars):', raw.slice(0, 500));
                     reject(new Error(`XML parse error: ${err.message}`));
                 }
             });
@@ -270,6 +271,15 @@ async function createToken(params) {
 
     assertSafeUrl(redirectUrl, 'redirectUrl');
     assertSafeUrl(backUrl, 'backUrl');
+
+    // DPO rejects localhost redirect URLs — catch this early in development
+    const redirectHost = new URL(redirectUrl).hostname;
+    if (redirectHost === 'localhost' || redirectHost === '127.0.0.1') {
+        throw new Error(
+            'DPO requires a publicly accessible redirect URL. ' +
+            'Set APP_PUBLIC_URL to a public URL (e.g. via ngrok) for local DPO testing.'
+        );
+    }
 
     const numericAmount = parseFloat(amount);
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {

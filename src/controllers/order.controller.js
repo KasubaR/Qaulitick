@@ -164,6 +164,7 @@ exports.createOrder = async (req, res) => {
                         `Insufficient stock for "${productObj.model}". Available: ${sellable}, Requested: ${requestedQuantity}`
                     );
                     err.statusCode = 409;
+                    err.productInfo = { id: productObj.id, brand: productObj.brand, model: productObj.model, sku: productObj.sku, stock: sellable };
                     throw err;
                 }
 
@@ -379,6 +380,9 @@ exports.createOrder = async (req, res) => {
         logger.error({ err: error }, 'Error creating order');
 
         if (error.statusCode === 409) {
+            if (error.productInfo) {
+                emailService.sendLowStockNotificationToAdmin(error.productInfo).catch(() => {});
+            }
             return res.status(409).json({
                 success: false,
                 message: error.message
