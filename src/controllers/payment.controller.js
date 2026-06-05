@@ -551,34 +551,31 @@ exports.handleDpoSuccess = async (req, res) => {
             return res.status(500).send('Server configuration error.');
         }
 
-        let payment = await Payment.findOne({
-            where: {
-                transactionId: token,
-                paymentMethod: 'bank_transfer'
-            }
-        });
+        // Primary lookup: transactionId holds the DPO token.
+        let payment = await Payment.findOne({ where: { transactionId: token } });
 
-        // Fallback: if transactionId was never persisted (e.g. the update failed after
-        // DPO returned the token), look up by payment ID embedded in CompanyRef.
+        // Fallback: scan metadata.companyRef (catches cases where transactionId update failed).
         if (!payment) {
             const companyRef = req.query.CompanyRef || req.query.companyref || '';
-            const idMatch = companyRef.match(/^QC-PAY-(\d+)$/i);
-            if (idMatch) {
-                payment = await Payment.findOne({
-                    where: { id: parseInt(idMatch[1], 10), paymentMethod: 'bank_transfer' }
-                });
-                // Persist the token so future lookups (scheduler, retries) work.
-                if (payment && !payment.transactionId) {
-                    await payment.update({ transactionId: token }).catch((e) => {
-                        logger.warn({ err: e }, 'handleDpoSuccess: failed to persist transactionId on fallback lookup');
-                    });
+            if (companyRef) {
+                const [results] = await Payment.sequelize.query(
+                    `SELECT id FROM payments WHERE JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.companyRef')) = ? AND status IN ('pending','processing') LIMIT 1`,
+                    { replacements: [companyRef] }
+                );
+                if (results.length) {
+                    payment = await Payment.findByPk(results[0].id);
+                    // Persist the token so future scheduler/retry lookups work.
+                    if (payment && !payment.transactionId) {
+                        await payment.update({ transactionId: token }).catch((e) => {
+                            logger.warn({ err: e }, 'handleDpoSuccess: failed to persist transactionId on fallback lookup');
+                        });
+                    }
                 }
             }
         }
 
-        const meta = payment ? payment.metadata || {} : {};
-        if (!payment || meta.gateway !== 'dpo') {
-            logger.warn({ token, query: req.query }, 'handleDpoSuccess: payment session not found');
+        if (!payment) {
+            logger.error({ token, query: req.query }, 'handleDpoSuccess: payment session not found');
             return res.status(404).send('Payment session not found.');
         }
 
@@ -634,12 +631,7 @@ exports.handleDpoCancel = async (req, res) => {
         const tokenRaw = req.query.TransactionToken || req.query.transactionToken;
         const token = tokenRaw != null ? String(tokenRaw).trim() : '';
         if (token) {
-            const payment = await Payment.findOne({
-                where: {
-                    transactionId: token,
-                    paymentMethod: 'bank_transfer'
-                }
-            });
+            const payment = await Payment.findOne({ where: { transactionId: token } });
             if (payment && (payment.metadata || {}).gateway === 'dpo' && ['pending', 'processing'].includes(payment.status)) {
                 await payment.update({
                     status: 'cancelled',
