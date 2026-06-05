@@ -26,6 +26,7 @@
                 </div>
             </div>
             
+            <% const hasOutOfStock = Array.isArray(initialCartItems) && initialCartItems.some(i => i.outOfStock); %>
             <% if (typeof cartWarnings !== 'undefined' && cartWarnings && cartWarnings.length > 0) { %>
                 <div class="cart-warnings" style="background: #fff3cd; border: 1px solid #ffc107; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
                     <strong>Please note:</strong>
@@ -64,8 +65,7 @@
                             </thead>
                             <tbody id="cartItemsBody">
                                 <% if (initialCartItems.length > 0) { %>
-                                    <% const hasOutOfStock = initialCartItems.some(i => i.outOfStock); %>
-                                    <% initialCartItems.forEach((item, index) => {
+                                                    <% initialCartItems.forEach((item, index) => {
                                         const finalPrice = typeof item.price === 'number' ? item.price : (parseFloat(item.price) || 0);
                                         const originalPrice = item.originalPrice || finalPrice;
                                         const subtotal = item.outOfStock ? 0 : finalPrice * item.quantity;
