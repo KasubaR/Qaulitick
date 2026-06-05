@@ -208,26 +208,8 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
         const items = updatedOrder.items || [];
 
         if (paymentStatus === 'completed' && previousPaymentStatus !== 'completed') {
-            // Layby orders have stock reserved at order creation — do not decrement again here.
-            // Only standard orders defer stock decrement to payment completion.
-            if (updatedOrder.checkoutMode !== 'layby') {
-                for (const item of items) {
-                    const qty = parseInt(item.quantity) || 1;
-                    const [rows] = await Product.update(
-                        { stock: sequelize.literal(`stock - ${qty}`) },
-                        {
-                            where: {
-                                id: parseInt(item.productId, 10),
-                                stock: { [Op.gte]: qty }
-                            }
-                        }
-                    );
-                    if (rows === 0) {
-                        console.warn(`[Order Service] Stock decrement skipped for product ${item.productId} on order ${orderNumber} — may have already been applied`);
-                    }
-                }
-                console.log(`[Order Service] Stock decremented for order ${orderNumber}`);
-            }
+            // Stock is reserved at order creation for all order types — no decrement needed here.
+            console.log(`[Order Service] Payment completed for order ${orderNumber} — stock already reserved at creation`);
 
         } else if ((paymentStatus === 'failed' || paymentStatus === 'cancelled') &&
                    previousPaymentStatus !== 'failed' && previousPaymentStatus !== 'cancelled') {
@@ -235,13 +217,14 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
                 const qty = parseInt(item.quantity) || 1;
                 const productId = parseInt(item.productId, 10);
 
-                // Layby reserves top-level `stock` at order creation (not colors JSON) — restore that only.
-                if (updatedOrder.checkoutMode === 'layby') {
-                    await Product.update(
-                        { stock: sequelize.literal(`stock + ${qty}`) },
-                        { where: { id: productId } }
-                    );
-                } else if (item.selectedColor) {
+                // All orders reserve top-level stock at creation — restore it on failure.
+                await Product.update(
+                    { stock: sequelize.literal(`stock + ${qty}`) },
+                    { where: { id: productId } }
+                );
+
+                // Standard color-variant orders also reserved colors[].stock — restore that too.
+                if (updatedOrder.checkoutMode !== 'layby' && item.selectedColor) {
                     const product = await Product.findByPk(productId);
                     if (product) {
                         const updatedColors = (product.colors || []).map(c =>
@@ -253,9 +236,7 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
                     }
                 }
             }
-            console.log(
-                `[Order Service] Stock restored for failed/cancelled order ${orderNumber} (layby: main stock; standard+color: colors JSON)`
-            );
+            console.log(`[Order Service] Stock restored for failed/cancelled order ${orderNumber}`);
         }
 
         console.log(`[Order Service] Order ${orderNumber} status updated from "${previousStatus}" to "${newOrderStatus}" (payment: "${previousPaymentStatus}" → "${newPaymentStatus}")`);

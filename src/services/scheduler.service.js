@@ -23,6 +23,7 @@ const {
 } = require('./paymentCompletion.service');
 const { GRACE_PERIOD_DAYS } = require('../config/layby');
 const { Op } = require('sequelize');
+const { sequelize } = require('../config/mysql');
 
 const PENDING_TTL_MS     = 10 * 60 * 1000; // 10 minutes for pending orders
 const PROCESSING_TTL_MS  = 30 * 60 * 1000; // 30 minutes for processing orders (gateway timeout)
@@ -80,6 +81,13 @@ async function expireStaleUnpaidOrders() {
                 const qty = parseInt(item.quantity) || 1;
                 const productId = parseInt(item.productId, 10);
 
+                // Restore top-level stock reserved at order creation.
+                await Product.update(
+                    { stock: sequelize.literal(`stock + ${qty}`) },
+                    { where: { id: productId } }
+                );
+
+                // Also restore colors[].stock for color-variant items.
                 if (item.selectedColor) {
                     const product = await Product.findByPk(productId);
                     if (product) {
