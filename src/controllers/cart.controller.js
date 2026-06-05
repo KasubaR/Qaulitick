@@ -218,6 +218,17 @@ exports.validateCart = async (req, res) => {
                 const itemColor = item.variant?.color || item.color || null;
                 const availableStock = getSellableUnitsForLine(productObj, itemColor);
 
+                if (availableStock === 0) {
+                    errors.push({
+                        itemId: item.id,
+                        productId: String(productObj.id),
+                        message: `"${productObj.model}"${itemColor ? ` (${itemColor})` : ''} is out of stock`,
+                        availableStock: 0,
+                        requestedQuantity: requestedQuantity
+                    });
+                    continue;
+                }
+
                 if (availableStock < requestedQuantity) {
                     warnings.push({
                         itemId: item.id,
@@ -407,6 +418,17 @@ exports.getCartItems = async (req, res) => {
             const itemColor = item.variant?.color || item.color || null;
             const sellable = getSellableUnitsForLine(productObj, itemColor);
             
+            if (sellable === 0) {
+                warnings.push({
+                    itemId: item.id,
+                    productId: String(productObj.id),
+                    message: `"${productObj.model}" is out of stock and has been removed from your cart`,
+                    availableStock: 0,
+                    requestedQuantity: requestedQuantity
+                });
+                continue;
+            }
+
             if (sellable < requestedQuantity) {
                 warnings.push({
                     itemId: item.id,
@@ -415,10 +437,10 @@ exports.getCartItems = async (req, res) => {
                     availableStock: sellable,
                     requestedQuantity: requestedQuantity
                 });
-                
+
                 item.quantity = sellable;
             }
-            
+
             // Recalculate price
             const originalPrice = productObj.price || 0;
             const discount = productObj.discount || 0;

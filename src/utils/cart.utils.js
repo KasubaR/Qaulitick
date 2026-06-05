@@ -98,6 +98,17 @@ async function parseAndValidateCartCookie(req) {
                 const itemColor = item.variant?.color || item.color || null;
                 const sellable = getSellableUnitsForLine(productObj, itemColor);
                 
+                if (sellable === 0) {
+                    warnings.push({
+                        itemId: item.id,
+                        productId: String(productObj.id),
+                        message: `"${productObj.model}" is out of stock and has been removed from your cart`,
+                        availableStock: 0,
+                        requestedQuantity: requestedQuantity
+                    });
+                    continue;
+                }
+
                 if (sellable < requestedQuantity) {
                     warnings.push({
                         itemId: item.id,

@@ -507,9 +507,12 @@ exports.processPayment = async (req, res) => {
                     })
                     .catch(() => {});
 
+                const dpoUserMessage = /^XML parse error/i.test(error.message)
+                    ? 'The payment gateway returned an unexpected response. Please try again or contact support.'
+                    : (error.message || 'Failed to initiate payment');
                 return res.status(500).json({
                     success: false,
-                    message: error.message || 'Failed to initiate payment',
+                    message: dpoUserMessage,
                     orderNumber,
                     paymentMethod,
                     amount: authoritativeAmount,
@@ -551,8 +554,7 @@ exports.handleDpoSuccess = async (req, res) => {
         const payment = await Payment.findOne({
             where: {
                 transactionId: token,
-                paymentMethod: 'bank_transfer',
-                status: { [Op.in]: ['pending', 'processing'] }
+                paymentMethod: 'bank_transfer'
             }
         });
 
@@ -564,6 +566,12 @@ exports.handleDpoSuccess = async (req, res) => {
         if (payment.status === 'completed') {
             return res.redirect(
                 `${base}/order-success/${encodeURIComponent(payment.orderNumber)}?dpo=already`
+            );
+        }
+
+        if (payment.status === 'failed' || payment.status === 'cancelled') {
+            return res.redirect(
+                `${base}/order-success/${encodeURIComponent(payment.orderNumber)}?dpo=error`
             );
         }
 
@@ -610,11 +618,10 @@ exports.handleDpoCancel = async (req, res) => {
             const payment = await Payment.findOne({
                 where: {
                     transactionId: token,
-                    paymentMethod: 'bank_transfer',
-                    status: { [Op.in]: ['pending', 'processing'] }
+                    paymentMethod: 'bank_transfer'
                 }
             });
-            if (payment && (payment.metadata || {}).gateway === 'dpo') {
+            if (payment && (payment.metadata || {}).gateway === 'dpo' && ['pending', 'processing'].includes(payment.status)) {
                 await payment.update({
                     status: 'cancelled',
                     cancelledAt: new Date(),
@@ -1550,9 +1557,12 @@ exports.retryPayment = async (req, res) => {
                         }
                     }).catch(() => {});
 
+                    const dpoRetryUserMessage = /^XML parse error/i.test(dpoError.message)
+                        ? 'The payment gateway returned an unexpected response. Please try again or contact support.'
+                        : (dpoError.message || 'Failed to initiate payment retry');
                     return res.status(500).json({
                         success: false,
-                        message: dpoError.message || 'Failed to initiate payment retry'
+                        message: dpoRetryUserMessage
                     });
                 }
             } else {
