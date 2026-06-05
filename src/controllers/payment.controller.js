@@ -551,15 +551,34 @@ exports.handleDpoSuccess = async (req, res) => {
             return res.status(500).send('Server configuration error.');
         }
 
-        const payment = await Payment.findOne({
+        let payment = await Payment.findOne({
             where: {
                 transactionId: token,
                 paymentMethod: 'bank_transfer'
             }
         });
 
+        // Fallback: if transactionId was never persisted (e.g. the update failed after
+        // DPO returned the token), look up by payment ID embedded in CompanyRef.
+        if (!payment) {
+            const companyRef = req.query.CompanyRef || req.query.companyref || '';
+            const idMatch = companyRef.match(/^QC-PAY-(\d+)$/i);
+            if (idMatch) {
+                payment = await Payment.findOne({
+                    where: { id: parseInt(idMatch[1], 10), paymentMethod: 'bank_transfer' }
+                });
+                // Persist the token so future lookups (scheduler, retries) work.
+                if (payment && !payment.transactionId) {
+                    await payment.update({ transactionId: token }).catch((e) => {
+                        logger.warn({ err: e }, 'handleDpoSuccess: failed to persist transactionId on fallback lookup');
+                    });
+                }
+            }
+        }
+
         const meta = payment ? payment.metadata || {} : {};
         if (!payment || meta.gateway !== 'dpo') {
+            logger.warn({ token, query: req.query }, 'handleDpoSuccess: payment session not found');
             return res.status(404).send('Payment session not found.');
         }
 
