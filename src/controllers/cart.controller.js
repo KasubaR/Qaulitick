@@ -418,18 +418,17 @@ exports.getCartItems = async (req, res) => {
             const itemColor = item.variant?.color || item.color || null;
             const sellable = getSellableUnitsForLine(productObj, itemColor);
             
-            if (sellable === 0) {
+            const outOfStock = sellable === 0;
+
+            if (outOfStock) {
                 warnings.push({
                     itemId: item.id,
                     productId: String(productObj.id),
-                    message: `"${productObj.model}" is out of stock and has been removed from your cart`,
+                    message: `"${productObj.model}" is out of stock`,
                     availableStock: 0,
                     requestedQuantity: requestedQuantity
                 });
-                continue;
-            }
-
-            if (sellable < requestedQuantity) {
+            } else if (sellable < requestedQuantity) {
                 warnings.push({
                     itemId: item.id,
                     productId: String(productObj.id),
@@ -437,7 +436,6 @@ exports.getCartItems = async (req, res) => {
                     availableStock: sellable,
                     requestedQuantity: requestedQuantity
                 });
-
                 item.quantity = sellable;
             }
 
@@ -447,6 +445,7 @@ exports.getCartItems = async (req, res) => {
             item.price = getSellingUnitPrice(productObj);
             item.originalPrice = originalPrice;
             item.stock = sellable;
+            item.outOfStock = outOfStock;
             item.stockStatus = getStockStatus(sellable, productObj.lowStockThreshold);
 
             validatedItems.push(item);

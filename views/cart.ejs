@@ -64,18 +64,22 @@
                             </thead>
                             <tbody id="cartItemsBody">
                                 <% if (initialCartItems.length > 0) { %>
+                                    <% const hasOutOfStock = initialCartItems.some(i => i.outOfStock); %>
                                     <% initialCartItems.forEach((item, index) => {
                                         const finalPrice = typeof item.price === 'number' ? item.price : (parseFloat(item.price) || 0);
                                         const originalPrice = item.originalPrice || finalPrice;
-                                        const subtotal = finalPrice * item.quantity;
+                                        const subtotal = item.outOfStock ? 0 : finalPrice * item.quantity;
                                         const itemId = item.id || item.productId;
                                     %>
-                                    <tr class="cart-item-row" data-item-id="<%= itemId %>">
+                                    <tr class="cart-item-row<%= item.outOfStock ? ' cart-item-oos' : '' %>" data-item-id="<%= itemId %>" data-out-of-stock="<%= item.outOfStock ? 'true' : 'false' %>">
                                         <td class="product-col" data-label="Product">
                                             <div class="cart-product">
-                                                <img src="<%= item.image || '/images/placeholder.jpg' %>" alt="<%= item.name %>" class="cart-product-image">
+                                                <img src="<%= item.image || '/images/placeholder.jpg' %>" alt="<%= item.name %>" class="cart-product-image<%= item.outOfStock ? ' cart-product-image-oos' : '' %>">
                                                 <div class="cart-product-info">
                                                     <a href="/product/<%= item.productId || item.id %>" class="cart-product-name"><%= item.name %></a>
+                                                    <% if (item.outOfStock) { %>
+                                                        <span class="oos-badge">Out of Stock</span>
+                                                    <% } %>
                                                     <% if (item.variant && (item.variant.color || item.variant.strap)) { %>
                                                         <div class="cart-product-variants">
                                                             <% if (item.variant.color) { %><span>Color: <%= item.variant.color %></span><% } %>
@@ -87,34 +91,38 @@
                                         </td>
                                         <td class="price-col" data-label="Price">
                                             <div class="price-display">
-                                                <% if (item.discount > 0 && originalPrice > finalPrice) { %>
+                                                <% if (!item.outOfStock && item.discount > 0 && originalPrice > finalPrice) { %>
                                                     <span class="original-price">K<%= originalPrice.toLocaleString() %></span>
                                                     <span class="discount-badge">-<%= item.discount %>%</span>
                                                 <% } %>
-                                                <span class="current-price">K<%= finalPrice.toLocaleString() %></span>
+                                                <span class="current-price" style="<%= item.outOfStock ? 'color:#999;text-decoration:line-through' : '' %>">K<%= finalPrice.toLocaleString() %></span>
                                             </div>
                                         </td>
                                         <td class="quantity-col" data-label="Quantity">
+                                            <% if (item.outOfStock) { %>
+                                                <span style="color:#999;font-size:0.85rem;">—</span>
+                                            <% } else { %>
                                             <div class="quantity-controls">
                                                 <button class="quantity-btn" data-action="decrease" data-item-id="<%= itemId %>" aria-label="Decrease quantity">
                                                     <i class="fas fa-minus"></i>
                                                 </button>
-                                                <input 
-                                                    type="number" 
-                                                    class="quantity-input" 
+                                                <input
+                                                    type="number"
+                                                    class="quantity-input"
                                                     data-action="update"
                                                     data-item-id="<%= itemId %>"
-                                                    value="<%= item.quantity %>" 
-                                                    min="1" 
+                                                    value="<%= item.quantity %>"
+                                                    min="1"
                                                     max="99"
                                                 >
                                                 <button class="quantity-btn" data-action="increase" data-item-id="<%= itemId %>" aria-label="Increase quantity">
                                                     <i class="fas fa-plus"></i>
                                                 </button>
                                             </div>
+                                            <% } %>
                                         </td>
                                         <td class="subtotal-col" data-label="Subtotal">
-                                            <span class="subtotal-amount">K<%= subtotal.toLocaleString() %></span>
+                                            <span class="subtotal-amount"><%= item.outOfStock ? '—' : 'K' + subtotal.toLocaleString() %></span>
                                         </td>
                                         <td class="action-col" data-label="Actions">
                                             <div class="cart-item-actions">
@@ -178,9 +186,12 @@
                         </div>
 
                         <!-- Checkout Button -->
-                        <button class="btn-primary btn-checkout" id="checkoutBtn" <%= initialCartItems.length > 0 ? '' : 'disabled' %>>
+                        <button class="btn-primary btn-checkout" id="checkoutBtn" <%= (initialCartItems.length > 0 && !hasOutOfStock) ? '' : 'disabled' %>>
                             <i class="fas fa-lock"></i> Proceed to Checkout
                         </button>
+                        <% if (hasOutOfStock) { %>
+                            <p style="color:#c0392b;font-size:0.82rem;margin:8px 0 0;text-align:center;">Remove out-of-stock items to proceed</p>
+                        <% } %>
 
                         <!-- Trust Badges -->
                         <div class="trust-badges-summary">
@@ -204,7 +215,7 @@
                         <div class="sticky-total">
                             <span>Total: <strong id="mobileTotal">K<%= (typeof initialCartTotals !== 'undefined' && initialCartTotals) ? initialCartTotals.total.toLocaleString() : '0' %></strong></span>
                         </div>
-                        <button class="btn-primary btn-checkout-mobile" id="checkoutBtnMobile" <%= initialCartItems.length > 0 ? '' : 'disabled' %>>
+                        <button class="btn-primary btn-checkout-mobile" id="checkoutBtnMobile" <%= (initialCartItems.length > 0 && !hasOutOfStock) ? '' : 'disabled' %>>
                             Checkout
                         </button>
                     </div>
@@ -226,6 +237,22 @@
         </div>
     </div>
 
+    <style>
+        .cart-item-oos { opacity: 0.65; }
+        .cart-product-image-oos { filter: grayscale(100%); }
+        .oos-badge {
+            display: inline-block;
+            background: #c0392b;
+            color: #fff;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            padding: 2px 8px;
+            border-radius: 3px;
+            margin-top: 4px;
+            text-transform: uppercase;
+        }
+    </style>
     <script src="/js/cart.js"></script>
 <%- include('partials/footer') %>
 

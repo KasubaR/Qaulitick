@@ -14,12 +14,12 @@ function initializeCartPage() {
     const serverRenderedItems = getServerRenderedCartItems();
     
     if (serverRenderedItems && serverRenderedItems.length > 0) {
-        // Use server-rendered items (SSR) - no need to reload from cookies
         cartPageItems = serverRenderedItems;
-        // Sync server-corrected prices back to cookie/localStorage so future
-        // requests don't trigger stale-price mismatch warnings.
+        // Auto-remove OOS items from storage so they're gone on next visit.
+        // We keep them in cartPageItems for this page render so the user sees the badge.
+        const inStockOnly = serverRenderedItems.filter(i => !i.outOfStock);
         if (typeof window.setCartItems === 'function') {
-            window.setCartItems(serverRenderedItems);
+            window.setCartItems(inStockOnly);
         }
     } else {
         // No server-rendered items, load from cookies/localStorage (client-side only)
@@ -97,6 +97,7 @@ function getServerRenderedCartItems() {
                 quantity: quantity,
                 image: image,
                 variant: variant,
+                outOfStock: row.dataset.outOfStock === 'true',
                 displayPrice: `K${price.toLocaleString()}`
             });
         });
@@ -500,8 +501,9 @@ function renderCart() {
 // Create cart item row
 function createCartItemRow(item, index) {
     const row = document.createElement('tr');
-    row.className = 'cart-item-row';
+    row.className = 'cart-item-row' + (item.outOfStock ? ' cart-item-oos' : '');
     row.dataset.itemId = item.id;
+    row.dataset.outOfStock = item.outOfStock ? 'true' : 'false';
     
     // ✅ Normalize price to number (handle both string and number for backward compatibility)
     // Note: item.price is already the final discounted price from server
@@ -523,12 +525,14 @@ function createCartItemRow(item, index) {
     
     const subtotal = finalPrice * item.quantity;
     
+    const itemIdAttr = item.id || item.productId;
     row.innerHTML = `
         <td class="product-col" data-label="Product">
             <div class="cart-product">
-                <img src="${item.image}" alt="${item.name}" class="cart-product-image">
+                <img src="${item.image}" alt="${item.name}" class="cart-product-image${item.outOfStock ? ' cart-product-image-oos' : ''}">
                 <div class="cart-product-info">
                     <a href="/product/${item.productId || item.id}" class="cart-product-name">${escapeHtml(item.name)}</a>
+                    ${item.outOfStock ? '<span class="oos-badge">Out of Stock</span>' : ''}
                     ${item.variant && (item.variant.color || item.variant.strap) ? `
                         <div class="cart-product-variants">
                             ${item.variant.color ? `<span>Color: ${escapeHtml(item.variant.color)}</span>` : ''}
@@ -547,38 +551,39 @@ function createCartItemRow(item, index) {
         </td>
         <td class="price-col" data-label="Price">
             <div class="price-display">
-                ${item.discount > 0 && originalPrice > finalPrice ? `
+                ${!item.outOfStock && item.discount > 0 && originalPrice > finalPrice ? `
                     <span class="original-price">K${originalPrice.toLocaleString()}</span>
                     <span class="discount-badge">-${item.discount}%</span>
                 ` : ''}
-                <span class="current-price">K${finalPrice.toLocaleString()}</span>
+                <span class="current-price" style="${item.outOfStock ? 'color:#999;text-decoration:line-through' : ''}">K${finalPrice.toLocaleString()}</span>
             </div>
         </td>
         <td class="quantity-col" data-label="Quantity">
+            ${item.outOfStock ? '<span style="color:#999;font-size:0.85rem;">—</span>' : `
             <div class="quantity-controls">
-                <button class="quantity-btn" data-action="decrease" data-item-id="${item.id || item.productId}" aria-label="Decrease quantity">
+                <button class="quantity-btn" data-action="decrease" data-item-id="${itemIdAttr}" aria-label="Decrease quantity">
                     <i class="fas fa-minus"></i>
                 </button>
-                <input 
-                    type="number" 
-                    class="quantity-input" 
+                <input
+                    type="number"
+                    class="quantity-input"
                     data-action="update"
-                    data-item-id="${item.id || item.productId}"
-                    value="${item.quantity}" 
-                    min="1" 
+                    data-item-id="${itemIdAttr}"
+                    value="${item.quantity}"
+                    min="1"
                     max="99"
                 >
-                <button class="quantity-btn" data-action="increase" data-item-id="${item.id || item.productId}" aria-label="Increase quantity">
+                <button class="quantity-btn" data-action="increase" data-item-id="${itemIdAttr}" aria-label="Increase quantity">
                     <i class="fas fa-plus"></i>
                 </button>
-            </div>
+            </div>`}
         </td>
         <td class="subtotal-col" data-label="Subtotal">
-            <span class="subtotal-amount">K${subtotal.toLocaleString()}</span>
+            <span class="subtotal-amount">${item.outOfStock ? '—' : 'K' + subtotal.toLocaleString()}</span>
         </td>
         <td class="action-col" data-label="Actions">
             <div class="cart-item-actions">
-                <button class="action-btn remove-btn" data-action="remove" data-item-id="${item.id || item.productId}" title="Remove Item">
+                <button class="action-btn remove-btn" data-action="remove" data-item-id="${itemIdAttr}" title="Remove Item">
                     <i class="fas fa-trash"></i>
                 </button>
             </div>
@@ -820,28 +825,28 @@ function removeItem(index) {
 
 // Update order summary
 function updateOrderSummary() {
-    // Calculate subtotal
+    const hasOutOfStockItems = cartPageItems.some(i => i.outOfStock);
+
+    // Calculate subtotal — exclude out-of-stock items
     let subtotal = 0;
     cartPageItems.forEach(item => {
-        // ✅ Normalize price to number (item.price is already the final discounted price from server)
+        if (item.outOfStock) return;
         let finalPrice;
         if (typeof item.price === 'number') {
             finalPrice = item.price;
         } else if (typeof item.price === 'string') {
-            // Backward compatibility: parse string price
             finalPrice = parseFloat(String(item.price).replace(/[K,]/g, '')) || 0;
         } else {
             finalPrice = 0;
         }
-        
-        // Use finalPrice directly (discount already applied by server)
         subtotal += finalPrice * item.quantity;
     });
-    
-    // Calculate shipping from per-product shipping prices (once per unique product)
+
+    // Calculate shipping from per-product shipping prices (once per unique in-stock product)
     const seenIds = new Set();
     let shipping = 0;
     cartPageItems.forEach(item => {
+        if (item.outOfStock) return;
         const pid = item.productId || item.id;
         if (!seenIds.has(pid)) {
             seenIds.add(pid);
@@ -887,8 +892,8 @@ function updateOrderSummary() {
         mobileTotal.textContent = `K${total.toLocaleString()}`;
     }
     
-    // Enable/disable checkout buttons
-    const canCheckout = cartPageItems.length > 0;
+    // Enable/disable checkout buttons — blocked if cart is empty or any item is out of stock
+    const canCheckout = cartPageItems.length > 0 && !hasOutOfStockItems;
     if (checkoutBtn) {
         checkoutBtn.disabled = !canCheckout;
     }
