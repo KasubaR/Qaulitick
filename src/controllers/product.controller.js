@@ -264,9 +264,11 @@ exports.renderProductDetails = async (req, res) => {
         
         const keywords = `${productObj.brand}, ${productObj.model}, luxury watch, AAA replica, ${productObj.movement}, ${productObj.gender} watch, premium timepiece`;
         const canonicalUrl = `https://qualitick-collections.com/product/${productSlug}`;
-        const ogImage = productObj.images && productObj.images[0] 
-            ? productObj.images[0] 
-            : 'https://qualitick-collections.com/images/default-watch.jpg';
+        const baseUrl = process.env.APP_PUBLIC_URL || 'https://qualitickzm.com';
+        const rawOgImage = productObj.images && productObj.images[0] ? productObj.images[0] : '';
+        const ogImage = rawOgImage
+            ? (rawOgImage.startsWith('http') ? rawOgImage : `${baseUrl}${rawOgImage}`)
+            : `${baseUrl}/images/default-watch.jpg`;
         
         // Calculate prices
         // In the DB, productObj.price is the current selling price.
