@@ -191,6 +191,17 @@
     white-space: nowrap;
 }
 
+.layby-order-summary__line-variants {
+    display: block;
+}
+
+.layby-order-summary__line-variant {
+    display: inline-block;
+    font-size: 11px;
+    color: var(--text-muted, #64748b);
+    margin-right: 8px;
+}
+
 .layby-order-summary__totals {
     border-top: 1px dashed var(--border, #cbd5e1);
     padding-top: 12px;

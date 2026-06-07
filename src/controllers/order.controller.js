@@ -260,11 +260,9 @@ exports.createOrder = async (req, res) => {
                 updatedAt: new Date().toISOString()
             };
 
-            // Colour variants: always enforce per-shade availability against `colors[].stock`.
-            // Standard checkout: decrement that JSON now; top-level `stock` is reduced when payment
-            // completes (order.service updateOrderStatusFromPayment).
-            // Layby: the reservation loop below decrements top-level `stock` only — do not also
-            // mutate `colors` here or units are reserved twice (JSON shade + global).
+            // Colour variants: enforce per-shade availability and decrement colors[].stock
+            // for all checkout modes so the client-side stock display stays accurate.
+            // Top-level `stock` is decremented separately below for all modes.
             for (const item of validatedItems) {
                 if (!item.selectedColor) continue;
 
@@ -278,10 +276,6 @@ exports.createOrder = async (req, res) => {
                     );
                     err.statusCode = 409;
                     throw err;
-                }
-
-                if (checkoutMode === 'layby') {
-                    continue;
                 }
 
                 const updatedColors = (freshProduct.colors || []).map(c =>
@@ -393,6 +387,13 @@ exports.createOrder = async (req, res) => {
 
         if (error.statusCode === 403) {
             return res.status(403).json({
+                success: false,
+                message: error.message
+            });
+        }
+
+        if (error.statusCode === 422) {
+            return res.status(422).json({
                 success: false,
                 message: error.message
             });

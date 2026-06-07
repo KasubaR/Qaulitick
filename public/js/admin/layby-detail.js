@@ -161,13 +161,20 @@ function renderOrderSummary(order) {
         const qty = it.quantity || 1;
         const price = Number(it.price != null ? it.price : it.unitPrice) || 0;
         const line = price * qty;
+        const selectedColor = it.selectedColor || it.variant?.color || null;
+        const selectedStrap = it.variant?.strap || null;
+        let variantMeta = '';
+        if (selectedColor) variantMeta += '<span class="layby-order-summary__line-variant">Color: ' + escapeHtml(selectedColor) + '</span>';
+        if (selectedStrap) variantMeta += '<span class="layby-order-summary__line-variant">Strap: ' + escapeHtml(selectedStrap) + '</span>';
         linesHtml +=
             '<li class="layby-order-summary__line">' +
             '<span class="layby-order-summary__line-name">' +
             escapeHtml(name) +
             '<span class="layby-order-summary__line-meta">× ' +
             String(qty) +
-            '</span></span>' +
+            '</span>' +
+            (variantMeta ? '<span class="layby-order-summary__line-variants">' + variantMeta + '</span>' : '') +
+            '</span>' +
             '<span class="layby-order-summary__line-price">' +
             formatZmw(line) +
             '</span></li>';

@@ -223,8 +223,8 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
                     { where: { id: productId } }
                 );
 
-                // Standard color-variant orders also reserved colors[].stock — restore that too.
-                if (updatedOrder.checkoutMode !== 'layby' && item.selectedColor) {
+                // All color-variant orders reserve colors[].stock at creation — restore that too.
+                if (item.selectedColor) {
                     const product = await Product.findByPk(productId);
                     if (product) {
                         const updatedColors = (product.colors || []).map(c =>

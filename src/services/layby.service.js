@@ -72,11 +72,12 @@ function clampDepositPercent(input) {
 }
 
 /**
- * Restore top-level product stock from line items (layby cancel).
- * @param {Array<{ productId?: *, quantity?: * }>} items
+ * Restore product stock from line items (layby cancel).
+ * @param {Array<{ productId?: *, quantity?: *, selectedColor?: string }>} items
  * @param {import('sequelize').Transaction} transaction
+ * @param {{ restoreColorStock?: boolean }} [opts] - set restoreColorStock:true for offline sales which decrement colors[].stock at creation
  */
-async function restoreStockFromLineItems(items, transaction) {
+async function restoreStockFromLineItems(items, transaction, opts = {}) {
     const list = Array.isArray(items) ? items : [];
     for (const item of list) {
         const qty = parseInt(item.quantity, 10) || 1;
@@ -84,6 +85,18 @@ async function restoreStockFromLineItems(items, transaction) {
         if (!productId) continue;
 
         await Product.increment('stock', { by: qty, where: { id: productId }, transaction });
+
+        if (opts.restoreColorStock && item.selectedColor) {
+            const product = await Product.findByPk(productId, { transaction });
+            if (product) {
+                const updatedColors = (product.colors || []).map(c =>
+                    c.name === item.selectedColor
+                        ? { ...c, stock: (Number(c.stock) || 0) + qty }
+                        : c
+                );
+                await product.update({ colors: updatedColors }, { transaction });
+            }
+        }
     }
 }
 
@@ -103,6 +116,18 @@ async function createFlexibleLaybyPlanAndPayments({
 }) {
     if (!orderId && !offlineSaleId) {
         throw new Error('Layby plan requires orderId or offlineSaleId');
+    }
+
+    if (userId) {
+        const activeCount = await LaybyPlan.count({
+            where: { userId, status: 'active' },
+            transaction
+        });
+        if (activeCount >= 2) {
+            const err = new Error('You already have 2 active layby plans. Please complete or cancel an existing plan before starting a new one.');
+            err.statusCode = 422;
+            throw err;
+        }
     }
 
     const total = roundMoney2(orderTotal);
@@ -696,7 +721,7 @@ async function cancelLaybyPlan(planId, opts = {}) {
             ? await Order.findByPk(plan.orderId, { transaction: t, lock: t.LOCK.UPDATE })
             : null;
         if (order) {
-            await restoreStockFromLineItems(order.items || [], t);
+            await restoreStockFromLineItems(order.items || [], t, { restoreColorStock: true });
 
             order.status = 'cancelled';
             order.history = Array.isArray(order.history) ? [...order.history] : [];
@@ -716,7 +741,7 @@ async function cancelLaybyPlan(planId, opts = {}) {
             });
             if (offlineSale) {
                 const items = offlineSale.items || [];
-                await restoreStockFromLineItems(items, t);
+                await restoreStockFromLineItems(items, t, { restoreColorStock: true });
             }
         }
 

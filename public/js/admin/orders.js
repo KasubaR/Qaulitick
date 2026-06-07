@@ -996,7 +996,9 @@ function loadOrderItems(items) {
         
         const quantity = item.quantity || 1;
         const subtotal = unitPrice * quantity;
-        
+        const selectedColor = item.selectedColor || item.variant?.color || null;
+        const selectedStrap = item.variant?.strap || null;
+
         return `
         <div class="order-item-card">
             <img src="${esc(item.image || '/images/placeholder.jpg')}" alt="${esc(item.name)}" class="order-item-image">
@@ -1005,6 +1007,8 @@ function loadOrderItems(items) {
                 <div class="order-item-sku">SKU: ${esc(item.sku || 'N/A')}</div>
                 <div class="order-item-meta">
                     <span>Quantity: ${quantity}</span>
+                    ${selectedColor ? `<span>Color: ${esc(selectedColor)}</span>` : ''}
+                    ${selectedStrap ? `<span>Strap: ${esc(selectedStrap)}</span>` : ''}
                 </div>
             </div>
             <div class="order-item-price">
