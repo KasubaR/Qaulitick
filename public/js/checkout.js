@@ -745,9 +745,15 @@ function updateOrderSummary() {
 
         const infoDiv = document.createElement('div');
         infoDiv.className = 'summary-item-info';
+        const itemColor = item.variant?.color || item.color || null;
+        const itemStrap = item.variant?.strap || item.strap || null;
+        const variantLine = [
+            itemColor ? `Color: ${escapeHtml(itemColor)}` : '',
+            itemStrap ? `Strap: ${escapeHtml(itemStrap)}` : ''
+        ].filter(Boolean).join(' · ');
         infoDiv.innerHTML = `
             <div class="summary-item-name">${escapeHtml(item.name)}</div>
-            <div class="summary-item-details">Qty: ${quantity}</div>
+            <div class="summary-item-details">Qty: ${quantity}${variantLine ? ` · ${variantLine}` : ''}</div>
             <div class="summary-item-price">K${(price * quantity).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
         `;
 
