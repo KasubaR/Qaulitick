@@ -44,7 +44,9 @@ function sanitizeLaybyPlanDetailForAdmin(plan) {
             items: items.map((it) => ({
                 name: it.name,
                 quantity: it.quantity,
-                price: it.price
+                price: it.price,
+                selectedColor: it.selectedColor || null,
+                variant: it.variant || null
             }))
         };
     }
@@ -74,7 +76,9 @@ function sanitizeLaybyPlanDetailForAdmin(plan) {
             items: items.map((it) => ({
                 name: it.name,
                 quantity: it.quantity,
-                price: it.unitPrice != null ? it.unitPrice : it.price
+                price: it.unitPrice != null ? it.unitPrice : it.price,
+                selectedColor: it.selectedColor || null,
+                variant: it.variant || null
             }))
         };
     }
