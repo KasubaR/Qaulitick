@@ -1541,6 +1541,97 @@ async function sendLaybyCancellationEmail({ order, reason }) {
     }
 }
 
+/**
+ * Send monthly layby payment reminder to a customer.
+ * @param {{ to: string, name: string, orderNumber: string, balanceRemaining: number }} params
+ */
+async function sendLaybyReminderEmail({ to, name, orderNumber, balanceRemaining }) {
+    const transporter = getTransporter();
+    if (!transporter) {
+        logger.warn('Cannot send layby reminder email: transporter not configured');
+        return { success: false, error: 'Email service not configured' };
+    }
+
+    const safeName = esc(name);
+    const safeOrderNumber = esc(orderNumber);
+    const balFmt = formatCurrency(balanceRemaining);
+    const siteOrigin = String(process.env.APP_PUBLIC_URL || 'https://qualitickzm.com').replace(/\/$/, '');
+
+    const html = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body { margin: 0; padding: 0; background: #f4f4f4; font-family: Arial, sans-serif; color: #333; }
+                .wrapper { max-width: 600px; margin: 30px auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+                .header { background: #FFD700; padding: 36px 30px; text-align: center; }
+                .header h1 { margin: 0; font-size: 26px; color: #222; letter-spacing: 0.5px; }
+                .header p { margin: 6px 0 0; color: #555; font-size: 14px; }
+                .body { padding: 32px 30px; }
+                .section { background: #fafafa; border-left: 4px solid #FFD700; border-radius: 4px; padding: 18px 20px; margin: 20px 0; }
+                .cta { display: inline-block; margin-top: 24px; padding: 12px 28px; background: #FFD700; color: #222; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px; }
+                .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #999; text-align: center; line-height: 1.8; }
+            </style>
+        </head>
+        <body>
+            <div class="wrapper">
+                <div class="header">
+                    <h1>Layby Payment Reminder</h1>
+                    <p>Qualitick Collections — Layby Plan</p>
+                </div>
+                <div class="body">
+                    <p>Dear ${safeName},</p>
+                    <p>This is a friendly reminder that you have an outstanding balance on your layby plan for order <strong>${safeOrderNumber}</strong>.</p>
+
+                    <div class="section">
+                        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+                            <tr>
+                                <td style="padding:8px;color:#555;">Order Number</td>
+                                <td style="padding:8px;font-weight:bold;">${safeOrderNumber}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px;color:#555;">Balance Remaining</td>
+                                <td style="padding:8px;font-weight:bold;color:#b45309;">K${balFmt}</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <p>Please make a payment at your earliest convenience to keep your layby plan active. You can view your plan and make payments from your account.</p>
+
+                    <div style="text-align:center;">
+                        <a href="${siteOrigin}/account/orders" class="cta">View My Layby Plan</a>
+                    </div>
+
+                    <p style="margin-top:24px;">If you have any questions, please don't hesitate to contact us — we're happy to help.</p>
+
+                    <div class="footer">
+                        <p><strong>Qualitick Collections</strong> — Premium Luxury Watches</p>
+                        <p>Questions? Contact us at <a href="mailto:support@qualitickzm.com" style="color:#999;">support@qualitickzm.com</a></p>
+                        <p>This is an automated message. Please do not reply directly to this email.</p>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
+
+    try {
+        const info = await transporter.sendMail({
+            from: MAIL_FROM,
+            to,
+            subject: `Layby payment reminder — order ${safeOrderNumber} — Qualitick Collections`,
+            html
+        });
+        logger.info({ orderNumber, messageId: info.messageId }, 'Layby reminder email sent');
+        return { success: true, messageId: info.messageId };
+    } catch (error) {
+        logger.error({ err: error, orderNumber }, 'Error sending layby reminder email');
+        return { success: false, error: error.message };
+    }
+}
+
 module.exports = {
     sendContactNotificationToAdmin,
     sendContactConfirmationToUser,
@@ -1555,6 +1646,7 @@ module.exports = {
     sendNewsletterWelcomeEmail,
     sendLaybyInstallmentConfirmedEmail,
     sendLaybyCancellationEmail,
+    sendLaybyReminderEmail,
     verifyTransporter
 };
 

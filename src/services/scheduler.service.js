@@ -21,6 +21,7 @@ const {
     applyPaymentStatusSideEffects,
     sendAdminPaymentNotificationOnce
 } = require('./paymentCompletion.service');
+const emailService = require('./email.service');
 const { GRACE_PERIOD_DAYS } = require('../config/layby');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/mysql');
@@ -194,6 +195,46 @@ async function flagOverdueLaybyInstallments() {
     if (cancelledCount > 0) {
         console.log(`[Scheduler] Cancelled ${cancelledCount} expired layby plan(s)`);
     }
+}
+
+/**
+ * Send layby payment reminder emails to all customers with active plans.
+ * Intended to run on the 26th of every month.
+ */
+async function sendMonthlyLaybyReminders() {
+    const activePlans = await LaybyPlan.findAll({
+        where: { status: 'active' },
+        include: [{ model: Order, as: 'order' }]
+    });
+
+    let sent = 0;
+    let skipped = 0;
+
+    for (const plan of activePlans) {
+        try {
+            const order = plan.order;
+            if (!order) { skipped++; continue; }
+            const orderJson = order.toJSON ? order.toJSON() : order;
+            const customerEmail = orderJson.customer?.email;
+            const customerName  = orderJson.customer?.name || 'Valued Customer';
+            if (!customerEmail) { skipped++; continue; }
+
+            const balance = Number(plan.balanceRemaining);
+            if (balance <= 0) { skipped++; continue; }
+
+            await emailService.sendLaybyReminderEmail({
+                to: customerEmail,
+                name: customerName,
+                orderNumber: orderJson.orderNumber || String(order.id),
+                balanceRemaining: balance
+            });
+            sent++;
+        } catch (err) {
+            console.error(`[Scheduler] Failed to send layby reminder for plan ${plan.id}:`, err.message);
+        }
+    }
+
+    console.log(`[Scheduler] Monthly layby reminders: sent=${sent}, skipped=${skipped}`);
 }
 
 async function pollPendingLencoPayments() {
@@ -462,12 +503,26 @@ class SchedulerService {
             }
         }, PAYMENT_POLL_INTERVAL_MS);
 
+        // Send monthly layby reminders on the 26th of each month — checked once per hour
+        const laybyReminderInterval = setInterval(async () => {
+            try {
+                const now = new Date();
+                if (now.getDate() === 26 && now.getHours() === 9) {
+                    console.log('[Scheduler] 26th detected — sending monthly layby reminders...');
+                    await sendMonthlyLaybyReminders();
+                }
+            } catch (error) {
+                console.error('[Scheduler] Error during monthly layby reminder:', error);
+            }
+        }, 60 * 60 * 1000); // every hour
+
         this.intervals.push(
             cleanupDeletedInterval,
             cleanupInactiveInterval,
             expireStaleOrdersInterval,
             laybyOverdueInterval,
-            paymentPollInterval
+            paymentPollInterval,
+            laybyReminderInterval
         );
 
         // Poll pending payments quickly on startup (10s) to catch anything missed during restarts
