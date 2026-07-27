@@ -15,6 +15,9 @@ const COOKIE_CATEGORIES = {
 // Cookie consent storage key
 const CONSENT_COOKIE_NAME = 'cookie_consent';
 const CONSENT_COOKIE_EXPIRY_DAYS = 365; // Store consent for 1 year
+// Bump this when cookie categories or the privacy policy change materially,
+// to force re-consent even for visitors whose 1-year cookie hasn't expired yet.
+const CONSENT_COOKIE_VERSION = '1.0';
 
 /**
  * Set a cookie with optional expiration and attributes
@@ -143,36 +146,44 @@ function deleteCookie(name, options = {}) {
 }
 
 /**
- * Check if user has given consent for cookies
- * @returns {boolean} - True if consent has been given
+ * Check if user has given consent for cookies under the *current* consent version.
+ * A stored consent from an older version is treated the same as no consent at all,
+ * so a policy/category change re-prompts the banner even if the 1-year cookie hasn't expired.
+ * @returns {boolean} - True if valid, current-version consent has been given
  */
 function hasConsent() {
-    const consent = getCookie(CONSENT_COOKIE_NAME);
-    return consent !== null && consent !== '';
+    return getConsentPreferences() !== null;
 }
 
 /**
  * Get detailed consent preferences
- * @returns {object|null} - Consent preferences object or null if no consent
+ * @returns {object|null} - Consent preferences object, or null if there's no consent
+ *   or the stored consent is from an outdated CONSENT_COOKIE_VERSION
  */
 function getConsentPreferences() {
     try {
         const consentData = getCookie(CONSENT_COOKIE_NAME);
-        
+
         if (!consentData) {
             return null;
         }
-        
+
         // Parse consent data (stored as JSON)
         const preferences = JSON.parse(consentData);
-        
+
+        // Treat consent recorded under a previous policy version as absent, so the
+        // banner re-prompts instead of silently honoring stale, outdated choices.
+        if ((preferences.version || '1.0') !== CONSENT_COOKIE_VERSION) {
+            return null;
+        }
+
         // Ensure all categories are present with defaults
         return {
             essential: preferences.essential !== false, // Always true (required)
             analytics: preferences.analytics === true,
             preferences: preferences.preferences === true,
             timestamp: preferences.timestamp || null,
-            version: preferences.version || '1.0'
+            version: preferences.version || CONSENT_COOKIE_VERSION
         };
     } catch (error) {
         console.error('[Cookie Utils] Error parsing consent preferences:', error);
@@ -202,7 +213,7 @@ function setConsentPreferences(preferences) {
             analytics: preferences.analytics === true,
             preferences: preferences.preferences === true,
             timestamp: new Date().toISOString(),
-            version: '1.0'
+            version: CONSENT_COOKIE_VERSION
         };
         
         // Store as JSON string in cookie
@@ -295,7 +306,13 @@ function clearAnalyticsCookies() {
                 });
                 
                 if (isAnalyticsCookie) {
-                    if (deleteCookie(cookieName)) {
+                    // GA may have set these on the exact host or on the parent domain
+                    // (e.g. a leading-dot domain on a subdomain setup) - try both so the
+                    // delete-by-overwrite trick doesn't silently miss a domain mismatch.
+                    let removed = deleteCookie(cookieName);
+                    removed = deleteCookie(cookieName, { domain: window.location.hostname }) || removed;
+                    removed = deleteCookie(cookieName, { domain: '.' + window.location.hostname }) || removed;
+                    if (removed) {
                         deletedCount++;
                     }
                 }

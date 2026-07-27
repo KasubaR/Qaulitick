@@ -58,16 +58,44 @@
     <!-- Session Management (load after cookie-utils and cookie-consent) -->
     <script src="/js/session.js"></script>
 
-    <!-- Google tag (gtag.js) -->
+    <!-- Google tag (gtag.js) - only loaded once the visitor has granted Analytics consent -->
     <% if (typeof GA4_MEASUREMENT_ID !== 'undefined' && GA4_MEASUREMENT_ID) { %>
-        <script async src="https://www.googletagmanager.com/gtag/js?id=<%= GA4_MEASUREMENT_ID %>"></script>
         <script>
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            window.gtag = gtag;
-            gtag('js', new Date());
-            gtag('config', '<%= GA4_MEASUREMENT_ID %>');
-            window.GA4_MEASUREMENT_ID = '<%= GA4_MEASUREMENT_ID %>';
+            (function() {
+                var GA_ID = '<%= GA4_MEASUREMENT_ID %>';
+                window.GA4_MEASUREMENT_ID = GA_ID;
+                var scriptLoaded = false;
+
+                function loadGoogleAnalytics() {
+                    window['ga-disable-' + GA_ID] = false;
+                    if (scriptLoaded) return;
+                    scriptLoaded = true;
+                    window.dataLayer = window.dataLayer || [];
+                    window.gtag = function() { window.dataLayer.push(arguments); };
+                    var script = document.createElement('script');
+                    script.async = true;
+                    script.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+                    document.head.appendChild(script);
+                    gtag('js', new Date());
+                    gtag('config', GA_ID);
+                }
+
+                function applyConsentState() {
+                    var allowed = !!(window.CookieUtils && window.CookieUtils.isCategoryAllowed('analytics'));
+                    if (allowed) {
+                        loadGoogleAnalytics();
+                    } else {
+                        // Standard GA opt-out flag: stops any in-flight tag instance from sending hits
+                        window['ga-disable-' + GA_ID] = true;
+                    }
+                }
+
+                // Analytics may already be consented from a previous visit
+                applyConsentState();
+
+                // React immediately when the visitor accepts/rejects Analytics this session
+                window.addEventListener('cookieConsentUpdated', applyConsentState);
+            })();
         </script>
     <% } %>
 

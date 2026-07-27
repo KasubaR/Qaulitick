@@ -43,18 +43,19 @@
             </div>
         </div>
 
-        <!-- Mobile Filter Button -->
-        <button class="mobile-filter-btn" id="mobileFilterBtn">
-            <i class="fas fa-filter"></i> Filters
-        </button>
+        <!-- Filter drawer backdrop -->
+        <div class="filter-backdrop" id="filterBackdrop"></div>
 
         <!-- Shop Content -->
         <div class="shop-content">
-            <!-- Filter Sidebar -->
-            <aside class="filter-sidebar" id="filterSidebar">
+            <!-- Filter Sidebar (off-canvas drawer) -->
+            <aside class="filter-sidebar" id="filterSidebar" aria-hidden="true">
                 <div class="filter-header">
                     <h3 class="filter-title">Filters</h3>
-                    <button class="clear-filters" id="clearFiltersBtn">Clear All</button>
+                    <div class="filter-header-actions">
+                        <button class="clear-filters" id="clearFiltersBtn">Clear All</button>
+                        <button type="button" class="filter-close-btn" id="filterCloseBtn" aria-label="Close filters">&times;</button>
+                    </div>
                 </div>
 
                 <!-- Price Filter -->
@@ -198,9 +199,15 @@
 
             <!-- Product Grid -->
             <main class="product-grid-section">
-                <!-- Active Filters -->
-                <div class="active-filters" id="activeFilters">
-                    <!-- Active filters will appear here -->
+                <!-- Filter chip + active filters, all on one line -->
+                <div class="shop-filter-row">
+                    <button class="filter-chip-btn" id="filterToggleBtn" aria-expanded="false" aria-controls="filterSidebar">
+                        <i class="fas fa-filter"></i> Filters
+                        <span class="filter-chip-count" id="filterChipCount">0</span>
+                    </button>
+                    <div class="active-filters" id="activeFilters">
+                        <!-- Active filters will appear here -->
+                    </div>
                 </div>
 
                 <!-- Product Grid -->

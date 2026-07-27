@@ -62,11 +62,11 @@
     function setOpen(open) {
         if (open) {
             modal.classList.add('is-open');
-            modal.removeAttribute('hidden');
+            modal.setAttribute('aria-hidden', 'false');
             document.body.classList.add('quick-view-open');
         } else {
             modal.classList.remove('is-open');
-            modal.setAttribute('hidden', '');
+            modal.setAttribute('aria-hidden', 'true');
             document.body.classList.remove('quick-view-open');
             if (lastFocus && typeof lastFocus.focus === 'function') {
                 lastFocus.focus();

@@ -20,6 +20,7 @@
     let bannerElement = null;
     let modalElement = null;
     let isInitialized = false;
+    let keyboardListenerAttached = false;
 
     /**
      * Initialize cookie consent banner
@@ -30,12 +31,12 @@
             return;
         }
 
-        // Check if user has already given consent
+        // Check if user has already given (current-version) consent
         if (CookieUtils.hasConsent()) {
-            // User has already consented, don't show banner
-            // But mark as initialized to prevent re-initialization
-            // Also create modal in case user wants to change preferences later
-            createModal();
+            // User has already consented, don't show banner.
+            // Mount the modal (hidden) so it's ready if the visitor reopens
+            // preferences later via the footer "Cookie Settings" link.
+            mountModal();
             isInitialized = true;
             return;
         }
@@ -43,8 +44,22 @@
         // Create and show banner
         createBanner();
         showBanner();
-        
+
         isInitialized = true;
+    }
+
+    /**
+     * Ensure the modal exists and is attached to the DOM, with its listeners wired.
+     * Safe to call repeatedly - no-ops if already mounted.
+     */
+    function mountModal() {
+        if (modalElement && modalElement.parentNode) {
+            return;
+        }
+        createModal();
+        document.body.appendChild(modalElement);
+        setupModalEventListeners();
+        attachKeyboardListener();
     }
 
     /**
@@ -88,15 +103,15 @@
             </div>
         `;
 
-        // Create modal for detailed preferences
-        createModal();
-
         // Append to body first (so getElementById works)
         document.body.appendChild(bannerElement);
-        document.body.appendChild(modalElement);
 
         // Add event listeners after elements are in DOM
-        setupEventListeners();
+        setupBannerEventListeners();
+
+        // Modal is mounted (created + appended + its own listeners wired) separately
+        // so it works whether or not a banner is showing (e.g. reopened via "Cookie Settings").
+        mountModal();
     }
 
     /**
@@ -204,73 +219,69 @@
     }
 
     /**
-     * Setup event listeners
+     * Setup banner button listeners (Accept / Reject / Customize)
      */
-    function setupEventListeners() {
-        if (!bannerElement || !modalElement) {
-            console.error('[Cookie Consent] Cannot setup event listeners: banner or modal element is missing');
+    function setupBannerEventListeners() {
+        if (!bannerElement) {
+            console.error('[Cookie Consent] Cannot setup banner listeners: banner element is missing');
             return;
         }
 
-        // Accept All button
         const acceptBtn = bannerElement.querySelector('#cookieAcceptBtn');
-        if (acceptBtn) {
-            acceptBtn.addEventListener('click', handleAcceptAll);
-        } else {
-            console.warn('[Cookie Consent] Accept button not found');
-        }
+        if (acceptBtn) acceptBtn.addEventListener('click', handleAcceptAll);
 
-        // Reject All button
         const rejectBtn = bannerElement.querySelector('#cookieRejectBtn');
-        if (rejectBtn) {
-            rejectBtn.addEventListener('click', handleRejectAll);
-        } else {
-            console.warn('[Cookie Consent] Reject button not found');
-        }
+        if (rejectBtn) rejectBtn.addEventListener('click', handleRejectAll);
 
-        // Customize button
         const customizeBtn = bannerElement.querySelector('#cookieCustomizeBtn');
-        if (customizeBtn) {
-            console.log('[Cookie Consent] Customize button found, adding event listener');
-            customizeBtn.addEventListener('click', handleCustomize);
-        } else {
-            console.error('[Cookie Consent] Customize button not found!');
+        if (customizeBtn) customizeBtn.addEventListener('click', handleCustomize);
+    }
+
+    /**
+     * Setup modal button listeners (Close / Cancel / Save / overlay click).
+     * Wired independently of the banner so the modal also works when it's
+     * reopened on its own (e.g. via the footer "Cookie Settings" link) with no banner present.
+     */
+    function setupModalEventListeners() {
+        if (!modalElement) {
+            console.error('[Cookie Consent] Cannot setup modal listeners: modal element is missing');
+            return;
         }
 
-        // Modal close button
         const modalCloseBtn = modalElement.querySelector('#cookieModalCloseBtn');
-        if (modalCloseBtn) {
-            modalCloseBtn.addEventListener('click', handleModalClose);
-        } else {
-            console.warn('[Cookie Consent] Modal close button not found');
-        }
+        if (modalCloseBtn) modalCloseBtn.addEventListener('click', handleModalClose);
 
-        // Modal cancel button
         const modalCancelBtn = modalElement.querySelector('#cookieModalCancelBtn');
-        if (modalCancelBtn) {
-            modalCancelBtn.addEventListener('click', handleModalClose);
-        } else {
-            console.warn('[Cookie Consent] Modal cancel button not found');
-        }
+        if (modalCancelBtn) modalCancelBtn.addEventListener('click', handleModalClose);
 
-        // Modal save button
         const modalSaveBtn = modalElement.querySelector('#cookieModalSaveBtn');
-        if (modalSaveBtn) {
-            modalSaveBtn.addEventListener('click', handleSavePreferences);
-        } else {
-            console.warn('[Cookie Consent] Modal save button not found');
-        }
+        if (modalSaveBtn) modalSaveBtn.addEventListener('click', handleSavePreferences);
 
-        // Close modal on overlay click
         const modalOverlay = modalElement.querySelector('.cookie-consent-modal-overlay');
-        if (modalOverlay) {
-            modalOverlay.addEventListener('click', handleModalClose);
-        } else {
-            console.warn('[Cookie Consent] Modal overlay not found');
-        }
+        if (modalOverlay) modalOverlay.addEventListener('click', handleModalClose);
+    }
 
-        // Keyboard navigation
+    /**
+     * Attach the global keydown handler (Escape to close, Tab to trap focus) once.
+     * Not tied to banner/modal creation so it keeps working across re-opens.
+     */
+    function attachKeyboardListener() {
+        if (keyboardListenerAttached) return;
         document.addEventListener('keydown', handleKeyboardNavigation);
+        keyboardListenerAttached = true;
+    }
+
+    /**
+     * Reflect the currently stored consent preferences (if any) onto the modal's checkboxes,
+     * so reopening "Customize" shows what was actually chosen instead of always defaulting to unchecked.
+     */
+    function syncModalCheckboxesFromConsent() {
+        if (!modalElement) return;
+        const preferences = CookieUtils.getConsentPreferences();
+        const analyticsCheckbox = modalElement.querySelector('#cookieAnalytics');
+        const preferencesCheckbox = modalElement.querySelector('#cookiePreferences');
+        if (analyticsCheckbox) analyticsCheckbox.checked = !!(preferences && preferences.analytics);
+        if (preferencesCheckbox) preferencesCheckbox.checked = !!(preferences && preferences.preferences);
     }
 
     /**
@@ -305,12 +316,8 @@
      * Handle Customize button click
      */
     function handleCustomize() {
-        console.log('[Cookie Consent] Customize button clicked');
-        console.log('[Cookie Consent] Modal element exists:', !!modalElement);
-        if (!modalElement) {
-            console.error('[Cookie Consent] Modal element not found! Creating modal...');
-            createModal();
-        }
+        mountModal();
+        syncModalCheckboxesFromConsent();
         showModal();
     }
 
@@ -433,26 +440,15 @@
                 bannerElement = null;
             }, 300); // Wait for animation
         }
-        
-        // Clean up modal element and keyboard listener
-        if (modalElement) {
-            if (modalElement.parentNode) {
-                modalElement.parentNode.removeChild(modalElement);
-            }
-            modalElement = null;
-        }
-        
-        // Remove keyboard event listener
-        document.removeEventListener('keydown', handleKeyboardNavigation);
+        // The modal is left mounted (just hidden, no 'active' class) so it stays ready
+        // for later reopening via the footer "Cookie Settings" link without a remount step.
     }
 
     /**
      * Show modal
      */
     function showModal() {
-        console.log('[Cookie Consent] showModal called, modalElement:', modalElement);
         if (modalElement) {
-            console.log('[Cookie Consent] Adding active class to modal');
             modalElement.classList.add('active');
             modalElement.setAttribute('aria-hidden', 'false');
             document.body.style.overflow = 'hidden'; // Prevent background scrolling
@@ -481,28 +477,45 @@
     }
 
     /**
-     * Public API: Show consent banner again (for settings page)
+     * Public API: Reopen cookie preferences (used by the footer "Cookie Settings" link)
      */
     function showConsentBanner() {
         if (!CookieUtils.hasConsent()) {
+            // No valid consent yet (or it expired / was recorded under an older
+            // CONSENT_COOKIE_VERSION) - show the full banner instead of just the modal.
+            isInitialized = false;
             init();
-        } else {
-            // User has consented - show modal for preference changes
-            // Ensure modal exists (it should have been created in init(), but create if missing)
-            if (!modalElement) {
-                createModal();
-                document.body.appendChild(modalElement);
-            }
-            showModal();
+            return;
+        }
+        // Already consented - reopen the preferences modal, pre-filled with current choices.
+        mountModal();
+        syncModalCheckboxesFromConsent();
+        showModal();
+    }
+
+    /**
+     * Wire up the footer "Cookie Settings" link to reopen preferences.
+     */
+    function setupSettingsLink() {
+        const settingsLink = document.getElementById('cookieSettingsLink');
+        if (settingsLink) {
+            settingsLink.addEventListener('click', function(event) {
+                event.preventDefault();
+                showConsentBanner();
+            });
         }
     }
 
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
+        document.addEventListener('DOMContentLoaded', function() {
+            init();
+            setupSettingsLink();
+        });
     } else {
         // DOM already loaded
         init();
+        setupSettingsLink();
     }
 
     // Export public API

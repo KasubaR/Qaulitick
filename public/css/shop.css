@@ -4,6 +4,12 @@ body.shop-page {
     color: #070707;
 }
 
+/* Nav bar is hidden on the shop page - the breadcrumb already covers wayfinding,
+   and the floating cart button (see main.css) replaces cart access. */
+body.shop-page header {
+    display: none;
+}
+
 .shop-container {
     min-height: 100vh;
     padding: 40px 5% 60px;
@@ -178,44 +184,101 @@ body.shop-page {
     box-shadow: 0 0 0 2px rgba(255, 238, 193, 0.1);
 }
 
-/* Mobile Filter Button */
-.mobile-filter-btn {
-    display: none;
-    width: 100%;
-    background: var(--gold);
-    color: #fff;
-    border: none;
-    padding: 15px;
-    border-radius: 5px;
-    font-weight: 600;
-    font-size: 16px;
-    cursor: pointer;
+/* Filter chip + active-filter chips all sit on one line */
+.shop-filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
     margin-bottom: 20px;
-    transition: 0.3s;
 }
 
-.mobile-filter-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(255, 238, 193, 0.3);
+/* Filter chip - opens the filter drawer, at every breakpoint */
+.filter-chip-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid rgba(175, 144, 68, 0.35);
+    color: #2c2618;
+    padding: 10px 20px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: border-color 0.2s ease, color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
 }
 
-/* Shop Content */
+.filter-chip-btn:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(175, 144, 68, 0.18);
+}
+
+.filter-chip-btn .filter-chip-count {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    background: var(--gold-gradient-horizontal);
+    color: #fff;
+    font-size: 11px;
+    border-radius: 999px;
+}
+
+.filter-chip-btn.has-active-filters .filter-chip-count {
+    display: inline-flex;
+}
+
+/* Shop Content - product grid always has the full width; the filter panel is an off-canvas drawer, not a grid column */
 .shop-content {
-    display: grid;
-    grid-template-columns: 280px 1fr;
-    gap: 30px;
     position: relative;
 }
 
-/* Filter Sidebar */
+/* Dimmed backdrop behind the open filter drawer */
+.filter-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 1499;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+}
+
+.filter-backdrop.active {
+    display: block;
+    opacity: 1;
+}
+
+/* Filter Sidebar - off-canvas drawer that slides in from the left when the filter chip is clicked */
 .filter-sidebar {
+    position: fixed;
+    top: 0;
+    left: -340px;
+    width: 320px;
+    max-width: 85vw;
+    height: 100vh;
     background: #fff;
-    border-radius: 14px;
     padding: 25px;
-    border: 1px solid rgba(160, 115, 53, 0.2);
-    height: fit-content;
-    position: sticky;
-    top: 100px;
+    border-radius: 0;
+    border-right: 1px solid rgba(160, 115, 53, 0.2);
+    box-shadow: 8px 0 30px rgba(0, 0, 0, 0.15);
+    overflow-y: auto;
+    z-index: 1500;
+    transition: left 0.35s ease;
+}
+
+.filter-sidebar.active {
+    left: 0;
+}
+
+body.filters-open {
+    overflow: hidden;
 }
 
 .filter-header {
@@ -225,6 +288,29 @@ body.shop-page {
     margin-bottom: 25px;
     padding-bottom: 15px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.filter-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.filter-close-btn {
+    background: none;
+    border: none;
+    font-size: 22px;
+    line-height: 1;
+    color: #7a6e58;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 50%;
+    transition: 0.2s;
+}
+
+.filter-close-btn:hover {
+    background: rgba(0, 0, 0, 0.06);
+    color: #070707;
 }
 
 .filter-title {
@@ -552,13 +638,6 @@ body.shop-page {
     gap: 8px;
 }
 
-.category-chip-label {
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
-    color: #7a6e58;
-}
-
 .category-chip {
     border: 1px solid rgba(175, 144, 68, 0.35);
     background: #fff;
@@ -582,10 +661,12 @@ body.shop-page {
     color: #fff;
 }
 
-/* Product Grid - responsive layout only */
+/* Product Grid - the filter panel is off-canvas, so the grid always has the
+   full content width to itself; auto-fill naturally settles on 3-4 columns
+   on desktop and fewer as the viewport narrows (overridden below on tablet/mobile). */
 .product-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     gap: 25px;
 }
 
@@ -1046,17 +1127,14 @@ body.shop-page {
     }
 }
 
-/* Quick View Modal */
-.modal.quick-view-modal.is-open {
-    display: block;
-}
-
+/* Quick View Modal - always in the DOM; opacity/visibility + a transform on
+   the content pane drive a smooth fade + rise-in instead of a hard display toggle. */
 body.quick-view-open {
     overflow: hidden;
 }
 
 .modal {
-    display: none;
+    display: block;
     position: fixed;
     top: 0;
     left: 0;
@@ -1065,6 +1143,15 @@ body.quick-view-open {
     background: rgba(0, 0, 0, 0.5);
     z-index: 2000;
     overflow-y: auto;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+
+.modal.quick-view-modal.is-open {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.3s ease, visibility 0s linear 0s;
 }
 
 .modal-content {
@@ -1077,6 +1164,12 @@ body.quick-view-open {
     position: relative;
     border: 1px solid rgba(175, 144, 68, 0.2);
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.12);
+    transform: translateY(24px) scale(0.97);
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.modal.quick-view-modal.is-open .modal-content {
+    transform: translateY(0) scale(1);
 }
 
 .close-modal {
@@ -1280,7 +1373,7 @@ body.quick-view-open {
     min-width: 140px;
     padding: 15px;
     font-size: 16px;
-    border-radius: 5px;
+    border-radius: 40px;
     border: none;
     cursor: pointer;
     font-weight: 600;
@@ -1309,7 +1402,7 @@ body.quick-view-open {
     font-size: 16px;
     text-align: center;
     text-decoration: none;
-    border-radius: 5px;
+    border-radius: 40px;
     border: 1px solid rgba(175, 144, 68, 0.4);
     color: #070707;
     font-weight: 600;
@@ -1337,7 +1430,7 @@ body.quick-view-open {
     border: 1px solid rgba(255, 255, 255, 0.3);
     color: white;
     padding: 15px;
-    border-radius: 5px;
+    border-radius: 40px;
 }
 
 .quick-view-actions .wishlist-btn.large:hover {
@@ -1378,7 +1471,7 @@ body.quick-view-open {
     background-position: right 12px center;
     background-size: 18px 18px;
     border: 1px solid rgba(175, 144, 68, 0.3);
-    border-radius: 5px;
+    border-radius: 40px;
     cursor: pointer;
     appearance: none;
     -webkit-appearance: none;
@@ -1400,7 +1493,7 @@ body.quick-view-open {
     align-items: center;
     width: fit-content;
     background: #fff;
-    border-radius: 5px;
+    border-radius: 40px;
     overflow: hidden;
     border: 1px solid rgba(175, 144, 68, 0.2);
 }
@@ -1450,14 +1543,6 @@ body.quick-view-open {
 
 /* Responsive Styles */
 @media (max-width: 1024px) {
-    .shop-content {
-        grid-template-columns: 250px 1fr;
-    }
-
-    .product-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
     .quick-view-content {
         grid-template-columns: 1fr;
         gap: 30px;
@@ -1469,28 +1554,10 @@ body.quick-view-open {
 }
 
 @media (max-width: 768px) {
-    .mobile-filter-btn {
-        display: block;
-    }
-
     .filter-sidebar {
-        position: fixed;
-        top: 0;
-        left: -100%;
         width: 100%;
-        height: 100vh;
-        z-index: 1000;
-        border-radius: 0;
-        overflow-y: auto;
-        transition: 0.3s;
-    }
-
-    .filter-sidebar.active {
-        left: 0;
-    }
-
-    .shop-content {
-        grid-template-columns: 1fr;
+        max-width: 100%;
+        left: -100%;
     }
 
     .shop-tools {

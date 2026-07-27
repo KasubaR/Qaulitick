@@ -167,6 +167,86 @@ nav a.active {
     border: 1.5px solid #000;
 }
 
+/* ── FLOATING CART BUTTON ──
+   Stands in for the header cart icon on pages where the nav bar is hidden (shop, product). */
+.floating-cart-btn {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 1500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: var(--gold-gradient-horizontal);
+    box-shadow: 0 8px 24px rgba(175, 144, 68, 0.4);
+    text-decoration: none;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    animation: floatingCartIn 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.floating-cart-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px rgba(175, 144, 68, 0.5);
+}
+
+.floating-cart-btn img {
+    width: 1.5rem;
+    height: 1.5rem;
+    filter: brightness(0) saturate(100%);
+}
+
+.floating-cart-count {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #070707;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 999px;
+    border: 2px solid #F9F9F9;
+}
+
+.floating-cart-btn.pulse {
+    animation: floatingCartPulse 0.5s ease;
+}
+
+@keyframes floatingCartIn {
+    from {
+        opacity: 0;
+        transform: scale(0.6) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes floatingCartPulse {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.18); }
+    60% { transform: scale(0.92); }
+    100% { transform: scale(1); }
+}
+
+@media (max-width: 768px) {
+    .floating-cart-btn {
+        right: 16px;
+        bottom: 16px;
+        width: 52px;
+        height: 52px;
+    }
+}
+
 /* ── BUTTONS ── */
 .btn {
     display: inline-flex;

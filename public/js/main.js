@@ -306,6 +306,7 @@ async function addToCart(productName, price, productId = null) {
             // Reload cartItems to get validated version
             cartItems = getCartItems();
             updateCartCount();
+            pulseFloatingCart();
             showNotification(`${cartItem.name || productName} added to cart!`, 'success');
         } else {
             showNotification('Failed to save item to cart. Please try again.', 'error');
@@ -325,11 +326,27 @@ window.addToCart = addToCart;
 window.setCartItems = setCartItems;
 
 function updateCartCount() {
-    if (!cartCount) return; // Element doesn't exist on this page
-    
     // Calculate total items (sum of quantities)
     const totalItems = cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
-    cartCount.textContent = totalItems;
+
+    if (cartCount) cartCount.textContent = totalItems;
+
+    // Floating cart button (shop/product pages, where the header cart icon is hidden)
+    const floatingCartCount = document.getElementById('floatingCartCount');
+    if (floatingCartCount) floatingCartCount.textContent = totalItems;
+}
+
+/**
+ * Briefly pulse the floating cart button when an item is added, so it's
+ * noticeable on pages where the nav bar (and its cart icon) is hidden.
+ */
+function pulseFloatingCart() {
+    const floatingCartBtn = document.getElementById('floatingCartBtn');
+    if (!floatingCartBtn) return;
+    floatingCartBtn.classList.remove('pulse');
+    // Force reflow so the animation restarts if triggered again quickly
+    void floatingCartBtn.offsetWidth;
+    floatingCartBtn.classList.add('pulse');
 }
 
 // Helper function to toggle add-to-cart buttons

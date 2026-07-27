@@ -168,11 +168,8 @@ class FilterManager {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // Close mobile filter sidebar if open
-        const sidebar = document.getElementById('filterSidebar');
-        if (sidebar && sidebar.classList.contains('active')) {
-            sidebar.classList.remove('active');
-        }
+        // Close the filter drawer if open
+        closeFilterDrawer();
 
         return;
         
@@ -920,11 +917,30 @@ function setupEventListeners() {
         priceMaxInput.addEventListener('blur', validatePriceInputs);
     }
 
-    // Mobile filter button
-    const mobileFilterBtn = document.getElementById('mobileFilterBtn');
-    if (mobileFilterBtn) {
-        mobileFilterBtn.addEventListener('click', toggleFilterSidebar);
+    // Filter drawer: chip opens it, close button / backdrop / Escape close it
+    const filterToggleBtn = document.getElementById('filterToggleBtn');
+    if (filterToggleBtn) {
+        filterToggleBtn.addEventListener('click', toggleFilterDrawer);
     }
+
+    const filterCloseBtn = document.getElementById('filterCloseBtn');
+    if (filterCloseBtn) {
+        filterCloseBtn.addEventListener('click', closeFilterDrawer);
+    }
+
+    const filterBackdrop = document.getElementById('filterBackdrop');
+    if (filterBackdrop) {
+        filterBackdrop.addEventListener('click', closeFilterDrawer);
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const sidebar = document.getElementById('filterSidebar');
+            if (sidebar && sidebar.classList.contains('active')) {
+                closeFilterDrawer();
+            }
+        }
+    });
 
     // Clear filters button
     const clearFiltersBtn = document.getElementById('clearFiltersBtn');
@@ -1102,7 +1118,26 @@ function updateProductCount(count = null) {
     productCountElement.textContent = totalCount;
 }
 
+function updateFilterChipCount() {
+    const chipBtn = document.getElementById('filterToggleBtn');
+    const chipCount = document.getElementById('filterChipCount');
+    if (!chipBtn || !chipCount || !filterManager || !filterManager.filters) return;
+
+    const f = filterManager.filters;
+    const count = (f.brands ? f.brands.length : 0) +
+        (f.straps ? f.straps.length : 0) +
+        (f.ratings ? f.ratings.length : 0) +
+        (f.gender && f.gender !== 'all' ? 1 : 0) +
+        (f.lowStock ? 1 : 0) +
+        ((f.minPrice > 0 || (f.maxPrice > 0 && f.maxPrice < 10000)) ? 1 : 0);
+
+    chipCount.textContent = count;
+    chipBtn.classList.toggle('has-active-filters', count > 0);
+}
+
 function updateActiveFilters() {
+    updateFilterChipCount();
+
     const activeFilters = document.getElementById('activeFilters');
     if (!activeFilters) return;
 
@@ -1121,11 +1156,6 @@ function updateActiveFilters() {
 
     // Clear existing content
     activeFilters.innerHTML = '';
-
-    const label = document.createElement('span');
-    label.className = 'category-chip-label';
-    label.textContent = 'Category:';
-    activeFilters.appendChild(label);
 
     genderCategories.forEach(cat => {
         const chip = document.createElement('button');
@@ -1215,9 +1245,37 @@ function clearAllFilters() {
     filterManager.applyFilters();
 }
 
-function toggleFilterSidebar() {
+function openFilterDrawer() {
     const sidebar = document.getElementById('filterSidebar');
-    sidebar.classList.toggle('active');
+    const backdrop = document.getElementById('filterBackdrop');
+    const toggleBtn = document.getElementById('filterToggleBtn');
+    if (!sidebar) return;
+    sidebar.classList.add('active');
+    sidebar.setAttribute('aria-hidden', 'false');
+    if (backdrop) backdrop.classList.add('active');
+    document.body.classList.add('filters-open');
+    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
+}
+
+function closeFilterDrawer() {
+    const sidebar = document.getElementById('filterSidebar');
+    const backdrop = document.getElementById('filterBackdrop');
+    const toggleBtn = document.getElementById('filterToggleBtn');
+    if (!sidebar) return;
+    sidebar.classList.remove('active');
+    sidebar.setAttribute('aria-hidden', 'true');
+    if (backdrop) backdrop.classList.remove('active');
+    document.body.classList.remove('filters-open');
+    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+}
+
+function toggleFilterDrawer() {
+    const sidebar = document.getElementById('filterSidebar');
+    if (sidebar && sidebar.classList.contains('active')) {
+        closeFilterDrawer();
+    } else {
+        openFilterDrawer();
+    }
 }
 
 // Debounced search function

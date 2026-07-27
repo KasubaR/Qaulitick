@@ -156,7 +156,7 @@
                             </div>
                             <div class="cookie-overview-content">
                                 <h4>Essential</h4>
-                                <p>3 cookies</p>
+                                <p>2 cookies</p>
                                 <span class="cookie-status always-active">Always Active</span>
                             </div>
                         </div>
@@ -210,14 +210,9 @@
                                     <td>1 year</td>
                                 </tr>
                                 <tr>
-                                    <td><code>session_id</code></td>
-                                    <td>Maintains your session for security and functionality</td>
-                                    <td>Session (deleted when browser closes)</td>
-                                </tr>
-                                <tr>
-                                    <td><code>csrf_token</code></td>
-                                    <td>Protects against cross-site request forgery attacks</td>
-                                    <td>Session (deleted when browser closes)</td>
+                                    <td><code>qc.sid</code></td>
+                                    <td>Keeps you signed in and maintains your cart and session state (also secures forms against cross-site request forgery)</td>
+                                    <td>4 hours of inactivity, or 30 days if you select "Remember Me" at login</td>
                                 </tr>
                             </tbody>
                         </table>

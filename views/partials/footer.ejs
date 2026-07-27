@@ -33,6 +33,7 @@
             <a href="/layby">How Layby Works</a>
             <a href="/privacy">Privacy Policy</a>
             <a href="/privacy#cookies">Cookie Policy</a>
+            <a href="#" id="cookieSettingsLink">Cookie Settings</a>
             <a href="/terms">Terms & Conditions</a>
         </div>
     </div>
@@ -44,6 +45,10 @@
 
 <% if (typeof page !== 'undefined' && (page === 'shop' || page === 'home')) { %>
     <%- include('quick-view-modal') %>
+<% } %>
+
+<% if (typeof page !== 'undefined' && (page === 'shop' || page === 'product')) { %>
+    <%- include('floating-cart') %>
 <% } %>
 
 <!-- JavaScript -->

@@ -156,21 +156,13 @@
     }
 
     /**
-     * Listen for consent changes and reload GA if needed
+     * Listen for consent changes. Loading/disabling gtag itself is handled in
+     * header.ejs's inline GA loader; this just logs for debugging.
      */
     function setupConsentListener() {
         window.addEventListener('cookieConsentUpdated', function(event) {
-            const preferences = event.detail;
-            
-            if (preferences.analytics && typeof gtag === 'undefined') {
-                // User just consented, reload page to initialize GA
-                // Or dynamically load GA script here
-                window.location.reload();
-            } else if (!preferences.analytics && typeof gtag !== 'undefined') {
-                // User withdrew consent, clear GA cookies
-                // GA cookies will be cleared by cookie-utils, but we can also disable tracking
-                console.log('[Analytics] Analytics consent withdrawn');
-            }
+            const preferences = event.detail || {};
+            console.log('[Analytics] Consent updated:', preferences.analytics ? 'analytics allowed' : 'analytics withdrawn');
         });
     }
 
