@@ -334,6 +334,9 @@ function updateCartCount() {
     // Floating cart button (shop/product pages, where the header cart icon is hidden)
     const floatingCartCount = document.getElementById('floatingCartCount');
     if (floatingCartCount) floatingCartCount.textContent = totalItems;
+
+    const floatingCartBtn = document.getElementById('floatingCartBtn');
+    if (floatingCartBtn) floatingCartBtn.classList.toggle('has-items', totalItems > 0);
 }
 
 /**

@@ -170,11 +170,11 @@ nav a.active {
 /* ── FLOATING CART BUTTON ──
    Stands in for the header cart icon on pages where the nav bar is hidden (shop, product). */
 .floating-cart-btn {
+    display: none;
     position: fixed;
     right: 24px;
     bottom: 24px;
     z-index: 1500;
-    display: flex;
     align-items: center;
     justify-content: center;
     width: 58px;
@@ -184,6 +184,10 @@ nav a.active {
     box-shadow: 0 8px 24px rgba(175, 144, 68, 0.4);
     text-decoration: none;
     transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.floating-cart-btn.has-items {
+    display: flex;
     animation: floatingCartIn 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
