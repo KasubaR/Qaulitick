@@ -889,6 +889,16 @@ select.form-input { cursor: pointer; }
 .dropdown-item.danger:hover { color: var(--danger); }
 .dropdown-item svg { width: 15px; height: 15px; }
 .dropdown-sep { height: 1px; background: var(--border); margin: 5px 0; }
+.dropdown-label {
+  display: block;
+  font-size: .68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: 4px 12px 2px;
+}
+.dropdown-menu .filter-select { width: 100%; margin: 0 0 2px; box-sizing: border-box; }
 
 /* ══════════════════════════════════════════════════════════════
    MODAL

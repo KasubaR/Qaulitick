@@ -196,7 +196,12 @@ async function handleExport(format, triggerEl) {
             triggerEl.style.pointerEvents = 'none';
             triggerEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting…';
         }
-        const result = await window.AdminLaybyAPI.exportPlans(format, filters);
+        const statusSelect = document.getElementById('exportStatusFilter');
+        const exportFilters = {
+            status: statusSelect ? statusSelect.value : filters.status,
+            search: filters.search
+        };
+        const result = await window.AdminLaybyAPI.exportPlans(format, exportFilters);
         notify(`Layby plans exported as ${result.filename}`, 'success');
     } catch (e) {
         notify(e.message || 'Failed to export layby plans', 'error');
@@ -215,7 +220,12 @@ function setupExportDropdown() {
 
     toggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
+        const opening = !dropdown.classList.contains('open');
         dropdown.classList.toggle('open');
+        if (opening) {
+            const statusSelect = document.getElementById('exportStatusFilter');
+            if (statusSelect) statusSelect.value = filters.status || '';
+        }
     });
 
     document.addEventListener('click', (e) => {
