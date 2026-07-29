@@ -9,6 +9,7 @@ const { Op } = require('sequelize');
 const { LaybyPlan, LaybyPayment, Order, User, Payment, OfflineSale } = require('../models');
 const laybyService = require('../services/layby.service');
 const { enrichLaybyPlan } = require('../utils/laybyStatusPresenter');
+const laybyExportService = require('../services/laybyExport.service');
 const logger = require('../utils/logger').child({ module: 'AdminLaybyController' });
 
 /** Allowed admin PATCH status transitions (LaybyPlan.status). */
@@ -108,28 +109,37 @@ exports.renderLaybyDetailPage = (req, res) => {
     });
 };
 
+/**
+ * Builds the shared Sequelize `where` clause for layby plan listing/export from query params.
+ */
+function buildLaybyPlansWhere(query) {
+    const status = query.status;
+    // Cap length and escape LIKE metacharacters to prevent wildcard DoS
+    const search = (query.search || '').trim().slice(0, 50).replace(/[%_\\]/g, '\\$&');
+
+    const where = {};
+    if (status && ['active', 'completed', 'cancelled'].includes(status)) {
+        where.status = status;
+    }
+
+    if (search) {
+        const like = `%${search}%`;
+        where[Op.or] = [
+            { '$order.orderNumber$': { [Op.like]: like } },
+            { '$offlineSale.saleNumber$': { [Op.like]: like } },
+            { '$offlineSale.customerName$': { [Op.like]: like } }
+        ];
+    }
+
+    return where;
+}
+
 exports.listPlans = async (req, res) => {
     try {
         const page = Math.max(1, parseInt(req.query.page, 10) || 1);
         const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
         const offset = (page - 1) * limit;
-        const status = req.query.status;
-        // Cap length and escape LIKE metacharacters to prevent wildcard DoS
-        const search = (req.query.search || '').trim().slice(0, 50).replace(/[%_\\]/g, '\\$&');
-
-        const where = {};
-        if (status && ['active', 'completed', 'cancelled'].includes(status)) {
-            where.status = status;
-        }
-
-        if (search) {
-            const like = `%${search}%`;
-            where[Op.or] = [
-                { '$order.orderNumber$': { [Op.like]: like } },
-                { '$offlineSale.saleNumber$': { [Op.like]: like } },
-                { '$offlineSale.customerName$': { [Op.like]: like } }
-            ];
-        }
+        const where = buildLaybyPlansWhere(req.query);
 
         const count = await LaybyPlan.count({
             where,
@@ -190,6 +200,86 @@ exports.listPlans = async (req, res) => {
     } catch (err) {
         logger.error({ err }, 'listPlans failed');
         res.status(500).json({ success: false, message: 'Failed to load layby plans' });
+    }
+};
+
+const LAYBY_EXPORT_CONTENT_TYPES = {
+    pdf: 'application/pdf',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+};
+
+exports.exportPlans = async (req, res) => {
+    try {
+        const format = String(req.query.format || '').toLowerCase();
+        if (!['pdf', 'xlsx', 'docx'].includes(format)) {
+            return res.status(400).json({ success: false, message: 'Invalid format. Must be: pdf, xlsx, or docx.' });
+        }
+
+        const where = buildLaybyPlansWhere(req.query);
+
+        const rows = await LaybyPlan.findAll({
+            where,
+            include: [
+                {
+                    model: Order,
+                    as: 'order',
+                    attributes: ['id', 'orderNumber', 'status', 'paymentStatus', 'checkoutMode'],
+                    required: false
+                },
+                {
+                    model: OfflineSale,
+                    as: 'offlineSale',
+                    attributes: ['id', 'saleNumber', 'saleType', 'customerName', 'customerEmail', 'soldAt'],
+                    required: false
+                },
+                { model: User, as: 'user', attributes: ['id', 'email', 'name'], required: false },
+                {
+                    model: LaybyPayment,
+                    as: 'laybyPayments',
+                    separate: true,
+                    order: [['sequence', 'ASC']],
+                    include: [
+                        {
+                            model: Payment,
+                            as: 'payment',
+                            required: false,
+                            attributes: ['id', 'status', 'paymentMethod', 'metadata', 'lencoReference', 'transactionId', 'createdAt', 'amount']
+                        }
+                    ]
+                }
+            ],
+            order: [['createdAt', 'DESC']],
+            limit: laybyExportService.MAX_EXPORT_ROWS,
+            subQuery: false
+        });
+
+        if (!rows.length) {
+            return res.status(400).json({ success: false, message: 'No layby plans to export' });
+        }
+
+        const exportRows = laybyExportService.buildExportRows(rows.map((p) => enrichLaybyPlan(p)));
+        const exportDate = new Date().toISOString().split('T')[0];
+
+        let buffer;
+        if (format === 'pdf') {
+            buffer = await laybyExportService.generateLaybyPDF(exportRows);
+        } else if (format === 'xlsx') {
+            buffer = await laybyExportService.generateLaybyXLSX(exportRows);
+        } else {
+            buffer = await laybyExportService.generateLaybyDOCX(exportRows);
+        }
+
+        if (rows.length === laybyExportService.MAX_EXPORT_ROWS) {
+            res.setHeader('X-Export-Truncated', 'true');
+        }
+
+        res.setHeader('Content-Type', LAYBY_EXPORT_CONTENT_TYPES[format]);
+        res.setHeader('Content-Disposition', `attachment; filename="layby_plans_${exportDate}.${format}"`);
+        res.send(buffer);
+    } catch (err) {
+        logger.error({ err }, 'exportPlans failed');
+        res.status(500).json({ success: false, message: 'Failed to export layby plans' });
     }
 };
 

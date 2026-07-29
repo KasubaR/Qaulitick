@@ -189,11 +189,63 @@ function clearFilters() {
     loadPlans();
 }
 
+async function handleExport(format, triggerEl) {
+    const originalHtml = triggerEl ? triggerEl.innerHTML : '';
+    try {
+        if (triggerEl) {
+            triggerEl.style.pointerEvents = 'none';
+            triggerEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting…';
+        }
+        const result = await window.AdminLaybyAPI.exportPlans(format, filters);
+        notify(`Layby plans exported as ${result.filename}`, 'success');
+    } catch (e) {
+        notify(e.message || 'Failed to export layby plans', 'error');
+    } finally {
+        if (triggerEl) {
+            triggerEl.style.pointerEvents = '';
+            triggerEl.innerHTML = originalHtml;
+        }
+    }
+}
+
+function setupExportDropdown() {
+    const dropdown = document.getElementById('exportDropdown');
+    const toggleBtn = document.getElementById('exportBtn');
+    if (!dropdown || !toggleBtn) return;
+
+    toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle('open');
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!dropdown.contains(e.target)) dropdown.classList.remove('open');
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') dropdown.classList.remove('open');
+    });
+
+    document.getElementById('exportPdfBtn')?.addEventListener('click', (e) => {
+        dropdown.classList.remove('open');
+        handleExport('pdf', e.currentTarget);
+    });
+    document.getElementById('exportExcelBtn')?.addEventListener('click', (e) => {
+        dropdown.classList.remove('open');
+        handleExport('xlsx', e.currentTarget);
+    });
+    document.getElementById('exportWordBtn')?.addEventListener('click', (e) => {
+        dropdown.classList.remove('open');
+        handleExport('docx', e.currentTarget);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     const ok = await window.AuthUtils?.initializeAuthCheck();
     if (!ok) return;
 
     setupSidebar();
+    setupExportDropdown();
 
     const sidebarToggle = document.getElementById('sidebarToggle');
     if (sidebarToggle) {

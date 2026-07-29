@@ -413,6 +413,11 @@ router.get('/api/admin/layby/plans/:id',
     authenticateAdmin,
     adminLaybyController.getPlan
 );
+router.get('/api/admin/layby/export',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }),
+    authenticateAdmin,
+    adminLaybyController.exportPlans
+);
 router.patch('/api/admin/layby/plans/:id/status',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
     authenticateAdmin,

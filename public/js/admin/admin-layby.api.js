@@ -87,10 +87,52 @@
         });
     }
 
+    /**
+     * Exports layby plans matching the given filters as a file download.
+     * @param {'pdf'|'xlsx'|'docx'} format
+     * @param {{ status?: string, search?: string }} filters
+     */
+    async function exportPlans(format, filters = {}) {
+        const q = new URLSearchParams();
+        q.set('format', format);
+        if (filters.status) q.set('status', filters.status);
+        if (filters.search) q.set('search', filters.search);
+
+        const response = await fetch(`${BASE}/export?${q.toString()}`, {
+            method: 'GET',
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.message || `Failed to export layby plans (${response.status})`);
+        }
+
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = `layby_plans_${new Date().toISOString().split('T')[0]}.${format}`;
+        if (contentDisposition) {
+            const match = contentDisposition.match(/filename="?([^"]+)"?/);
+            if (match) filename = match[1];
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+
+        return { filename };
+    }
+
     window.AdminLaybyAPI = {
         listPlans,
         getPlan,
         updatePlanStatus,
-        confirmInstallmentOffline
+        confirmInstallmentOffline,
+        exportPlans
     };
 })(window);

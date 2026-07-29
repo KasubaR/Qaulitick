@@ -26,6 +26,14 @@
                     <h1 class="page-title">Layby plans</h1>
                 </div>
                 <div class="header-right">
+                    <div class="dropdown" id="exportDropdown">
+                        <%- include('../partials/admin-button', { id: 'exportBtn', icon: 'fa-download', label: 'Export', buttonType: 'button' }) %>
+                        <div class="dropdown-menu">
+                            <div class="dropdown-item" id="exportPdfBtn"><i class="fas fa-file-pdf" aria-hidden="true"></i> PDF</div>
+                            <div class="dropdown-item" id="exportExcelBtn"><i class="fas fa-file-excel" aria-hidden="true"></i> Excel</div>
+                            <div class="dropdown-item" id="exportWordBtn"><i class="fas fa-file-word" aria-hidden="true"></i> Word</div>
+                        </div>
+                    </div>
                     <%- include('../partials/admin-button', { id: 'refreshBtn', icon: 'fa-sync-alt', label: 'Refresh', buttonType: 'button' }) %>
                 </div>
             </header>
