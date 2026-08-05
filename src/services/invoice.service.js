@@ -1,9 +1,38 @@
 // Invoice Service
-// Generates PDF invoices for orders using PDFKit
+// Generates PDF invoices for orders using PDFKit, styled to match the
+// Qualitick Collections letterhead invoice template (Qualitick-Invoice.pdf).
 
 const PDFDocument = require('pdfkit');
-const fs = require('fs');
 const path = require('path');
+
+// ---- Brand assets ----
+// Rasterized from public/images/icons/logo_black name.svg (see scripts that
+// generated it) so PDFKit can embed it — PDFKit cannot draw SVGs directly.
+const LOGO_PATH = path.join(__dirname, '../../public/images/icons/logo-invoice.png');
+// Rasterized from public/images/icons/watermark-half.svg — the same diagonal
+// chevron ribbon used as the background watermark on the reference letterhead.
+const WATERMARK_PATH = path.join(__dirname, '../../public/images/icons/watermark-invoice.png');
+const FONT_REGULAR_PATH = path.join(__dirname, '../../public/fonts/OTF/Satoshi-Regular.otf');
+const FONT_MEDIUM_PATH = path.join(__dirname, '../../public/fonts/OTF/Satoshi-Medium.otf');
+const FONT_BOLD_PATH = path.join(__dirname, '../../public/fonts/OTF/Satoshi-Bold.otf');
+
+// ---- Brand palette (matches the logo and Qualitick-Invoice.pdf letterhead) ----
+const GOLD = '#b09144';
+const DARK = '#171717';
+const BAR_DARK = '#404040';
+const GRAY = '#666666';
+const BORDER = '#e6dcc2';
+
+// Fixed company/letterhead details (the physical business info printed on
+// every invoice — not order-specific, so not stored per-order in the DB).
+const COMPANY = {
+    phone: '+260 975 587 617', // WhatsApp number
+    email: 'support@qualitickzm.com',
+    tpin: 'TPIN: 1005834979'
+};
+
+const PAGE_LEFT = 50;
+const PAGE_RIGHT = 545; // printable right edge on A4 with 50pt margins
 
 /**
  * Strip control characters from string
@@ -67,6 +96,56 @@ function safeText(doc, text, x, y, options = {}) {
 }
 
 /**
+ * Render a line of text and return the y position of the line below it,
+ * measuring the actual rendered height (including wraps) instead of a
+ * hardcoded offset so following lines never overlap.
+ * @param {Object} doc - PDFKit document
+ * @param {string} text - Text to render
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {Object} options - PDFKit text options (width required for wrapping fields)
+ * @returns {number} Y position for the next line
+ */
+function writeLine(doc, text, x, y, options = {}) {
+    const { gap = 4, ...textOptions } = options;
+    const sanitized = sanitizeTextField(text, options.maxLength || 200);
+    safeText(doc, sanitized, x, y, textOptions);
+    const height = sanitized ? (doc.heightOfString(sanitized, textOptions) || doc.currentLineHeight()) : doc.currentLineHeight();
+    return y + height + gap;
+}
+
+/**
+ * Register the brand font (Satoshi) on the document, falling back to
+ * PDFKit's built-in Helvetica if the font files are unavailable.
+ * @param {Object} doc - PDFKit document
+ */
+function registerFonts(doc) {
+    try {
+        doc.registerFont('Body', FONT_REGULAR_PATH);
+        doc.registerFont('Body-Medium', FONT_MEDIUM_PATH);
+        doc.registerFont('Body-Bold', FONT_BOLD_PATH);
+    } catch (error) {
+        console.warn('[Invoice Service] Could not load brand font, falling back to Helvetica:', error.message);
+        doc.registerFont('Body', 'Helvetica');
+        doc.registerFont('Body-Medium', 'Helvetica-Bold');
+        doc.registerFont('Body-Bold', 'Helvetica-Bold');
+    }
+}
+
+/**
+ * Draw the brand watermark (watermark-half.svg) across the full page,
+ * behind all other content, matching the reference letterhead.
+ * @param {Object} doc - PDFKit document
+ */
+function drawWatermark(doc) {
+    try {
+        doc.image(WATERMARK_PATH, 0, 0, { width: doc.page.width, height: doc.page.height });
+    } catch (error) {
+        console.warn('[Invoice Service] Could not draw watermark:', error.message);
+    }
+}
+
+/**
  * Generate PDF Invoice for an order
  * @param {Object} order - Order object from database
  * @param {Object} options - Options for invoice generation
@@ -87,187 +166,187 @@ async function generateInvoicePDF(order, options = {}) {
                 }
             });
 
+            registerFonts(doc);
+
             // Collect PDF data chunks
             const chunks = [];
             doc.on('data', chunk => chunks.push(chunk));
             doc.on('end', () => resolve(Buffer.concat(chunks)));
             doc.on('error', reject);
 
-            // Company Information
-            doc.fontSize(24)
-               .fillColor('#1a1a1a')
-               .text('QUALITICK COLLECTIONS', 50, 50, { align: 'left' });
+            // Starts a new page and redraws the watermark on it
+            const newPage = () => {
+                doc.addPage();
+                drawWatermark(doc);
+            };
 
-            doc.fontSize(10)
-               .fillColor('#666666')
-               .text('Luxury Watch Retailer', 50, 80)
-               .text('Email: info@qualitickcollections.com', 50, 95)
-               .text('Phone: +260 XXX XXX XXX', 50, 110);
+            drawWatermark(doc);
 
-            // Invoice Header
-            doc.fontSize(20)
-               .fillColor('#1a1a1a')
-               .text('INVOICE', 400, 50, { align: 'right' });
-
-            doc.fontSize(10)
-               .fillColor('#666666');
-            safeText(doc, `Invoice #: ${sanitizeTextField(order.orderNumber, 50)}`, 400, 80, { align: 'right' });
-            safeText(doc, `Date: ${formatDate(order.createdAt)}`, 400, 95, { align: 'right' });
-            safeText(doc, `Status: ${sanitizeTextField(order.status, 20).toUpperCase()}`, 400, 110, { align: 'right' });
-
-            // Customer Information
-            const customerY = 150;
-            doc.fontSize(12)
-               .fillColor('#1a1a1a')
-               .text('Bill To:', 50, customerY);
-
-            doc.fontSize(10)
-               .fillColor('#333333');
-            safeText(doc, sanitizeTextField(order.customer?.name, 80), 50, customerY + 20);
-            safeText(doc, sanitizeTextField(order.customer?.email, 100), 50, customerY + 35);
-            safeText(doc, sanitizeTextField(order.customer?.phone, 30), 50, customerY + 50);
-
-            // Shipping Information
-            if (order.shipping && !order.shipping.pickup) {
-                doc.fontSize(12)
-                   .fillColor('#1a1a1a')
-                   .text('Ship To:', 300, customerY);
-
-                doc.fontSize(10)
-                   .fillColor('#333333');
-                safeText(doc, sanitizeTextField(order.shipping?.address, 200) || '-', 300, customerY + 20, { width: 250 });
-                safeText(doc, `${sanitizeTextField(order.shipping?.city, 50) || ''}, ${sanitizeTextField(order.shipping?.province, 50) || ''}`, 300, customerY + 35);
-            } else {
-                doc.fontSize(12)
-                   .fillColor('#1a1a1a')
-                   .text('Delivery Method:', 300, customerY);
-
-                doc.fontSize(10)
-                   .fillColor('#333333')
-                   .text('Store Pickup', 300, customerY + 20);
+            // ---- Letterhead: logo + contact block + invoice number bar ----
+            try {
+                doc.image(LOGO_PATH, PAGE_LEFT, 40, { width: 100 });
+            } catch (logoError) {
+                console.warn('[Invoice Service] Could not embed logo:', logoError.message);
             }
 
-            // Items Table Header
-            const tableStartY = customerY + 90;
+            const contactX = 300;
+            const contactWidth = PAGE_RIGHT - contactX;
+            doc.font('Body').fontSize(10).fillColor(GOLD);
+            safeText(doc, COMPANY.phone, contactX, 48, { align: 'right', width: contactWidth });
+            safeText(doc, COMPANY.email, contactX, 63, { align: 'right', width: contactWidth });
+            safeText(doc, COMPANY.tpin, contactX, 78, { align: 'right', width: contactWidth });
+
+            const invBarY = 102;
+            const invBarHeight = 25;
+            doc.rect(contactX, invBarY, contactWidth, invBarHeight).fill(BAR_DARK);
+            doc.font('Body-Bold').fontSize(10).fillColor('#ffffff');
+            safeText(doc, `INV. No. : ${sanitizeTextField(order.orderNumber, 50)}`, contactX + 12, invBarY + 8, { width: contactWidth - 20 });
+
+            doc.font('Body').fontSize(10).fillColor(GRAY);
+            safeText(doc, `Date: ${formatDate(order.createdAt)}`, contactX, invBarY + invBarHeight + 12, { width: contactWidth });
+
+            // ---- Recipient ----
+            let cursorY = 178;
+            doc.font('Body').fontSize(11).fillColor(GRAY);
+            cursorY = writeLine(doc, 'Recipient:', PAGE_LEFT, cursorY, { width: 300, gap: 6 });
+
+            doc.font('Body-Bold').fontSize(12).fillColor(DARK);
+            cursorY = writeLine(doc, sanitizeTextField(order.customer?.name, 80) || 'Customer', PAGE_LEFT, cursorY, { width: 300, gap: 3 });
+
+            doc.font('Body').fontSize(10).fillColor(GRAY);
+            if (order.shipping && !order.shipping.pickup) {
+                cursorY = writeLine(doc, sanitizeTextField(order.shipping?.address, 200) || '-', PAGE_LEFT, cursorY, { width: 280, gap: 2 });
+                const cityLine = [sanitizeTextField(order.shipping?.city, 50), sanitizeTextField(order.shipping?.province, 50)].filter(Boolean).join(', ');
+                if (cityLine) {
+                    cursorY = writeLine(doc, cityLine, PAGE_LEFT, cursorY, { width: 280, gap: 2 });
+                }
+            } else {
+                cursorY = writeLine(doc, 'Store Pickup', PAGE_LEFT, cursorY, { width: 280, gap: 2 });
+            }
+
+            // ---- Items table ----
+            const colQtyX = 60, colQtyWidth = 50;
+            const colDescX = 130, colDescWidth = 210;
+            const colUnitX = 350, colUnitWidth = 100;
+            const colTotalX = 460, colTotalWidth = 85;
 
             // Renders the item table header at y and returns the new currentY
             const renderTableHeader = (y) => {
-                doc.fontSize(10)
-                   .fillColor('#ffffff')
-                   .rect(50, y, 500, 25)
-                   .fill('#1a1a1a');
-                doc.text('Item', 60, y + 8)
-                   .text('Quantity', 250, y + 8)
-                   .text('Unit Price', 350, y + 8)
-                   .text('Total', 480, y + 8, { align: 'right' });
+                doc.rect(PAGE_LEFT, y, PAGE_RIGHT - PAGE_LEFT, 25).fill(GOLD);
+                doc.font('Body-Bold').fontSize(10).fillColor(DARK);
+                doc.text('Qty', colQtyX, y + 8, { width: colQtyWidth, align: 'center' });
+                doc.text('Description', colDescX, y + 8, { width: colDescWidth });
+                doc.text('Unit Price', colUnitX, y + 8, { width: colUnitWidth, align: 'right' });
+                doc.text('Total Price', colTotalX, y + 8, { width: colTotalWidth, align: 'right' });
                 return y + 35;
             };
 
-            renderTableHeader(tableStartY);
+            const tableStartY = Math.max(cursorY + 15, 175);
+            let currentY = renderTableHeader(tableStartY);
 
             // Items
-            let currentY = tableStartY + 35;
             order.items.forEach((item, index) => {
                 try {
                     // Page break before this row if it would overflow the printable area
                     if (currentY > 700) {
-                        doc.addPage();
+                        newPage();
                         currentY = renderTableHeader(50);
                     }
 
-                    // Alternate row colors
-                    if (index % 2 === 0) {
-                        doc.rect(50, currentY - 5, 500, 30)
-                           .fill('#f5f5f5');
-                    }
+                    doc.font('Body').fontSize(9).fillColor(DARK);
+                    safeText(doc, String(item.quantity || 0).padStart(2, '0'), colQtyX, currentY, { width: colQtyWidth, align: 'center' });
+                    safeText(doc, sanitizeTextField(item.name, 80) || 'Product', colDescX, currentY, { width: colDescWidth });
+                    safeText(doc, formatCurrency(item.price || 0), colUnitX, currentY, { width: colUnitWidth, align: 'right' });
+                    safeText(doc, formatCurrency((item.price || 0) * (item.quantity || 0)), colTotalX, currentY, { width: colTotalWidth, align: 'right' });
 
-                    doc.fontSize(9)
-                       .fillColor('#333333');
-                    safeText(doc, sanitizeTextField(item.name, 80) || 'Product', 60, currentY, { width: 180 });
-                    safeText(doc, String(item.quantity || 0), 250, currentY);
-                    safeText(doc, `K${formatCurrency(item.price || 0)}`, 350, currentY);
-                    safeText(doc, `K${formatCurrency((item.price || 0) * (item.quantity || 0))}`, 480, currentY, { align: 'right' });
-
-                    // SKU if available
-                    if (item.sku) {
-                        doc.fontSize(8)
-                           .fillColor('#666666');
-                        safeText(doc, `SKU: ${sanitizeTextField(item.sku, 50)}`, 60, currentY + 15);
-                    }
-
-                    currentY += 35;
+                    currentY += 28;
+                    doc.strokeColor(BORDER).lineWidth(0.75)
+                       .moveTo(PAGE_LEFT, currentY - 6).lineTo(PAGE_RIGHT, currentY - 6).stroke();
                 } catch (itemError) {
                     console.warn(`[Invoice Service] Error rendering item ${index}:`, itemError.message);
                     // Continue with next item even if one fails
-                    currentY += 35;
+                    currentY += 28;
                 }
             });
 
-            // If totals + payment info + footer (~250pt) won't fit on the current page, start a new one
-            if (currentY + 250 > doc.page.height - 50) {
-                doc.addPage();
+            // If totals + payment info + footer (~260pt) won't fit on the current page, start a new one
+            if (currentY + 260 > doc.page.height - 50) {
+                newPage();
                 currentY = 50;
             }
 
-            // Totals Section
+            // ---- Totals ----
+            // Two right-aligned columns that both stay within the printable
+            // page width (A4 minus 50pt margins ends at x=545): a label
+            // column ending at x=450 and a value column ending at x=545.
             const totalsStartY = currentY + 20;
-            const totalsWidth = 200;
-            const totalsX = 400;
+            const totalsLabelX = 275;
+            const totalsLabelWidth = 130;
+            const totalsValueX = 405;
+            const totalsValueWidth = 140;
             let totalsOffset = 0;
 
-            doc.fontSize(10)
-               .fillColor('#333333')
-               .text('Subtotal:', totalsX, totalsStartY + totalsOffset, { width: totalsWidth, align: 'right' })
-               .text(`K${formatCurrency(order.totals?.subtotal || 0)}`, totalsX + totalsWidth, totalsStartY + totalsOffset, { align: 'right' });
+            doc.font('Body').fontSize(10).fillColor(GRAY);
+            doc.text('Subtotal:', totalsLabelX, totalsStartY + totalsOffset, { width: totalsLabelWidth, align: 'right' });
+            doc.fillColor(DARK).text(formatCurrency(order.totals?.subtotal || 0), totalsValueX, totalsStartY + totalsOffset, { width: totalsValueWidth, align: 'right' });
 
-            totalsOffset += 20;
+            totalsOffset += 18;
             if (order.totals?.discount > 0) {
-                doc.text('Discount:', totalsX, totalsStartY + totalsOffset, { width: totalsWidth, align: 'right' })
-                   .text(`-K${formatCurrency(order.totals.discount)}`, totalsX + totalsWidth, totalsStartY + totalsOffset, { align: 'right' });
-                totalsOffset += 20;
+                doc.fillColor(GRAY).text('Discount:', totalsLabelX, totalsStartY + totalsOffset, { width: totalsLabelWidth, align: 'right' });
+                doc.fillColor(DARK).text(`-${formatCurrency(order.totals.discount)}`, totalsValueX, totalsStartY + totalsOffset, { width: totalsValueWidth, align: 'right' });
+                totalsOffset += 18;
             }
 
             if (order.totals?.delivery > 0) {
-                doc.text('Delivery Fee:', totalsX, totalsStartY + totalsOffset, { width: totalsWidth, align: 'right' })
-                   .text(`K${formatCurrency(order.totals.delivery)}`, totalsX + totalsWidth, totalsStartY + totalsOffset, { align: 'right' });
-                totalsOffset += 20;
+                doc.fillColor(GRAY).text('Delivery Fee:', totalsLabelX, totalsStartY + totalsOffset, { width: totalsLabelWidth, align: 'right' });
+                doc.fillColor(DARK).text(formatCurrency(order.totals.delivery), totalsValueX, totalsStartY + totalsOffset, { width: totalsValueWidth, align: 'right' });
+                totalsOffset += 18;
             }
 
-            // Total
-            totalsOffset += 10;
+            // Total — bold, underlined twice in gold like the reference letterhead
+            totalsOffset += 12;
             const totalY = totalsStartY + totalsOffset;
-            doc.fontSize(12)
-               .fillColor('#1a1a1a')
-               .text('Total:', totalsX, totalY, { width: totalsWidth, align: 'right' })
-               .fontSize(14)
-               .text(`K${formatCurrency(order.totals?.total || 0)}`, totalsX + totalsWidth, totalY, { align: 'right' });
+            doc.font('Body-Bold').fontSize(12).fillColor(DARK);
+            doc.text('Total', totalsLabelX, totalY, { width: totalsLabelWidth, align: 'right' });
+            doc.fontSize(13);
+            doc.text(`ZMW ${formatCurrency(order.totals?.total || 0)}`, totalsValueX, totalY, { width: totalsValueWidth, align: 'right' });
 
-            // Payment Information
-            const paymentY = totalY + 40;
-            doc.fontSize(10)
-               .fillColor('#666666');
-            safeText(doc, 'Payment Method:', 50, paymentY);
-            doc.fillColor('#333333');
-            safeText(doc, formatPaymentMethod(order.paymentMethod), 50, paymentY + 15);
+            const totalLineY = totalY + 20;
+            doc.strokeColor(GOLD).lineWidth(1)
+               .moveTo(totalsLabelX, totalLineY).lineTo(PAGE_RIGHT, totalLineY).stroke()
+               .moveTo(totalsLabelX, totalLineY + 3).lineTo(PAGE_RIGHT, totalLineY + 3).stroke();
 
-            doc.fillColor('#666666');
-            safeText(doc, 'Payment Status:', 50, paymentY + 35);
-            doc.fillColor('#333333');
-            safeText(doc, sanitizeTextField(order.paymentStatus || 'pending', 20).toUpperCase(), 50, paymentY + 50);
+            // ---- Payment & order status ----
+            let paymentY = totalLineY + 25;
+            doc.font('Body').fontSize(10);
+
+            doc.fillColor(GRAY);
+            paymentY = writeLine(doc, 'Order Status:', PAGE_LEFT, paymentY, { width: 200, gap: 2 });
+            doc.fillColor(DARK).font('Body-Medium');
+            paymentY = writeLine(doc, sanitizeTextField(order.status, 20).toUpperCase(), PAGE_LEFT, paymentY, { width: 200, gap: 8 });
+
+            doc.font('Body').fillColor(GRAY);
+            paymentY = writeLine(doc, 'Payment Method:', PAGE_LEFT, paymentY, { width: 200, gap: 2 });
+            doc.fillColor(DARK).font('Body-Medium');
+            paymentY = writeLine(doc, formatPaymentMethod(order.paymentMethod), PAGE_LEFT, paymentY, { width: 200, gap: 8 });
+
+            doc.font('Body').fillColor(GRAY);
+            paymentY = writeLine(doc, 'Payment Status:', PAGE_LEFT, paymentY, { width: 200, gap: 2 });
+            doc.fillColor(DARK).font('Body-Medium');
+            paymentY = writeLine(doc, sanitizeTextField(order.paymentStatus || 'pending', 20).toUpperCase(), PAGE_LEFT, paymentY, { width: 200, gap: 8 });
 
             if (order.transactionId) {
-                doc.fillColor('#666666');
-                safeText(doc, 'Transaction ID:', 50, paymentY + 70);
-                doc.fillColor('#333333');
-                safeText(doc, sanitizeTextField(order.transactionId, 100), 50, paymentY + 85);
+                doc.font('Body').fillColor(GRAY);
+                paymentY = writeLine(doc, 'Transaction ID:', PAGE_LEFT, paymentY, { width: 300, gap: 2 });
+                doc.fillColor(DARK).font('Body-Medium');
+                paymentY = writeLine(doc, sanitizeTextField(order.transactionId, 100), PAGE_LEFT, paymentY, { width: 300, gap: 8 });
             }
 
-            // Footer — anchored to the bottom of the last (current) page
-            const footerY = doc.page.height - 80;
-            doc.fontSize(8)
-               .fillColor('#999999')
-               .text('Thank you for your business!', 50, footerY, { align: 'center', width: 500 })
-               .text('This is a computer-generated invoice.', 50, footerY + 15, { align: 'center', width: 500 });
+            // ---- Footer — anchored to the bottom of the last (current) page ----
+            const footerY = doc.page.height - 110;
+            doc.font('Body').fontSize(9).fillColor(GRAY);
+            doc.text('Thank you for your business.', PAGE_LEFT, footerY, { width: 400 });
+            doc.text('Please contact us if you have any questions regarding this invoice.', PAGE_LEFT, footerY + 14, { width: 450 });
 
             // Finalize PDF
             doc.end();
@@ -322,4 +401,3 @@ function formatPaymentMethod(method) {
 module.exports = {
     generateInvoicePDF
 };
-
