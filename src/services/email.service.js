@@ -10,46 +10,43 @@ const logger = require('../utils/logger').child({ module: 'EmailService' });
  * Integrates with notification settings to respect user preferences
  */
 
-// SMTP Configuration — prefers cPanel SMTP_* vars, falls back to Gmail
-const createTransporter = () => {
+function hasCpanelCreds() {
+    return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+}
+
+function hasGmailCreds() {
+    return !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+}
+
+function createCpanelTransporter() {
     const smtpHost = process.env.SMTP_HOST;
     const smtpUser = process.env.SMTP_USER;
     const smtpPass = process.env.SMTP_PASS;
+    const port = parseInt(process.env.SMTP_PORT || '465', 10);
+    const secure = process.env.SMTP_SECURE !== 'false'; // default true for port 465
+    logger.info({ host: smtpHost, port, secure }, 'Using cPanel SMTP');
+    return nodemailer.createTransport({
+        host: smtpHost,
+        port,
+        secure,
+        auth: { user: smtpUser, pass: smtpPass },
+        tls: { rejectUnauthorized: false },
+        pool: true,
+        maxConnections: 5,
+        rateDelta: 1000,
+        rateLimit: 5
+    });
+}
 
+function createGmailTransporter() {
     const gmailUser = process.env.GMAIL_USER;
     const gmailPassword = process.env.GMAIL_APP_PASSWORD;
-
-    const useCpanel = smtpHost && smtpUser && smtpPass;
-    const useGmail = gmailUser && gmailPassword;
-
-    if (!useCpanel && !useGmail) {
-        logger.warn('No SMTP credentials configured. Email functionality will be disabled.');
-        return null;
-    }
-
-    if (useCpanel) {
-        const port = parseInt(process.env.SMTP_PORT || '465', 10);
-        const secure = process.env.SMTP_SECURE !== 'false'; // default true for port 465
-        logger.info({ host: smtpHost, port, secure }, 'Using cPanel SMTP');
-        return nodemailer.createTransport({
-            host: smtpHost,
-            port,
-            secure,
-            auth: { user: smtpUser, pass: smtpPass },
-            tls: { rejectUnauthorized: false },
-            pool: true,
-            maxConnections: 5,
-            rateDelta: 1000,
-            rateLimit: 5
-        });
-    }
-
-    // Fallback: Gmail
     const tlsOptions = {};
     if (process.env.NODE_ENV !== 'production' && process.env.ALLOW_INSECURE_EMAIL === 'true') {
         tlsOptions.rejectUnauthorized = false;
         logger.warn('SSL cert validation disabled. Development only.');
     }
+    logger.info('Using Gmail SMTP');
     return nodemailer.createTransport({
         host: 'smtp.gmail.com',
         port: 587,
@@ -61,13 +58,37 @@ const createTransporter = () => {
         rateLimit: 5,
         tls: Object.keys(tlsOptions).length > 0 ? tlsOptions : undefined
     });
+}
+
+// SMTP Configuration — prefers cPanel SMTP_* vars, falls back to Gmail if cPanel
+// isn't configured at all. Runtime failover (cPanel configured but erroring) is
+// handled separately in getTransporter()'s sendMail wrapper below, since picking
+// a transport once at creation time can't react to a mid-flight auth failure.
+const createTransporter = () => {
+    const useCpanel = hasCpanelCreds();
+    const useGmail = hasGmailCreds();
+
+    if (!useCpanel && !useGmail) {
+        logger.warn('No SMTP credentials configured. Email functionality will be disabled.');
+        return null;
+    }
+
+    return useCpanel ? createCpanelTransporter() : createGmailTransporter();
 };
+
+// Errors that mean "this transport itself is broken right now" (bad auth, can't
+// reach the host) as opposed to a message-specific rejection — worth failing
+// over to the secondary provider for.
+function isTransportLevelFailure(err) {
+    return ['EAUTH', 'ESOCKET', 'ECONNECTION', 'ECONNREFUSED', 'ETIMEDOUT'].includes(err && err.code);
+}
 
 // Lazy transporter: created on first use so env vars loaded after this module is
 // first imported (e.g. via dotenv in a different require order) are always visible.
 // A new transporter is created each time credentials are missing or after a
 // send failure so a stale/broken connection does not persist across restarts.
 let _transporter;
+let _gmailFallback;
 
 function resetTransporter() {
     if (_transporter) {
@@ -76,18 +97,38 @@ function resetTransporter() {
     _transporter = null;
 }
 
+function getGmailFallback() {
+    if (!_gmailFallback) {
+        _gmailFallback = createGmailTransporter();
+    }
+    return _gmailFallback;
+}
+
 function getTransporter() {
     if (!_transporter) {
         const raw = createTransporter();
         if (!raw) return null;
+        const primaryIsCpanel = hasCpanelCreds();
         // Wrap sendMail so any transport-level error clears the cached instance,
-        // forcing a fresh connection on the next attempt.
+        // forcing a fresh connection on the next attempt. If the primary is
+        // cPanel and it fails with an auth/connection error, retry once against
+        // Gmail (when configured) so a cPanel outage doesn't silently drop
+        // every outgoing email until someone notices.
         _transporter = Object.create(raw);
         _transporter.sendMail = async function(...args) {
             try {
                 return await raw.sendMail.apply(raw, args);
             } catch (err) {
                 resetTransporter();
+                if (primaryIsCpanel && isTransportLevelFailure(err) && hasGmailCreds()) {
+                    logger.warn({ err: err.message }, 'cPanel SMTP failed, retrying via Gmail fallback');
+                    try {
+                        return await getGmailFallback().sendMail.apply(getGmailFallback(), args);
+                    } catch (fallbackErr) {
+                        _gmailFallback = null;
+                        throw fallbackErr;
+                    }
+                }
                 throw err;
             }
         };

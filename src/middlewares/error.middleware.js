@@ -45,6 +45,14 @@ class NetworkError extends AppError {
  * Must be used after all routes
  */
 function errorHandler(err, req, res, next) {
+    // If a response is already underway (e.g. the client disconnected mid-stream,
+    // or a handler already wrote a partial response before erroring), writing
+    // headers/body again throws ERR_HTTP_HEADERS_SENT. Hand off to Express's
+    // default handler, which just closes the connection in that case.
+    if (res.headersSent) {
+        return next(err);
+    }
+
     err.statusCode = err.statusCode || 500;
     err.status = err.status || 'error';
 

@@ -279,7 +279,9 @@ exports.exportPlans = async (req, res) => {
         res.send(buffer);
     } catch (err) {
         logger.error({ err }, 'exportPlans failed');
-        res.status(500).json({ success: false, message: 'Failed to export layby plans' });
+        const statusCode = err.statusCode || 500;
+        const message = err.isOperational ? err.message : 'Failed to export layby plans';
+        res.status(statusCode).json({ success: false, message });
     }
 };
 

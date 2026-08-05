@@ -1,9 +1,25 @@
 // Layby Export Service
 // Builds flat row data from enriched layby plans and renders it as PDF, XLSX, or DOCX.
 
-const PDFDocument = require('pdfkit');
-const ExcelJS = require('exceljs');
-const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, ShadingType } = require('docx');
+// pdfkit/exceljs/docx are required lazily (inside each generate* function) rather
+// than at module load time. This file is pulled in at server boot (app.js ->
+// admin.routes.js -> admin.layby.controller.js), so a top-level require() of a
+// missing/uninstalled package here used to crash the *entire* process on startup
+// instead of just failing the one export request. Lazy-loading turns a missing
+// dependency into a normal 500 on the export endpoint.
+function requireOptional(moduleName, humanName) {
+    try {
+        return require(moduleName);
+    } catch (err) {
+        if (err.code === 'MODULE_NOT_FOUND') {
+            const wrapped = new Error(`${humanName} export is unavailable: '${moduleName}' is not installed on this server. Run "npm install" and try again.`);
+            wrapped.statusCode = 503;
+            wrapped.isOperational = true;
+            throw wrapped;
+        }
+        throw err;
+    }
+}
 
 const MAX_EXPORT_ROWS = 5000;
 
@@ -65,6 +81,7 @@ function buildExportRows(plans) {
  * @returns {Promise<Buffer>}
  */
 async function generateLaybyPDF(rows) {
+    const PDFDocument = requireOptional('pdfkit', 'PDF');
     return new Promise((resolve, reject) => {
         try {
             const doc = new PDFDocument({
@@ -133,6 +150,7 @@ async function generateLaybyPDF(rows) {
  * @returns {Promise<Buffer>}
  */
 async function generateLaybyXLSX(rows) {
+    const ExcelJS = requireOptional('exceljs', 'Excel');
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Qualitick Collections Admin Panel';
     workbook.created = new Date();
@@ -164,6 +182,7 @@ async function generateLaybyXLSX(rows) {
  * @returns {Promise<Buffer>}
  */
 async function generateLaybyDOCX(rows) {
+    const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, ShadingType } = requireOptional('docx', 'Word');
     const headerCells = COLUMNS.map((col) => new TableCell({
         shading: { type: ShadingType.SOLID, color: '1A1A1A', fill: '1A1A1A' },
         children: [new Paragraph({
