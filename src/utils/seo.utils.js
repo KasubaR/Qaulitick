@@ -49,7 +49,7 @@ function generateMetaDescription(product) {
         // Take first 155 characters of description
         return product.description.substring(0, 155).trim() + '...';
     }
-    return `Buy ${product.model} - ${product.brand} luxury watch. ${product.gender} watch with ${product.rating || 0} star rating. Free shipping worldwide.`;
+    return `Buy ${product.model} - ${product.brand} luxury watch. ${product.gender} watch with ${product.rating || 0} star rating. Delivery across Zambia.`;
 }
 
 /**

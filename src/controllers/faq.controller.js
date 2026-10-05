@@ -33,6 +33,22 @@ async function getPublishedFaqGroups() {
     return Array.from(groups, ([category, items]) => ({ category, items }));
 }
 
+// Flat list of published FAQs in display order, used by the Contact page.
+async function getPublishedFaqList() {
+    const faqs = await Faq.findAll({ where: { isPublished: true }, order: ORDER });
+    return faqs.map(faq => faq.toJSON());
+}
+
+exports.renderContactPage = async (req, res) => {
+    let faqs = [];
+    try {
+        faqs = await getPublishedFaqList();
+    } catch (error) {
+        logger.error({ err: error }, 'Failed to load FAQs for /contact');
+    }
+    res.render('contact', { title: 'Contact Us | Qualitick Collections', page: 'contact', faqs });
+};
+
 exports.renderFaqPage = async (req, res) => {
     let groups = [];
     try {

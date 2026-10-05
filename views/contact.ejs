@@ -140,80 +140,23 @@
             </div>
         </div>
 
-        <!-- FAQ Section -->
+        <!-- FAQ Section (managed in Admin → FAQ) -->
+        <% if (typeof faqs !== 'undefined' && faqs.length > 0) { %>
         <section class="faq-section">
             <h2 class="section-title">Frequently Asked Questions</h2>
             <div class="faq-grid">
+                <% faqs.forEach(function (faq) { %>
                 <div class="faq-item">
                     <h3 class="faq-question">
-                        <i class="fas fa-question-circle"></i> How long does shipping take?
+                        <i class="fas fa-question-circle"></i> <%= faq.question %>
                     </h3>
-                    <p class="faq-answer">
-                        Standard shipping typically takes 5-7 business days. Express shipping options are available 
-                        for faster delivery (2-3 business days).
-                    </p>
+                    <p class="faq-answer"><%= faq.answer %></p>
                 </div>
-                <div class="faq-item">
-                    <h3 class="faq-question">
-                        <i class="fas fa-question-circle"></i> What is your return policy?
-                    </h3>
-                    <p class="faq-answer">
-                        We offer a 30-day return policy. Items must be in original condition with all packaging. 
-                        Please contact us for return authorization.
-                    </p>
-                </div>
-                <div class="faq-item">
-                    <h3 class="faq-question">
-                        <i class="fas fa-question-circle"></i> Do you offer international shipping?
-                    </h3>
-                    <p class="faq-answer">
-                        Yes, we ship worldwide. Shipping times and costs vary by location. Contact us for specific 
-                        international shipping rates.
-                    </p>
-                </div>
-                <div class="faq-item">
-                    <h3 class="faq-question">
-                        <i class="fas fa-question-circle"></i> Are your watches authentic?
-                    </h3>
-                    <p class="faq-answer">
-                        We specialize in premium triple-A grade luxury watches that meet the highest quality standards.
-                        Each watch undergoes rigorous quality control before shipping.
-                    </p>
-                </div>
-                <div class="faq-item">
-                    <h3 class="faq-question">
-                        <i class="fas fa-question-circle"></i> When will I receive my order?
-                    </h3>
-                    <p class="faq-answer">
-                        Delivery is arranged once your order or layby is fully paid. Our team will contact you to confirm your delivery details and schedule based on your location.
-                    </p>
-                </div>
-                <div class="faq-item">
-                    <h3 class="faq-question">
-                        <i class="fas fa-question-circle"></i> Do you deliver nationwide?
-                    </h3>
-                    <p class="faq-answer">
-                        Yes, we deliver across Zambia. Delivery fees and timelines vary by location and will be confirmed at the time of dispatch.
-                    </p>
-                </div>
-                <div class="faq-item">
-                    <h3 class="faq-question">
-                        <i class="fas fa-question-circle"></i> Are there any hidden charges?
-                    </h3>
-                    <p class="faq-answer">
-                        No. All prices and terms are clearly shown before you confirm your order. There are no hidden fees — what you see is what you pay.
-                    </p>
-                </div>
-                <div class="faq-item">
-                    <h3 class="faq-question">
-                        <i class="fas fa-question-circle"></i> What if there is a problem with my product?
-                    </h3>
-                    <p class="faq-answer">
-                        We assist with returns or replacements for valid issues under warranty. Contact us via WhatsApp or email as soon as possible and we will work to resolve the matter promptly.
-                    </p>
-                </div>
+                <% }) %>
             </div>
+            <p class="faq-view-all"><a href="/faq" class="tc-link">View all FAQs</a></p>
         </section>
+        <% } %>
     </div>
 
 <%- include('partials/footer') %>

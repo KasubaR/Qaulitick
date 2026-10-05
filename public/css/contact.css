@@ -575,3 +575,18 @@ body.contact-page {
     }
 }
 
+
+.faq-view-all {
+    text-align: center;
+    margin-top: 28px;
+}
+
+.faq-view-all a {
+    color: var(--gold);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.faq-view-all a:hover {
+    text-decoration: underline;
+}

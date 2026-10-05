@@ -12,6 +12,7 @@ const logger = require('../utils/logger');
 
 const productController = require('../controllers/product.controller');
 const marketingController = require('../controllers/marketing.controller');
+const faqController = require('../controllers/faq.controller');
 const contactController = require('../controllers/contact.controller');
 const newsletterController = require('../controllers/newsletter.controller');
 const paymentController = require('../controllers/payment.controller');
@@ -234,9 +235,7 @@ router.get('/about', (req, res) => {
     res.render('about', { title: 'About Us | Qualitick Collections', page: 'about' });
 });
 
-router.get('/contact', (req, res) => {
-    res.render('contact', { title: 'Contact Us | Qualitick Collections', page: 'contact' });
-});
+router.get('/contact', faqController.renderContactPage);
 
 router.get('/terms', (req, res) => {
     res.render('terms', { title: 'Terms & Conditions | Qualitick Collections', page: 'terms' });

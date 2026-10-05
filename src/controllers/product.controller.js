@@ -662,7 +662,7 @@ exports.renderShop = async (req, res) => {
         // and let the frontend handle messaging. This avoids showing a
         // misleading \"No products available\" error when data is still loading.
         const canonicalUrl = `${SITE_URL}/shop`;
-        const description = 'Shop premium triple-A luxury watches. Browse Rolex, Omega, Tag Heuer, Cartier and more. Free worldwide shipping.';
+        const description = 'Shop premium triple-A luxury watches. Browse Rolex, Omega, Tag Heuer, Cartier and more. Delivery across Zambia.';
         const keywords = 'luxury watches, AAA replica watches, premium watches, Rolex, Omega, Tag Heuer, Cartier, men watches, women watches, shop watches';
 
         if (!products || products.length === 0) {
