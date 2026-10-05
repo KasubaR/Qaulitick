@@ -1073,12 +1073,43 @@ function showCheckoutErrorModal(retryAfterSeconds) {
     modal.style.display = 'flex';
 }
 
+// The order created by the last checkout attempt, kept so "Retry Payment" can pay the SAME order.
+// Creating a second order would be rejected for the last unit in stock, because the first
+// attempt's order is still holding that unit until it expires.
+let reusableCheckoutOrder = null;
+
+// Fingerprint of everything that defines the order. If any of it changes, a new order is needed.
+function checkoutOrderSignature(orderData) {
+    return JSON.stringify({
+        items: (orderData.items || []).map(i => [
+            String(i.productId || i.id),
+            Number(i.quantity) || 1,
+            (i.variant && i.variant.color) || i.color || null
+        ]),
+        customer: orderData.customer || null,
+        shipping: orderData.shipping || null,
+        checkoutMode: orderData.checkoutMode || 'standard',
+        laybyDepositPercent: orderData.laybyDepositPercent || null,
+        total: orderData.totals ? orderData.totals.total : null
+    });
+}
+
 // Process order with Lenco payment
-async function processOrder(orderData, formData) {
+// allowRebuild: if the server says the remembered order can no longer be paid, create a fresh one once.
+async function processOrder(orderData, formData, allowRebuild = true) {
     try {
         const csrfToken = getCheckoutCsrfToken();
         if (!csrfToken) throw new Error(CHECKOUT_CSRF_MISSING_MSG);
 
+        const signature = checkoutOrderSignature(orderData);
+        let orderNumber;
+        let laybyPaymentId = null;
+
+        if (reusableCheckoutOrder && reusableCheckoutOrder.signature === signature) {
+            // Retry of an unpaid attempt with nothing changed: pay the existing order.
+            orderNumber = reusableCheckoutOrder.orderNumber;
+            laybyPaymentId = reusableCheckoutOrder.laybyPaymentId;
+        } else {
         // Step 1: Create order
         const orderResponse = await fetch('/api/orders/create', {
             method: 'POST',
@@ -1108,7 +1139,10 @@ async function processOrder(orderData, formData) {
             throw err;
         }
 
-        const orderNumber = orderResult.orderNumber;
+        orderNumber = orderResult.orderNumber;
+        laybyPaymentId = orderResult.laybyPaymentId || null;
+        reusableCheckoutOrder = { signature, orderNumber, laybyPaymentId };
+        }
 
         // Step 2: Prepare payment data based on payment method
         // NOTE: amount is intentionally omitted — the server always fetches the
@@ -1123,8 +1157,8 @@ async function processOrder(orderData, formData) {
             orderData: orderData // Include full order data for Lenco
         };
 
-        if (orderResult.laybyPaymentId) {
-            paymentData.laybyPaymentId = orderResult.laybyPaymentId;
+        if (laybyPaymentId) {
+            paymentData.laybyPaymentId = laybyPaymentId;
         }
 
         // Add payment method specific data
@@ -1154,6 +1188,12 @@ async function processOrder(orderData, formData) {
 
         const paymentResult = await paymentResponse.json();
 
+        if (!paymentResult.success && paymentResult.code === 'ORDER_NOT_PAYABLE' && allowRebuild) {
+            // The remembered order was cancelled/expired/failed meanwhile — start over with a fresh order.
+            reusableCheckoutOrder = null;
+            return processOrder(orderData, formData, false);
+        }
+
         if (!paymentResult.success) {
             // Payment failed - order is created but payment failed
             return {
@@ -1165,7 +1205,8 @@ async function processOrder(orderData, formData) {
             };
         }
 
-        // Payment initiated successfully
+        // Payment initiated successfully — this order is now in the customer's hands; never reuse it.
+        reusableCheckoutOrder = null;
         return {
             success: true,
             orderNumber: orderNumber,

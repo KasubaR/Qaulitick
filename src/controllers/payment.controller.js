@@ -101,6 +101,17 @@ exports.processPayment = async (req, res) => {
             });
         }
 
+        // Checkout payments are only valid for an order still awaiting payment. A failed/cancelled/
+        // expired order has had its stock released, so taking payment now could oversell.
+        // (Layby installments are validated against their plan below instead.)
+        if (!laybyIdValid && !['pending', 'payment_pending'].includes(order.status)) {
+            return res.status(409).json({
+                success: false,
+                code: 'ORDER_NOT_PAYABLE',
+                message: 'This order is no longer awaiting payment. Please place the order again.'
+            });
+        }
+
         // Authoritative amount — never derived from req.body (except layby installment from DB row).
         let authoritativeAmount = Number(order.totals.total);
         let orderDataForLenco = order.toJSON();
