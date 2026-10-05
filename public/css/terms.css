@@ -406,3 +406,8 @@ body {
     .tc-section-header h2 { font-size: 1.1rem; }
     .tc-section-icon { width: 42px; height: 42px; font-size: 17px; }
 }
+
+/* Keep anchored sections (e.g. /terms#returns) clear of the fixed header */
+.tc-section[id] {
+    scroll-margin-top: 100px;
+}
