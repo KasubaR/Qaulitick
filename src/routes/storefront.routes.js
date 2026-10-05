@@ -277,15 +277,12 @@ router.get('/cart', async (req, res) => {
 
 router.get('/checkout', (req, res) => {
     const u = res.locals.currentUser;
-    const enableBankTransfer =
-        process.env.ENABLE_BANK_TRANSFER === 'true' || process.env.ENABLE_BANK_TRANSFER === '1';
     res.render('checkout', {
         title: 'Checkout | Qualitick Collections',
         page: 'checkout',
         loggedIn: !!u,
         laybyEligible: !!(u && u.emailVerifiedAt),
         laybyPlanDays: laybyConfig.PLAN_PERIOD_DAYS,
-        enableBankTransfer,
         prefill: u ? {
             name: u.name || '',
             email: u.email || '',
@@ -298,12 +295,10 @@ router.get('/checkout', (req, res) => {
 });
 
 router.get('/order-success/:orderNumber', (req, res) => {
-    const dpo = req.query.dpo || null;
     res.render('order-success', {
         title: 'Order Success | Qualitick Collections',
         page: 'order-success',
-        orderNumber: req.params.orderNumber,
-        dpo
+        orderNumber: req.params.orderNumber
     });
 });
 

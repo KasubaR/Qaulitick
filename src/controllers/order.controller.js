@@ -10,11 +10,6 @@ const User = require('../models/User.model');
 const LaybyPlan = require('../models/LaybyPlan.model');
 const LaybyPayment = require('../models/LaybyPayment.model');
 const orderService = require('../services/order.service');
-const dpoService = require('../services/dpo.service');
-const {
-    compactDpoVerifyRaw,
-    applyDpoVerificationOutcome
-} = require('../services/dpoPaymentOutcome.service');
 const logger = require('../utils/logger').child({ module: 'OrderController' });
 const { getSellableUnitsForLine } = require('../utils/stock.utils');
 /** Admin order list filters — must match `Order` model ENUMs */
@@ -829,34 +824,12 @@ exports.verifyOrderPayment = async (req, res) => {
             });
         }
 
-        // Gateway verification (Lenco mobile money or DPO bank_transfer)
+        // Gateway verification (Lenco mobile money)
         let verified = false;
         let verificationError = null;
 
-        const payMeta = payment.metadata || {};
 
-        if (payMeta.gateway === 'dpo' && payment.paymentMethod === 'bank_transfer') {
-            try {
-                const dpoResult = await dpoService.verifyToken(payment.transactionId);
-                const { outcome, raw } = dpoResult;
-
-                if (outcome.paid) {
-                    await applyDpoVerificationOutcome(payment, outcome, raw, 'order verify-payment');
-                } else if (!outcome.terminal) {
-                    await payment.update({ gatewayResponse: compactDpoVerifyRaw(raw) });
-                } else {
-                    await applyDpoVerificationOutcome(payment, outcome, raw, 'order verify-payment');
-                }
-
-                payment = await Payment.findByPk(payment.id);
-                verified = true;
-
-                logger.info({ orderNumber, paymentStatus: payment.status }, 'DPO payment verified');
-            } catch (error) {
-                logger.error({ err: error }, 'Error verifying payment with DPO');
-                verificationError = error.message;
-            }
-        } else if (payment.lencoTransactionId || payment.lencoReference) {
+        if (payment.lencoTransactionId || payment.lencoReference) {
             try {
                 const lencoService = require('../services/lenco.service');
 

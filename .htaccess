@@ -15,7 +15,7 @@ Options -Indexes
     RewriteEngine On
 
     # Block direct access to source and config directories
-    RewriteRule ^(src|node_modules|scripts|example-dpo|views|controllers|docs|materials)(/|$) - [F,L]
+    RewriteRule ^(src|node_modules|scripts|views|controllers|docs|materials)(/|$) - [F,L]
 </IfModule>
 
 # Show maintenance page when Node.js/Passenger is down or on server errors

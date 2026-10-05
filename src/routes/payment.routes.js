@@ -14,10 +14,6 @@ const { authenticateAdmin, optionalAdminAuth } = require('../middlewares/auth.mi
  * Regular Payment Routes:
  */
 
-// DPO return URLs (GET — no CSRF)
-router.get('/dpo/success', paymentController.handleDpoSuccess);
-router.get('/dpo/cancel', paymentController.handleDpoCancel);
-
 // Process payment
 router.post('/process', paymentController.processPayment);
 

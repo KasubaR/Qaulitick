@@ -36,7 +36,7 @@ const sampleProducts = [
         caseDiameter: '40mm',
         glassType: 'Sapphire',
         gender: 'Men',
-        warranty: '2 Years International',
+        warranty: '2 Months',
         status: 'active'
     },
     {
@@ -66,7 +66,7 @@ const sampleProducts = [
         caseDiameter: '42mm',
         glassType: 'Sapphire',
         gender: 'Men',
-        warranty: '2 Years International',
+        warranty: '2 Months',
         status: 'active'
     },
     {
@@ -94,7 +94,7 @@ const sampleProducts = [
         caseDiameter: '41mm',
         glassType: 'Sapphire',
         gender: 'Unisex',
-        warranty: '2 Years International',
+        warranty: '2 Months',
         status: 'active'
     },
     {
@@ -124,7 +124,7 @@ const sampleProducts = [
         caseDiameter: '39.8mm',
         glassType: 'Sapphire',
         gender: 'Women',
-        warranty: '2 Years International',
+        warranty: '2 Months',
         status: 'active'
     },
     {
@@ -152,7 +152,7 @@ const sampleProducts = [
         caseDiameter: '41mm',
         glassType: 'Sapphire',
         gender: 'Men',
-        warranty: '2 Years International',
+        warranty: '2 Months',
         status: 'active'
     },
     {
@@ -182,7 +182,7 @@ const sampleProducts = [
         caseDiameter: '40mm',
         glassType: 'Sapphire',
         gender: 'Men',
-        warranty: '2 Years International',
+        warranty: '2 Months',
         status: 'active'
     },
     {
@@ -213,7 +213,7 @@ const sampleProducts = [
         caseDiameter: '36mm',
         glassType: 'Sapphire',
         gender: 'Unisex',
-        warranty: '2 Years International',
+        warranty: '2 Months',
         status: 'active'
     },
     {
@@ -241,7 +241,7 @@ const sampleProducts = [
         caseDiameter: '42mm',
         glassType: 'Sapphire',
         gender: 'Men',
-        warranty: '2 Years International',
+        warranty: '2 Months',
         status: 'active'
     }
 ];

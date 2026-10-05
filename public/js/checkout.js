@@ -162,16 +162,12 @@ function updatePaymentMethodUI(method) {
     // Remove existing payment method options
     const existingProviderSection = document.getElementById('mobileProviderSection');
     const existingPaymentPhoneSection = document.getElementById('paymentPhoneSection');
-    const existingBankSection = document.getElementById('bankTransferSection');
 
     if (existingProviderSection) {
         existingProviderSection.remove();
     }
     if (existingPaymentPhoneSection) {
         existingPaymentPhoneSection.remove();
-    }
-    if (existingBankSection) {
-        existingBankSection.remove();
     }
 
     // Get payment method section
@@ -219,18 +215,6 @@ function updatePaymentMethodUI(method) {
         const paymentPhone = document.getElementById('paymentPhone');
         if (mobileProvider) mobileProvider.addEventListener('change', validatePaymentPhone);
         if (paymentPhone) paymentPhone.addEventListener('blur', validatePaymentPhone);
-    }
-
-    if (method === 'bank' || method === 'bank_transfer') {
-        const bankSection = document.createElement('div');
-        bankSection.id = 'bankTransferSection';
-        bankSection.className = 'form-group checkout-hosted-pay-info';
-        bankSection.innerHTML = `
-            <p class="checkout-hosted-pay-note">
-                You will be redirected to our secure payment partner to complete your payment (bank transfer, card, or mobile money).
-            </p>
-        `;
-        paymentSection.appendChild(bankSection);
     }
 }
 
@@ -967,7 +951,7 @@ async function handleFormSubmit(e) {
                 instructions: formData.get('deliveryInstructions') || '',
                 pickup: document.getElementById('pickupOption').checked
             },
-            paymentMethod: ({ mobile: 'mobile_money', bank: 'bank_transfer' })[paymentMethod] || paymentMethod,
+            paymentMethod: ({ mobile: 'mobile_money' })[paymentMethod] || paymentMethod,
             items: validatedItems, // Use server-validated items
             totals: validatedTotals, // Use server-validated totals
             checkoutMode
@@ -989,11 +973,6 @@ async function handleFormSubmit(e) {
 
         // Process order and initiate payment
         const response = await processOrder(orderData, formData);
-
-        if (response.success && response.redirectToPaymentUrl && response.paymentUrl) {
-            window.location.assign(response.paymentUrl);
-            return;
-        }
 
         // Hide processing modal
         document.getElementById('paymentModal').style.display = 'none';
@@ -1198,7 +1177,6 @@ async function processOrder(orderData, formData) {
             paymentUrl: paymentResult.paymentUrl,
             bankAccount: paymentResult.bankAccount,
             expiresAt: paymentResult.expiresAt,
-            redirectToPaymentUrl: !!paymentResult.redirectToPaymentUrl,
             message: paymentResult.message || 'Payment initiated successfully'
         };
     } catch (error) {

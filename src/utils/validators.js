@@ -367,11 +367,7 @@ function validateOrder(orderData) {
         });
     }
     
-    const enableBank =
-        process.env.ENABLE_BANK_TRANSFER === 'true' || process.env.ENABLE_BANK_TRANSFER === '1';
-    const validPaymentMethods = enableBank
-        ? ['mobile_money', 'bank_transfer']
-        : ['mobile_money'];
+    const validPaymentMethods = ['mobile_money'];
     if (!orderData.paymentMethod || !validPaymentMethods.includes(orderData.paymentMethod)) {
         errors.push('Valid payment method is required');
     }
