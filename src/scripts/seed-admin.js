@@ -117,7 +117,7 @@ async function seedAdmin() {
         console.log('   - Never share your admin credentials');
         console.log('   - Change the default password if you used one');
         console.log('\n🔗 Login Instructions:');
-        console.log(`   1. Access: /admin/login?secret=${process.env.ADMIN_SECRET_TOKEN || 'YOUR_SECRET_TOKEN'}`);
+        console.log('   1. Access: /admin/login?secret=<ADMIN_SECRET_TOKEN from your .env>');
         console.log(`   2. Email: ${adminEmail}`);
         console.log(`   3. Password: [The password you set in ADMIN_PASSWORD]`);
         console.log('\n');
