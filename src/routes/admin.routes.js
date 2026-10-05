@@ -115,6 +115,10 @@ router.get('/admin/marketing/featured-products', requireAdminAuth, (req, res) =>
 
 router.get('/admin/contact-submissions', requireAdminAuth, contactController.renderContactSubmissionsPage);
 
+router.get('/admin/faq', requireAdminAuth, (req, res) => {
+    res.render('admin/faq', { title: 'FAQ Management | Admin Panel', page: 'admin', activePage: 'faq' });
+});
+
 router.get('/admin/reviews', requireAdminAuth, (req, res) => {
     res.render('admin/reviews', { title: 'Reviews | Admin Panel', page: 'admin', activePage: 'reviews' });
 });

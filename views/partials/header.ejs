@@ -163,6 +163,12 @@
         <link rel="stylesheet" href="/css/terms.css">
     <% } %>
     
+    <% if (typeof page !=='undefined' && page==='faq' ) { %>
+        <!-- FAQ — Terms layout + accordion styles -->
+        <link rel="stylesheet" href="/css/terms.css">
+        <link rel="stylesheet" href="/css/faq.css">
+    <% } %>
+
     <% if (typeof page !=='undefined' && page==='privacy' ) { %>
         <!-- Privacy Policy: shared layout styles (about CTA, cards) + contact hero/container -->
         <link rel="stylesheet" href="/css/about.css">

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQ Management | Admin Panel</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="icon" type="image/svg+xml" href="/images/icons/Qualitick-01.svg">
+    <link rel="apple-touch-icon" href="/images/icons/Qualitick-01.svg">
+
+    <% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
+        <meta name="csrf-token" content="<%= csrfToken %>">
+    <% } %>
+    <link rel="stylesheet" href="/css/admin/admin.css">
+    <link rel="stylesheet" href="/css/admin/faq.css">
+</head>
+<body class="admin-page">
+
+<div class="admin-container">
+    <%- include('../partials/admin-sidebar', { activePage: 'faq' }) %>
+
+    <main class="admin-main">
+        <div class="faq-admin">
+
+            <div class="faq-admin-header">
+                <div>
+                    <h1>FAQ</h1>
+                    <p>Manage the questions shown on the public <a href="/faq" target="_blank" rel="noopener noreferrer">FAQ page</a></p>
+                </div>
+                <button type="button" class="btn-primary" id="newFaqBtn">
+                    <i class="fas fa-plus"></i> New FAQ
+                </button>
+            </div>
+
+            <div class="admin-card">
+                <div class="table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Order</th>
+                                <th>Question</th>
+                                <th>Category</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="faqTableBody">
+                            <tr><td colspan="5" class="faq-state-cell">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<div id="faqModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="faqModalTitle">New FAQ</h2>
+            <button type="button" class="modal-close" id="faqModalClose">&times;</button>
+        </div>
+        <form id="faqForm">
+            <div class="modal-body">
+                <input type="hidden" id="faqId">
+                <div class="form-group">
+                    <label for="faqQuestion">Question *</label>
+                    <input type="text" id="faqQuestion" class="form-input" maxlength="500" required placeholder="e.g., How does layby work?">
+                </div>
+                <div class="form-group">
+                    <label for="faqAnswer">Answer *</label>
+                    <textarea id="faqAnswer" class="form-input" rows="6" required placeholder="Plain text. Line breaks are preserved."></textarea>
+                </div>
+                <div class="faq-form-row">
+                    <div class="form-group">
+                        <label for="faqCategory">Category <span class="faq-optional">(optional)</span></label>
+                        <input type="text" id="faqCategory" class="form-input" maxlength="100" list="faqCategoryList" placeholder="General">
+                        <datalist id="faqCategoryList"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label for="faqSortOrder">Sort order</label>
+                        <input type="number" id="faqSortOrder" class="form-input" value="0">
+                    </div>
+                </div>
+                <label class="faq-checkbox">
+                    <input type="checkbox" id="faqPublished" checked> Published (visible on the FAQ page)
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-outline" id="faqCancelBtn">Cancel</button>
+                <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Save FAQ</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="/js/admin/auth-utils.js"></script>
+<script src="/js/admin/sidebar.js"></script>
+<script src="/js/admin/orders-badge.js"></script>
+<script src="/js/admin/faq.js"></script>
+
+</body>
+</html>

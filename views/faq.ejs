@@ -1,0 +1,74 @@
+<%- include('partials/header', {
+    title: typeof title !== 'undefined' ? title : 'FAQ | Qualitick Collections',
+    page: 'faq',
+    description: 'Frequently asked questions about Qualitick Collections — orders, delivery, layby, returns and warranty.',
+    keywords: 'faq, frequently asked questions, qualitick collections, watches, layby, returns, warranty',
+    canonicalUrl: typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com/faq',
+    url: typeof url !== 'undefined' ? url : '/faq',
+    ogType: 'website'
+}) %>
+
+<!-- FAQ PAGE -->
+
+<section class="tc-hero">
+    <div class="tc-hero-inner">
+        <span class="tc-eyebrow">Customer care</span>
+        <h1 class="tc-hero-title">Frequently Asked Questions</h1>
+        <p class="tc-hero-desc">Quick answers about orders, delivery, layby, returns and warranty.</p>
+    </div>
+    <img src="/images/icons/watermark.svg" alt="" class="tc-hero-watermark" aria-hidden="true">
+</section>
+
+<div class="tc-breadcrumb">
+    <div class="tc-breadcrumb-inner">
+        <a href="/">Home</a>
+        <i class="fas fa-chevron-right"></i>
+        <span>FAQ</span>
+    </div>
+</div>
+
+<div class="tc-body">
+    <div class="tc-body-inner">
+
+        <% if (!faqGroups || faqGroups.length === 0) { %>
+            <div class="tc-section">
+                <div class="tc-section-body">
+                    <p>No questions have been published yet. If you need help, please <a href="/contact" class="tc-link">contact us</a>.</p>
+                </div>
+            </div>
+        <% } else { %>
+            <% faqGroups.forEach(function (group) { %>
+                <div class="tc-section">
+                    <div class="tc-section-header">
+                        <div class="tc-section-icon"><i class="fas fa-circle-question"></i></div>
+                        <h2><%= group.category %></h2>
+                    </div>
+                    <div class="tc-section-body">
+                        <% group.items.forEach(function (faq) { %>
+                            <details class="faq-item">
+                                <summary class="faq-question"><%= faq.question %></summary>
+                                <div class="faq-answer"><%= faq.answer %></div>
+                            </details>
+                        <% }) %>
+                    </div>
+                </div>
+            <% }) %>
+        <% } %>
+
+        <div class="tc-section tc-section-contact">
+            <div class="tc-section-header">
+                <div class="tc-section-icon"><i class="fas fa-envelope"></i></div>
+                <h2>Still need help?</h2>
+            </div>
+            <div class="tc-section-body">
+                <p>Can't find what you're looking for? Reach us through our <a href="/contact" class="tc-link">contact page</a>.</p>
+                <div class="tc-contact-btns">
+                    <a href="/contact" class="btn-hero-primary">Contact Us <img src="/images/icons/Arrow-Icon.svg" alt=""></a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<%- include('partials/footer') %>

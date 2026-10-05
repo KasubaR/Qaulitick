@@ -1,0 +1,40 @@
+/* FAQ page — accordion items (layout comes from terms.css) */
+.faq-item {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.faq-item:last-child {
+    border-bottom: none;
+}
+
+.faq-question {
+    cursor: pointer;
+    padding: 16px 28px 16px 0;
+    font-weight: 600;
+    list-style: none;
+    position: relative;
+}
+
+.faq-question::-webkit-details-marker {
+    display: none;
+}
+
+.faq-question::after {
+    content: '+';
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.3rem;
+    color: var(--gold);
+}
+
+.faq-item[open] > .faq-question::after {
+    content: '\2212';
+}
+
+.faq-answer {
+    padding: 0 0 18px;
+    line-height: 1.7;
+    white-space: pre-line;
+}

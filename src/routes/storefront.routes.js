@@ -26,6 +26,7 @@ const cartRoutes = require('./cart.routes');
 const orderRoutes = require('./order.routes');
 const paymentRoutes = require('./payment.routes');
 const marketingRoutes = require('./marketing.routes');
+const faqRoutes = require('./faq.routes');
 
 // ============================================
 // Favicon
@@ -380,5 +381,6 @@ router.post('/account/logout-all-devices', requireCustomerAuth, csrfTokenValidat
 // ============================================
 router.use('/product', productRoutes);
 router.use('/', marketingRoutes);
+router.use('/', faqRoutes);
 
 module.exports = router;

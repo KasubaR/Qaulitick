@@ -98,6 +98,7 @@ const LaybyPayment = require('./LaybyPayment.model');
 const NewsletterSubscriber = require('./NewsletterSubscriber.model');
 const NewsletterSubscribeAttempt = require('./NewsletterSubscribeAttempt.model');
 const OfflineSale = require('./OfflineSale.model');
+const Faq = require('./Faq.model');
 
 User.hasMany(Order, { foreignKey: 'userId', as: 'orders' });
 Order.belongsTo(User, { foreignKey: 'userId', as: 'user' });
@@ -123,7 +124,7 @@ OfflineSale.belongsTo(Admin, { foreignKey: 'createdByAdminId', as: 'createdByAdm
 OfflineSale.hasOne(LaybyPlan, { foreignKey: 'offlineSaleId', as: 'laybyPlan' });
 LaybyPlan.belongsTo(OfflineSale, { foreignKey: 'offlineSaleId', as: 'offlineSale' });
 
-[Product, Order, Payment, FlashSale, FeaturedProduct, ContactSubmission, Settings, Admin, User, PasswordResetToken, LaybyPlan, LaybyPayment, NewsletterSubscriber, NewsletterSubscribeAttempt, OfflineSale].forEach(addMongooseCompat);
+[Product, Order, Payment, FlashSale, FeaturedProduct, ContactSubmission, Settings, Admin, User, PasswordResetToken, LaybyPlan, LaybyPayment, NewsletterSubscriber, NewsletterSubscribeAttempt, OfflineSale, Faq].forEach(addMongooseCompat);
 
 module.exports = {
     Product,
@@ -140,5 +141,6 @@ module.exports = {
     LaybyPayment,
     NewsletterSubscriber,
     NewsletterSubscribeAttempt,
-    OfflineSale
+    OfflineSale,
+    Faq
 };
