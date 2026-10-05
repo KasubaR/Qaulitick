@@ -2,6 +2,7 @@ const newsletterService = require('../services/newsletter.service');
 const emailService = require('../services/email.service');
 const { validateNewsletterSubscribe, sanitizeObject } = require('../utils/validators');
 const logger = require('../utils/logger').child({ module: 'NewsletterController' });
+const { SITE_URL } = require('../config/site');
 
 /** Same user-facing copy for new, existing, and per-email-throttled signups (privacy-preserving). */
 const NEWSLETTER_SUCCESS_MESSAGE =
@@ -63,7 +64,7 @@ exports.unsubscribePage = async (req, res) => {
         title: 'Unsubscribed | Qualitick Collections',
         page: 'privacy',
         description: 'You have been unsubscribed from Qualitick Collections marketing emails.',
-        canonicalUrl: 'https://qualitick-collections.com/newsletter/unsubscribe',
+        canonicalUrl: `${SITE_URL}/newsletter/unsubscribe`,
         url: '/newsletter/unsubscribe'
     });
 };

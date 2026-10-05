@@ -515,7 +515,7 @@ async function sendInvoiceEmail(order, pdfBuffer, options = {}) {
                         <div class="footer">
                             <p><strong>Qualitick Collections</strong></p>
                             <p>Premium Luxury Watches</p>
-                            <p>Email: info@qualitickcollections.com</p>
+                            <p>Email: support@qualitickzm.com</p>
                             <p>This is an automated email. Please do not reply to this email.</p>
                         </div>
                     </div>

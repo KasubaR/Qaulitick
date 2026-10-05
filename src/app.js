@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
+const siteConfig = require('./config/site');
 
 // Database connection
 const { connectDatabase } = require('./config/database');
@@ -31,6 +32,8 @@ app.set('trust proxy', 1);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '..', 'views'));
 app.locals.GA4_MEASUREMENT_ID = process.env.GA4_MEASUREMENT_ID || null;
+app.locals.siteUrl = siteConfig.SITE_URL;
+app.locals.defaultOgImage = siteConfig.DEFAULT_OG_IMAGE;
 
 // ============================================
 // Core middleware

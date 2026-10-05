@@ -17,19 +17,19 @@
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="<%= typeof ogType !== 'undefined' ? ogType : 'website' %>">
-    <meta property="og:url" content="<%= typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com' + (typeof url !== 'undefined' ? url : '') %>">
+    <meta property="og:url" content="<%= typeof canonicalUrl !== 'undefined' ? canonicalUrl : siteUrl + (typeof url !== 'undefined' ? url : '') %>">
     <meta property="og:title" content="<%= typeof title !== 'undefined' ? title : 'Qualitick Collections | Luxury Watches' %>">
     <meta property="og:description" content="<%= typeof description !== 'undefined' ? description : 'Premium triple-A luxury watches with worldwide shipping and guaranteed satisfaction.' %>">
-    <meta property="og:image" content="<%= typeof ogImage !== 'undefined' ? ogImage : 'https://qualitick-collections.com/images/og-image.jpg' %>">
+    <meta property="og:image" content="<%= typeof ogImage !== 'undefined' ? ogImage : defaultOgImage %>">
     <meta property="og:site_name" content="Qualitick Collections">
     <meta property="og:locale" content="en_US">
     
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="<%= typeof canonicalUrl !== 'undefined' ? canonicalUrl : 'https://qualitick-collections.com' + (typeof url !== 'undefined' ? url : '') %>">
+    <meta property="twitter:url" content="<%= typeof canonicalUrl !== 'undefined' ? canonicalUrl : siteUrl + (typeof url !== 'undefined' ? url : '') %>">
     <meta property="twitter:title" content="<%= typeof title !== 'undefined' ? title : 'Qualitick Collections | Luxury Watches' %>">
     <meta property="twitter:description" content="<%= typeof description !== 'undefined' ? description : 'Premium triple-A luxury watches with worldwide shipping and guaranteed satisfaction.' %>">
-    <meta property="twitter:image" content="<%= typeof ogImage !== 'undefined' ? ogImage : 'https://qualitick-collections.com/images/og-image.jpg' %>">
+    <meta property="twitter:image" content="<%= typeof ogImage !== 'undefined' ? ogImage : defaultOgImage %>">
     
     <!-- Canonical URL -->
     <% if (typeof canonicalUrl !== 'undefined') { %>

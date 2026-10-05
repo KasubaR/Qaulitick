@@ -4,6 +4,7 @@ const productService = require('../services/product.service');
 const { calculateSavings, getSellingUnitPrice } = require('../utils/price.utils');
 const { clearCache } = require('../middlewares/cache.middleware');
 const { getStockStatus } = require('../utils/stock.utils');
+const { SITE_URL, DEFAULT_OG_IMAGE } = require('../config/site');
 
 /**
  * Convert a Sequelize model instance to a plain object.
@@ -85,7 +86,7 @@ function buildShopLd(products, canonicalUrl) {
                 item: {
                     '@type': 'Product',
                     name: p.model,
-                    url: `https://qualitick-collections.com/product/${p._id}`,
+                    url: `${SITE_URL}/product/${p._id}`,
                     image: p.images[0] || '/images/placeholder.jpg',
                     brand: { '@type': 'Brand', name: p.brand },
                     offers: {
@@ -263,12 +264,12 @@ exports.renderProductDetails = async (req, res) => {
             : `${productObj.brand} ${productObj.model} - Premium AAA luxury watch with ${productObj.warranty} warranty.`;
         
         const keywords = `${productObj.brand}, ${productObj.model}, luxury watch, AAA replica, ${productObj.movement}, ${productObj.gender} watch, premium timepiece`;
-        const canonicalUrl = `https://qualitick-collections.com/product/${productSlug}`;
-        const baseUrl = process.env.APP_PUBLIC_URL || 'https://qualitickzm.com';
+        const canonicalUrl = `${SITE_URL}/product/${productSlug}`;
+        const baseUrl = SITE_URL;
         const rawOgImage = productObj.images && productObj.images[0] ? productObj.images[0] : '';
         const ogImage = rawOgImage
             ? (rawOgImage.startsWith('http') ? rawOgImage : `${baseUrl}${rawOgImage}`)
-            : `${baseUrl}/images/default-watch.jpg`;
+            : DEFAULT_OG_IMAGE;
         
         // Calculate prices
         // In the DB, productObj.price is the current selling price.
@@ -399,8 +400,8 @@ exports.renderProductDetails = async (req, res) => {
             '@context': 'https://schema.org',
             '@type': 'BreadcrumbList',
             itemListElement: [
-                { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://qualitick-collections.com/' },
-                { '@type': 'ListItem', position: 2, name: 'Shop', item: 'https://qualitick-collections.com/shop' },
+                { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_URL}/` },
+                { '@type': 'ListItem', position: 2, name: 'Shop', item: `${SITE_URL}/shop` },
                 { '@type': 'ListItem', position: 3, name: productWithPrices.model || 'Product', item: canonicalUrl }
             ]
         };
@@ -660,7 +661,7 @@ exports.renderShop = async (req, res) => {
         // If there are no products, render the shop page with an empty list
         // and let the frontend handle messaging. This avoids showing a
         // misleading \"No products available\" error when data is still loading.
-        const canonicalUrl = 'https://qualitick-collections.com/shop';
+        const canonicalUrl = `${SITE_URL}/shop`;
         const description = 'Shop premium triple-A luxury watches. Browse Rolex, Omega, Tag Heuer, Cartier and more. Free worldwide shipping.';
         const keywords = 'luxury watches, AAA replica watches, premium watches, Rolex, Omega, Tag Heuer, Cartier, men watches, women watches, shop watches';
 
