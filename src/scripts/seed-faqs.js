@@ -53,7 +53,7 @@ const FAQS = [
     },
     {
         question: 'How long is the warranty?',
-        answer: 'Our watches have a limited warranty against manufacturing defects, such as a faulty movement or defective internal components, valid for 3–6 months from the date of delivery. It applies to the original purchaser only and does not cover physical or water damage, battery depletion, normal wear and tear, strap wear, or misuse.',
+        answer: 'Our watches have a limited warranty against manufacturing defects, such as a faulty movement or defective internal components, valid for 2 months from the date of delivery. It applies to the original purchaser only and does not cover physical or water damage, battery depletion, normal wear and tear, strap wear, or misuse.',
         category: 'Returns & Warranty'
     },
     {
