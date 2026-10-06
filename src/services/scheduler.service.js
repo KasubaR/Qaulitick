@@ -64,47 +64,64 @@ async function expireStaleUnpaidOrders() {
     for (const order of expiredOrders) {
         try {
             const items = order.items || [];
-            const ttlLabel = order.paymentStatus === 'processing' ? '30 minutes' : '10 minutes';
+            const previousPaymentStatus = order.paymentStatus;
+            const ttlLabel = previousPaymentStatus === 'processing' ? '30 minutes' : '10 minutes';
 
-            for (const item of items) {
-                const qty = parseInt(item.quantity) || 1;
-                const productId = parseInt(item.productId, 10);
+            // Claim the order and restore its stock in ONE transaction. The claim is an atomic
+            // UPDATE guarded by "still unpaid", so a payment completing concurrently wins cleanly,
+            // and if anything below fails the whole thing rolls back — stock can never be restored
+            // twice for the same order (the old order of operations did exactly that on a failed save).
+            const expired = await sequelize.transaction(async (t) => {
+                const history = Array.isArray(order.history) ? [...order.history] : [];
+                history.push({
+                    status: 'cancelled',
+                    paymentStatus: 'expired',
+                    notes: `Order expired — payment not received within ${ttlLabel}`,
+                    updatedBy: 'system',
+                    updatedAt: new Date().toISOString(),
+                    source: 'expiry_cron'
+                });
 
-                // Restore top-level stock reserved at order creation.
-                await Product.update(
-                    { stock: sequelize.literal(`stock + ${qty}`) },
-                    { where: { id: productId } }
+                // 'expired' is not a value of orders.paymentStatus (ENUM) — store 'failed'; the
+                // order status ('cancelled') and the history note above record that it expired.
+                const [claimed] = await Order.update(
+                    { status: 'cancelled', paymentStatus: 'failed', history },
+                    {
+                        where: { id: order.id, paymentStatus: { [Op.in]: ['pending', 'processing'] } },
+                        transaction: t
+                    }
                 );
+                if (claimed === 0) return false; // already paid/failed/expired by someone else
 
-                // Also restore colors[].stock for color-variant items.
-                if (item.selectedColor) {
-                    const product = await Product.findByPk(productId);
-                    if (product) {
-                        const updatedColors = (product.colors || []).map(c =>
-                            c.name === item.selectedColor
-                                ? { ...c, stock: (c.stock || 0) + qty }
-                                : c
-                        );
-                        await product.update({ colors: updatedColors });
+                for (const item of items) {
+                    const qty = parseInt(item.quantity) || 1;
+                    const productId = parseInt(item.productId, 10);
+
+                    // Restore top-level stock reserved at order creation.
+                    await Product.update(
+                        { stock: sequelize.literal(`stock + ${qty}`) },
+                        { where: { id: productId }, transaction: t }
+                    );
+
+                    // Also restore colors[].stock for color-variant items.
+                    if (item.selectedColor) {
+                        const product = await Product.findByPk(productId, { transaction: t });
+                        if (product) {
+                            const updatedColors = (product.colors || []).map(c =>
+                                c.name === item.selectedColor
+                                    ? { ...c, stock: (c.stock || 0) + qty }
+                                    : c
+                            );
+                            await product.update({ colors: updatedColors }, { transaction: t });
+                        }
                     }
                 }
-            }
-
-            order.status = 'cancelled';
-            order.paymentStatus = 'expired';
-            const history = Array.isArray(order.history) ? [...order.history] : [];
-            history.push({
-                status: 'cancelled',
-                paymentStatus: 'expired',
-                notes: `Order expired — payment not received within ${ttlLabel}`,
-                updatedBy: 'system',
-                updatedAt: new Date().toISOString(),
-                source: 'expiry_cron'
+                return true;
             });
-            order.history = history;
-            await order.save();
 
-            console.log(`[Scheduler] Expired order ${order.orderNumber} (was ${order.paymentStatus})`);
+            if (expired) {
+                console.log(`[Scheduler] Expired order ${order.orderNumber} (was ${previousPaymentStatus})`);
+            }
         } catch (err) {
             console.error(`[Scheduler] Error expiring order ${order.orderNumber}:`, err);
         }
@@ -508,4 +525,5 @@ class SchedulerService {
 
 // Export singleton instance
 module.exports = new SchedulerService();
+module.exports.expireStaleUnpaidOrders = expireStaleUnpaidOrders; // exposed for tests
 

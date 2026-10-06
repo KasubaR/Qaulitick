@@ -167,9 +167,14 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
         const previousStatus = order.status;
         const previousPaymentStatus = order.paymentStatus;
 
+        // orders.paymentStatus is an ENUM without 'cancelled' — writing it makes MySQL reject the
+        // whole update (the order would stay pending and its stock would never be restored).
+        // Store 'failed'; the order status ('cancelled') and history note keep the real reason.
+        const storedPaymentStatus = newPaymentStatus === 'cancelled' ? 'failed' : newPaymentStatus;
+
         const updateFields = {
             status: newOrderStatus,
-            paymentStatus: newPaymentStatus,
+            paymentStatus: storedPaymentStatus,
             history: [...(order.history || []), {
                 status: newOrderStatus,
                 paymentStatus: newPaymentStatus,
@@ -189,7 +194,7 @@ async function updateOrderStatusFromPayment(orderNumber, paymentStatus, transact
         const isTerminal = terminalStates.includes(paymentStatus);
         const atomicWhere = { orderNumber };
         if (isTerminal) {
-            atomicWhere.paymentStatus = { [Op.ne]: paymentStatus };
+            atomicWhere.paymentStatus = { [Op.ne]: storedPaymentStatus };
         }
 
         const [updatedRows] = await Order.update(updateFields, { where: atomicWhere });
